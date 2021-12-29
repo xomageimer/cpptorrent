@@ -104,7 +104,7 @@ std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester:
             return {std::move(err), std::nullopt};
         }
     }
-    return {"failed to connect to url", std::nullopt};
+    return {"Nothing was returned from the tracker", std::nullopt};
 }
 
 tracker::Tracker::Tracker(std::string tracker_url_arg,

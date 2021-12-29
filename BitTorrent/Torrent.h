@@ -38,7 +38,7 @@ namespace bittorrent {
         [[nodiscard]] AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator> begin() const;
         [[nodiscard]] AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator> end() const;
     private:
-        Torrent & m_torrent;
+        Torrent & m_torrent; // TODO пусть io_service живет тут и до конца используется в отдельном потоке (а подключения все асинхронные, чтобы быстрее работало)
     };
 
     struct Torrent {
