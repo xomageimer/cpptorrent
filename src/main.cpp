@@ -14,10 +14,10 @@
 using namespace std;
 
 int main() {
-    bittorrent::Torrent torrent (std::filesystem::current_path()/"No Country for Old Men.torrent");
-    if (!torrent.TryConnect()) {
-        std::cerr << "Can't connect" << std::endl;
-        return EXIT_FAILURE;
+    bittorrent::Torrent torrent (std::filesystem::current_path()/"WarhammerRegicide.torrent");
+    for (auto tracker_it : bittorrent::AnnouncesRange(torrent)){
+        if (tracker_it.TryConnect(tracker::Event::Empty))
+            break;
     }
     return EXIT_SUCCESS;
 

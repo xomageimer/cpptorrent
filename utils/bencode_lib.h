@@ -20,11 +20,6 @@ namespace bencode {
             return *this;
         }
 
-        template <typename T>
-        std::optional<T> const & TryAs() const {
-            return (std::holds_alternative<T>(*this)) ? std::get<T>(*this) : std::nullopt;
-        }
-
         [[nodiscard]] long long AsNumber() const {
             return std::get<long long>(*this);
         }

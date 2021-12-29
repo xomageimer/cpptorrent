@@ -104,11 +104,12 @@ std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester:
             return {std::move(err), std::nullopt};
         }
     }
+    return {"failed to connect to url", std::nullopt};
 }
 
-tracker::Tracker::Tracker(std::string tracker_url_arg, size_t port_arg,
+tracker::Tracker::Tracker(std::string tracker_url_arg,
                           bittorrent::Torrent & torrent_arg)
-    : port(port_arg), torrent(torrent_arg)
+    : torrent(torrent_arg)
 {
     std::vector<std::string> urls_parts;
     boost::regex expression(
@@ -133,12 +134,12 @@ tracker::Tracker::Tracker(std::string tracker_url_arg, size_t port_arg,
     tracker_url.Port = urls_parts[2];
     if (urls_parts.size() > 3)
         tracker_url.Path = urls_parts[3];
-    // TODO }
 
     if (tracker_url.Protocol == "udp")
         request = std::make_shared<udpRequester>();
     else
         request = std::make_shared<httpRequester>();
+    // TODO }
 }
 
 std::string const &tracker::Tracker::GetInfoHash() const {
@@ -147,4 +148,8 @@ std::string const &tracker::Tracker::GetInfoHash() const {
 
 size_t tracker::Tracker::GetMasterPeerId() const {
     return torrent.GetMasterPeer()->GetKey();
+}
+
+size_t tracker::Tracker::GetPort() const {
+    return torrent.GetPort();
 }

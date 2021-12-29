@@ -86,13 +86,11 @@ namespace tracker {
     struct Tracker : std::enable_shared_from_this<Tracker> {
     private:
         Url tracker_url;
-        size_t port = 6881;
         bittorrent::Torrent & torrent;
 
         std::shared_ptr<Requester> request;
     public:
-        Tracker(std::string tracker_url_arg, size_t port_arg,
-                bittorrent::Torrent & torrent_arg);
+        Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
         Response Request(const tracker::Query &query){
             auto answer = (*request)(query, *this);
             if (!answer.second){
@@ -104,7 +102,7 @@ namespace tracker {
         std::shared_ptr<Tracker> Get() { return shared_from_this(); }
 
         Url const & GetUrl() const { return tracker_url; }
-        size_t GetPort() const { return port; }
+        size_t GetPort() const;
         std::string const & GetInfoHash() const;
         size_t GetMasterPeerId() const;
     };
@@ -116,7 +114,7 @@ namespace tracker {
 
     struct udpRequester : public Requester {
         std::pair<std::string, std::optional<Response>> operator()(const tracker::Query &query, const tracker::Tracker & tracker) override {
-            return {"ABOBA", std::nullopt}; // TODO Make udp request
+            return {"No impl for UDP", std::nullopt}; // TODO Make udp request
         };
     };
 }
