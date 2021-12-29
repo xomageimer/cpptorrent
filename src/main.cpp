@@ -15,6 +15,9 @@ using namespace std;
 
 int main() {
     bittorrent::Torrent torrent (std::filesystem::current_path()/"WarhammerRegicide.torrent");
+    if (!torrent.HasTrackers())
+        return EXIT_FAILURE;
+
     for (auto tracker_it : bittorrent::AnnouncesRange(torrent)){
         if (tracker_it.TryConnect(tracker::Event::Empty))
             break;

@@ -3,7 +3,6 @@
 #include <map>
 #include <utility>
 
-#include <boost/asio.hpp>
 #include <boost/regex.hpp>
 
 #include "auxiliary.h"
@@ -12,7 +11,7 @@
 namespace ba = boost::asio;
 
 // TODO потом перенести логику в приватные методы, а тут решать по протоколу какой (http или https) алгоритм обработки выбрать
-std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester::operator()(const tracker::Query &query, const tracker::Tracker & tracker) {
+std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester::operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) {
     auto & tracker_url = tracker.GetUrl();
     static std::map<tracker::Event, std::string> events_str {
             {tracker::Event::Completed, "completed"},
@@ -21,8 +20,6 @@ std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester:
     };
 
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-
-    boost::asio::io_service service;
 
     ba::ip::tcp::resolver resolver(service);
     auto resolver_query = ba::ip::tcp::resolver::query{tracker_url.Host, tracker_url.Port};

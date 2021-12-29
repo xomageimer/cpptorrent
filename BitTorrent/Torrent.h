@@ -7,9 +7,13 @@
 #include <filesystem>
 #include <queue>
 #include <utility>
+#include <thread>
+
+#include <boost/asio.hpp>
 
 #include "bencode_lib.h"
 #include "Tracker.h"
+#include "random_generator.h"
 
 // Объект с котором работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
 
@@ -23,28 +27,32 @@ namespace bittorrent {
     template <typename Iter>
     struct AnnounceIterator {
     public:
-        explicit AnnounceIterator(Iter iterator, tracker::Query query) : m_iterator(iterator), m_query(std::move(query)) {}
+        explicit AnnounceIterator(boost::asio::io_service & service, Iter iterator, tracker::Query query) : m_service(service), m_iterator(iterator), m_query(std::move(query)) {}
         bool TryConnect(tracker::Event event = tracker::Event::Empty);
         bool operator!=(AnnounceIterator<Iter> const& other) const { return m_iterator != other.m_iterator; }
         bool operator==(AnnounceIterator<Iter> const& other) const { return m_iterator == other.m_iterator; }
         AnnounceIterator<Iter> operator*() const { return *this;}
         AnnounceIterator<Iter>& operator++() { m_iterator++; return *this;}
     private:
+        boost::asio::io_service & m_service;
         Iter m_iterator;
         tracker::Query m_query;
     };
     struct AnnouncesRange {
-        explicit AnnouncesRange(Torrent & torrent) : m_torrent(torrent) {};
+        explicit AnnouncesRange(Torrent & torrent) : m_torrent(torrent) {
+//            std::thread([&] {service.run();} ).detach();
+        };
         [[nodiscard]] AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator> begin() const;
         [[nodiscard]] AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator> end() const;
     private:
         Torrent & m_torrent; // TODO пусть io_service живет тут и до конца используется в отдельном потоке (а подключения все асинхронные, чтобы быстрее работало)
+        mutable boost::asio::io_service service;
     };
 
     struct Torrent {
     public:
         explicit Torrent(std::filesystem::path const & torrent_file_path);
-//        bool ConnectTo(const std::shared_ptr<tracker::Tracker>& tracker, tracker::Event event = tracker::Event::Empty); // TODO начальный метод просто сделать коннект, потом переделать! Мб обходить все доступные трекеры и проверять где лучше респоунс
+        bool SyncConnect(tracker::Event event = tracker::Event::Empty);
 
         [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash;}
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
@@ -74,7 +82,7 @@ namespace bittorrent {
         auto & tracker = *m_iterator;
         std::cerr << tracker->GetUrl().Host << ": " << std::endl;
         try {
-            response = tracker->Request(m_query);
+            response = tracker->Request(m_service, m_query);
             if (response.warning_message)
                 std::cerr << response.warning_message.value() << std::endl;
         } catch (tracker::BadConnect & bc) {

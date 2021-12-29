@@ -9,6 +9,8 @@
 #include <utility>
 #include <memory>
 
+#include <boost/asio.hpp>
+
 #include "bencode_lib.h"
 
 #include "Peer.h"
@@ -70,7 +72,7 @@ namespace tracker {
     struct Tracker;
     struct Requester {
     public:
-        virtual std::pair<std::string, std::optional<Response>> operator()(const tracker::Query &query, const tracker::Tracker & tracker) = 0; // first = ошибка (failure reason) или second = response
+        virtual std::pair<std::string, std::optional<Response>> operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) = 0; // first = ошибка (failure reason) или second = response
     };
 
     struct Url {
@@ -91,8 +93,8 @@ namespace tracker {
         std::shared_ptr<Requester> request;
     public:
         Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
-        Response Request(const tracker::Query &query){
-            auto answer = (*request)(query, *this);
+        Response Request(boost::asio::io_service & service, const tracker::Query &query){
+            auto answer = (*request)(service, query, *this);
             if (!answer.second){
                 throw BadConnect(answer.first);
             }
@@ -109,11 +111,11 @@ namespace tracker {
 
     struct httpRequester : public Requester {
         // TODO сделать реквестер для https с помощью OpenSSL
-        std::pair<std::string, std::optional<Response>> operator()(const tracker::Query &query, const tracker::Tracker & tracker) override;
+        std::pair<std::string, std::optional<Response>> operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) override;
     };
 
     struct udpRequester : public Requester {
-        std::pair<std::string, std::optional<Response>> operator()(const tracker::Query &query, const tracker::Tracker & tracker) override {
+        std::pair<std::string, std::optional<Response>> operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) override {
             return {"No impl for UDP", std::nullopt}; // TODO Make udp request
         };
     };
