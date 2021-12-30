@@ -1,5 +1,6 @@
 #include "Torrent.h"
 
+#include <random>
 #include <sstream>
 
 #include "auxiliary.h"
@@ -23,25 +24,28 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
     FillTrackers();
 }
 
-bool bittorrent::Torrent::SyncConnect(tracker::Event event) {
+bool bittorrent::Torrent::TryConnect(tracker::Event event) {
     if (!HasTrackers())
         return false;
 
-    boost::asio::io_service service;
     tracker::Query query {event, t_uploaded, t_downloaded, t_left};
 
     tracker::Response response;
-    try {
-        response = active_trackers.at(random_generator::Random().GetNumberBetween<size_t>(0, active_trackers.size()))->Request(service, query);
-        if (response.warning_message)
-            std::cerr << response.warning_message.value() << std::endl;
-    } catch (tracker::BadConnect const & bc) {
-        std::cerr << bc.what() << std::endl;
-        return false;
-    }
+    for (auto & tracker : active_trackers) {
+        try {
+            std::cerr << tracker->GetUrl().Host << ": " << std::endl;
+            response = tracker->Request(GetService(), query);
+            if (response.warning_message)
+                std::cerr << response.warning_message.value() << std::endl;
 
-    std::cout << response.tracker_id << std::endl; // в случае успеха получаем ID
-    return true;
+            std::cout << response.tracker_id << std::endl; // в случае успеха получаем ID
+            return true;
+        } catch (tracker::BadConnect const &bc) {
+            std::cerr << bc.what() << std::endl;
+            continue;
+        }
+    }
+    return false;
 }
 
 bool bittorrent::Torrent::FillTrackers() {
@@ -67,6 +71,8 @@ bool bittorrent::Torrent::FillTrackers() {
     } else {
         return false;
     }
+
+//    std::shuffle(active_trackers.begin(), active_trackers.end(), random_generator::Random());
     return true;
 }
 
@@ -78,10 +84,6 @@ tracker::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
     return tracker::Query{.event = tracker::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left};
 }
 
-bittorrent::AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator> bittorrent::AnnouncesRange::begin() const {
-    return AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator>(service, m_torrent.active_trackers.begin(), m_torrent.GetDefaultTrackerQuery());
-}
-
-bittorrent::AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator> bittorrent::AnnouncesRange::end() const {
-    return AnnounceIterator<std::vector<std::shared_ptr<tracker::Tracker>>::const_iterator>(service, m_torrent.active_trackers.end(), m_torrent.GetDefaultTrackerQuery());
+boost::asio::io_service & bittorrent::Torrent::GetService() const {
+    return service;
 }

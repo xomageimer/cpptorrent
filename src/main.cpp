@@ -14,14 +14,9 @@
 using namespace std;
 
 int main() {
-    bittorrent::Torrent torrent (std::filesystem::current_path()/"WarhammerRegicide.torrent");
-    if (!torrent.HasTrackers())
+    bittorrent::Torrent torrent (std::filesystem::current_path()/"No Country for Old Men.torrent");
+    if (!torrent.TryConnect(tracker::Event::Empty))
         return EXIT_FAILURE;
-
-    for (auto tracker_it : bittorrent::AnnouncesRange(torrent)){
-        if (tracker_it.TryConnect(tracker::Event::Empty))
-            break;
-    }
     // TODO отсюда надо обрабатываться лучший трекер
     return EXIT_SUCCESS;
 }

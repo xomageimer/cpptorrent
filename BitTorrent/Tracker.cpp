@@ -53,7 +53,7 @@ std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester:
                            << "Host: " << tracker_url.Host << "\r\n"
                            << "Accept: */*\r\n"
                            << "Connection: close\r\n\r\n";
-//            std::cout << request_stream.rdbuf() << std::endl;
+
             ba::write(socket, request_query);
 
             ba::streambuf response;
@@ -94,14 +94,12 @@ std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester:
 
             return {"", Response{}};
         } catch (std::exception &e) {
-            if (endpoint_iterator == boost::asio::ip::tcp::resolver::iterator())
-                break;
-
-            std::string err = "Exception: " + std::string(e.what()) + "\n";
-            return {std::move(err), std::nullopt};
+            if (endpoint_iterator == boost::asio::ip::tcp::resolver::iterator()) {
+                std::string err = "Exception: " + std::string(e.what()) + "\n";
+                return {std::move(err), std::nullopt};
+            } else continue;
         }
     }
-    return {"Nothing was returned from the tracker", std::nullopt};
 }
 
 tracker::Tracker::Tracker(std::string tracker_url_arg,
