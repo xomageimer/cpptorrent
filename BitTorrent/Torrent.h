@@ -9,8 +9,6 @@
 #include <utility>
 #include <thread>
 
-#include <boost/asio.hpp>
-
 #include "bencode_lib.h"
 #include "Tracker.h"
 #include "random_generator.h"
@@ -23,10 +21,14 @@ namespace bittorrent {
         bencode::Node dict;
     };
 
+    enum class launch {
+        any,
+        best
+    };
     struct Torrent {
     public:
         explicit Torrent(std::filesystem::path const & torrent_file_path);
-        bool TryConnect(tracker::Event event = tracker::Event::Empty);
+        bool TryConnect(bittorrent::launch policy = bittorrent::launch::best, tracker::Event event = tracker::Event::Empty);
 
         [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash;}
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
@@ -40,7 +42,7 @@ namespace bittorrent {
         size_t t_downloaded {};
         size_t t_left {};
 
-        std::vector<std::shared_ptr<tracker::Tracker>> active_trackers;
+        std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
         size_t port = 6881;                    // TODO надо иначе хендлить и создавать порты
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::Peer> master_peer;

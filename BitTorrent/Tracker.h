@@ -9,10 +9,8 @@
 #include <utility>
 #include <memory>
 
-#include <boost/asio.hpp>
-
+#include "AsyncTracker.h"
 #include "bencode_lib.h"
-
 #include "Peer.h"
 
 namespace bittorrent {
@@ -31,8 +29,14 @@ namespace tracker {
         Started = 2,
         Stopped = 3
     };
+    static std::map<tracker::Event, std::string> events_str {
+            {tracker::Event::Completed, "completed"},
+            {tracker::Event::Started, "started"},
+            {tracker::Event::Stopped, "stopped"}
+    };
     struct Query {
         Event event = Event::Empty;
+        size_t port {};
         size_t uploaded{};
         size_t downloaded{};
         size_t left{};
@@ -64,11 +68,6 @@ namespace tracker {
         std::optional<std::chrono::seconds> min_interval;
     };
 
-    struct BadConnect : std::runtime_error {
-    public:
-        explicit BadConnect(const std::string &arg) : runtime_error(arg) {};
-        [[nodiscard]] const char* what() const noexcept override { return std::runtime_error::what();}
-    };
     struct Tracker;
     struct Requester {
     public:
@@ -96,7 +95,7 @@ namespace tracker {
         Response Request(boost::asio::io_service & service, const tracker::Query &query){
             auto answer = (*request)(service, query, *this);
             if (!answer.second){
-                throw BadConnect(answer.first);
+                throw network::BadConnect(answer.first);
             }
             return answer.second.value();
         }

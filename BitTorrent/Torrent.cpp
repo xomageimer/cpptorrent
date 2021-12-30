@@ -24,24 +24,37 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
     FillTrackers();
 }
 
-bool bittorrent::Torrent::TryConnect(tracker::Event event) {
+bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event event) {
     if (!HasTrackers())
         return false;
 
     tracker::Query query {event, t_uploaded, t_downloaded, t_left};
 
     tracker::Response response;
-    for (auto & tracker : active_trackers) {
+    for (auto tracker_it = active_trackers.begin();
+         tracker_it != active_trackers.end();) {
         try {
+            auto tracker = *tracker_it;
             std::cerr << tracker->GetUrl().Host << ": " << std::endl;
-            response = tracker->Request(GetService(), query);
+            auto cur_resp = tracker->Request(GetService(), query);
             if (response.warning_message)
                 std::cerr << response.warning_message.value() << std::endl;
 
-            std::cout << response.tracker_id << std::endl; // в случае успеха получаем ID
-            return true;
-        } catch (tracker::BadConnect const &bc) {
+            auto to_swap = tracker_it;
+            tracker_it++;
+            active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
+            switch (policy) {               // в случае успеха получаем ID и ставим трекер вперед
+                case launch::any: {
+                    std::cout << cur_resp.tracker_id << std::endl;
+                    return true;
+                }
+                case launch::best: {
+                    // TODO сравнение респонсов
+                }
+            }
+        } catch (network::BadConnect const &bc) {
             std::cerr << bc.what() << std::endl;
+            tracker_it++;
             continue;
         }
     }
@@ -50,8 +63,9 @@ bool bittorrent::Torrent::TryConnect(tracker::Event event) {
 
 bool bittorrent::Torrent::FillTrackers() {
     // TODO как-то надо хендлить исключения (если они вообще должны тут быть) (могут быть при emplace_back)
+    std::vector<std::shared_ptr<tracker::Tracker>> trackers;
     auto make_tracker = [&](const std::string& announce_url) {
-        active_trackers.emplace_back(std::make_shared<tracker::Tracker>(
+        trackers.emplace_back(std::make_shared<tracker::Tracker>(
                 announce_url,
                 *this
         ));
@@ -72,7 +86,8 @@ bool bittorrent::Torrent::FillTrackers() {
         return false;
     }
 
-//    std::shuffle(active_trackers.begin(), active_trackers.end(), random_generator::Random());
+    std::shuffle(trackers.begin(), trackers.end(), random_generator::Random());
+    active_trackers.insert(active_trackers.end(), std::make_move_iterator(trackers.begin()), std::make_move_iterator(trackers.end()));
     return true;
 }
 

@@ -13,11 +13,6 @@ namespace ba = boost::asio;
 // TODO потом перенести логику в приватные методы, а тут решать по протоколу какой (http или https) алгоритм обработки выбрать
 std::pair<std::string, std::optional<tracker::Response>> tracker::httpRequester::operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) {
     auto & tracker_url = tracker.GetUrl();
-    static std::map<tracker::Event, std::string> events_str {
-            {tracker::Event::Completed, "completed"},
-            {tracker::Event::Started, "started"},
-            {tracker::Event::Stopped, "stopped"}
-    };
 
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 
