@@ -3,24 +3,51 @@
 #include <iostream>
 #include <utility>
 
-#include "Tracker.h"
 #include "auxiliary.h"
 
 void network::TrackerRequester::SetResponse() {
+    std::string resp_str{(std::istreambuf_iterator<char>(&response)), std::istreambuf_iterator<char>()} ;
+    std::vector<std::string> urls_parts;
+    boost::regex expression(
+            "^d(?:.|\\n)*e\\Z"
+    );
+    if (!boost::regex_split(std::back_inserter(urls_parts), resp_str, expression))
+    {
+        return;
+    }
+    std::stringstream ss (urls_parts.back());
+    auto bencoder = bencode::Deserialize::Load(ss);
+    const auto& bencode_resp = bencoder.GetRoot();
 
+    tracker::Response resp;
+    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
+        resp.tracker_id = tracker_id_opt.value().get().AsString();
+    if (auto interval_opt = bencode_resp.TryAt("interval"); interval_opt)
+        resp.interval = std::chrono::seconds(interval_opt.value().get().AsNumber());
+    if (auto min_interval_opt = bencode_resp.TryAt("min_interval"); min_interval_opt)
+        resp.min_interval = std::chrono::seconds(min_interval_opt.value().get().AsNumber());
+
+    resp.complete = bencode_resp["complete"].AsNumber();
+    resp.incomplete = bencode_resp["incomplete"].AsNumber();
+
+    // TODO додеалть респоунс
+
+    promise_of_resp.set_value(std::move(resp));
 }
 
 void network::TrackerRequester::SetException(const network::BadConnect &exc) {
-
+    promise_of_resp.set_exception(exc);
 }
 
 void network::httpRequester::Connect(const tracker::Query &query) {
-    ba::ip::tcp::resolver::query resolver_query(tracker_->GetUrl().Host, tracker_->GetUrl().Port);
+    ba::ip::tcp::resolver::query resolver_query(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port);
     boost::system::error_code ec;
     ba::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(resolver_query, ec);
 
-    if (ec)
-        throw BadConnect(ec.message());
+    if (ec) {
+        SetException(BadConnect(ec.message()));
+        return;
+    }
 
     do_connect(endpoint_iterator, query);
 }
@@ -40,20 +67,21 @@ void network::httpRequester::do_connect(
 void network::httpRequester::do_request(const tracker::Query &query) {
     ba::streambuf request_query;
     std::ostream request_stream(&request_query);
-    request_stream << "GET /" << tracker_->GetUrl().Path.value_or("") << "?"
+    std::cerr << tracker_.expired() << std::endl;
+    request_stream << "GET /" << tracker_.lock()->GetUrl().Path.value_or("") << "?"
 
-                   << "info_hash=" << UrlEncode(tracker_->GetInfoHash())
-                   << "&peer_id=" << UrlEncode(std::to_string(tracker_->GetMasterPeerId()))
-                   << "&port=" << tracker_->GetPort() << "&uploaded=" << query.uploaded << "&downloaded="
+                   << "info_hash=" << UrlEncode(tracker_.lock()->GetInfoHash())
+                   << "&peer_id=" << UrlEncode(std::to_string(tracker_.lock()->GetMasterPeerId()))
+                   << "&port=" << tracker_.lock()->GetPort() << "&uploaded=" << query.uploaded << "&downloaded="
                    << query.downloaded << "&left=" << query.left << "&compact=1"
                    << ((query.event != tracker::Event::Empty) ? "&event=" + tracker::events_str.at(query.event) : "")
 
                    << " HTTP/1.0\r\n"
-                   << "Host: " << tracker_->GetUrl().Host << "\r\n"
+                   << "Host: " << tracker_.lock()->GetUrl().Host << "\r\n"
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
 
-    std::cerr << tracker_->GetUrl().Host << std::endl;
+    std::cerr << tracker_.lock()->GetUrl().Host << std::endl;
     boost::asio::async_write(socket_, request_query,  [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();

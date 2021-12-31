@@ -31,8 +31,8 @@ namespace network {
         virtual void Connect(const tracker::Query &query) = 0;
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
     protected:
-        boost::asio::streambuf response;
         boost::promise<tracker::Response> promise_of_resp;
+        boost::asio::streambuf response;
 
         virtual void SetResponse();
         virtual void SetException(const network::BadConnect &exc);
@@ -40,8 +40,8 @@ namespace network {
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service)
-                : tracker_(std::move(tracker)), socket_(io_service), resolver(io_service) {}
+        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::io_service & io_service)
+                : tracker_(tracker), socket_(io_service), resolver(io_service) {}
         void Connect(const tracker::Query &query) override;
     private:
         void do_connect(ba::ip::tcp::resolver::iterator endpoint_iterator, const tracker::Query &query);
@@ -53,12 +53,12 @@ namespace network {
         ba::ip::tcp::resolver resolver;
         ba::ip::tcp::socket socket_;
 
-        std::shared_ptr<tracker::Tracker> tracker_;
+        std::weak_ptr<tracker::Tracker> tracker_;
     };
 
     struct udpRequester : public TrackerRequester {
         void Connect(const tracker::Query &query) override {
-             // TODO Make udp request
+             promise_of_resp.set_exception(network::BadConnect("No impl for UDP."));
         };
     };
 }

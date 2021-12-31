@@ -14,6 +14,7 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #include <boost/thread.hpp>
+#include <boost/regex.hpp>
 
 #include "bencode_lib.h"
 #include "Peer.h"
@@ -59,7 +60,7 @@ namespace tracker {
         std::optional<std::string> trackerid;
     };
     struct Response {
-        std::chrono::seconds interval;
+        std::chrono::seconds interval = std::chrono::seconds(900);
         std::string tracker_id;
         size_t complete;
         size_t incomplete;
@@ -95,12 +96,15 @@ namespace tracker {
         Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
         boost::future<Response> Request(boost::asio::io_service & service, const tracker::Query &query);
 
-        std::shared_ptr<Tracker> Get() { return shared_from_this(); }
+        auto Get() { return shared_from_this(); }
 
         Url const & GetUrl() const { return tracker_url; }
         size_t GetPort() const;
         std::string const & GetInfoHash() const;
         size_t GetMasterPeerId() const;
+    private:
+        friend class bittorrent::Torrent;
+        void MakeRequester();
     };
 }
 

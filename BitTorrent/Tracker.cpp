@@ -1,11 +1,6 @@
 #include "Tracker.h"
 
-#include <map>
-#include <utility>
-
 #include "TrackerRequester.h"
-#include <boost/regex.hpp>
-
 #include "auxiliary.h"
 #include "Torrent.h"
 
@@ -41,10 +36,6 @@ tracker::Tracker::Tracker(std::string tracker_url_arg,
     if (urls_parts.size() > 3)
         tracker_url.Path = urls_parts[3];
 
-    if (tracker_url.Protocol == "udp")
-        request = std::make_shared<network::udpRequester>();
-    else
-        request = std::make_shared<network::httpRequester>(Get(), torrent.GetService());
     // TODO }
 }
 
@@ -63,4 +54,11 @@ size_t tracker::Tracker::GetPort() const {
 boost::future<tracker::Response> tracker::Tracker::Request(boost::asio::io_service &service, const tracker::Query &query) {
     request->Connect(query);
     return request->GetResponse();
+}
+
+void tracker::Tracker::MakeRequester() {
+    if (tracker_url.Protocol == "udp")
+        request = std::make_shared<network::udpRequester>();
+    else
+        request = std::make_shared<network::httpRequester>(Get(), torrent.GetService());
 }

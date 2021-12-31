@@ -24,67 +24,100 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
     FillTrackers();
 }
 
-// TODO создаем проток где будет крутится io_service::run, делаем реквест ко всем трекерам
-// TODO возвращаем boost::future<Response> и потом уже обрабатываем их в основном потоке (например с помощью when_any и then -> boost::thread)!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event event) {
     if (!HasTrackers())
         return false;
-
+    service.reset();
     tracker::Query query {event, t_uploaded, t_downloaded, t_left};
 
-    tracker::Response response;
-    for (auto tracker_it = active_trackers.begin();
-         tracker_it != active_trackers.end();) {
-        try {
-            auto tracker = *tracker_it;
-            std::cerr << tracker->GetUrl().Host << ": " << std::endl;
-            auto cur_resp = tracker->Request(GetService(), query);
-            if (response.warning_message)
-                std::cerr << response.warning_message.value() << std::endl;
-
-            auto to_swap = tracker_it;
-            tracker_it++;
-            active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
-            switch (policy) {               // в случае успеха получаем ID и ставим трекер вперед
-                case launch::any: {
-//                    std::cout << cur_resp.tracker_id << std::endl;
-                    return true;
-                }
-                case launch::best: {
-                    // TODO сравнение респонсов
-                }
-            }
-        } catch (network::BadConnect const &bc) {
-            std::cerr << bc.what() << std::endl;
-            tracker_it++;
-            continue;
+    SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+    std::thread t;
+    try {
+        std::vector<boost::future<tracker::Response>> results;
+        for (auto & tracker : active_trackers) {
+            results.push_back(tracker->Request(service, query));
         }
+
+        t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); });
+        switch (policy) {
+            case launch::any: {
+                struct DoneCheck {
+                public:
+                    tracker::Response operator()(boost::future<std::vector<boost::future<tracker::Response>>> result_args){
+                        auto results = result_args.get();
+                        auto any_res = results.begin();
+                        if (!any_res->has_exception() || results.empty()) {
+                            return std::move(any_res->get());
+                        } else {
+                            results.erase(results.begin(), results.begin() + 1);
+                            return std::move(boost::when_any(results.begin(), results.end())
+                                    .then(DoneCheck{*this}).get());
+                        }
+                    }
+                };
+                data_from_tracker = boost::when_any(results.begin(), results.end())
+                        .then(DoneCheck{}).get();
+            }
+            case launch::best: {
+                data_from_tracker = boost::when_all(results.begin(), results.end())
+                        .then([&](boost::future<std::vector<boost::future<tracker::Response>>> ready_results){
+                    auto results = ready_results.get();
+                    tracker::Response resp;
+                    int i = 0;
+                    for (auto & el : results){
+                        if (el.get().peers.size() > resp.peers.size()) {
+                            auto to_swap = std::next(active_trackers.begin(), i);
+                            active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
+                            resp = el.get();
+                        }
+                        i++;
+                    }
+                    return resp;
+                }).get();
+            }
+        }
+        service.stop();
+        t.join();
+
+        std::cout << data_from_tracker.complete << std::endl;
+        return true;
+    } catch (network::BadConnect const &bc) {
+        service.stop();
+        t.join();
+
+        std::cerr << bc.what() << std::endl;
+        return false;
     }
-    return false;
 }
 
 bool bittorrent::Torrent::FillTrackers() {
-    // TODO как-то надо хендлить исключения (если они вообще должны тут быть) (могут быть при emplace_back)
     std::vector<std::shared_ptr<tracker::Tracker>> trackers;
     auto make_tracker = [&](const std::string& announce_url) {
         trackers.emplace_back(std::make_shared<tracker::Tracker>(
                 announce_url,
                 *this
         ));
+        trackers.back()->MakeRequester();
     };
-    if (auto announce_list_opt = GetMeta().TryAt("announce-list"); announce_list_opt){
-        for (auto & announce : announce_list_opt.value().get().AsArray()) {
-            if (std::holds_alternative<std::string>(announce))
-                make_tracker(announce.AsString());
-            else {
-                for (auto & announce_str : announce.AsArray()) {
-                    make_tracker(announce_str.AsString());
+
+    try {
+        if (auto announce_list_opt = GetMeta().TryAt("announce-list"); announce_list_opt) {
+            for (auto &announce: announce_list_opt.value().get().AsArray()) {
+                if (std::holds_alternative<std::string>(announce))
+                    make_tracker(announce.AsString());
+                else {
+                    for (auto &announce_str: announce.AsArray()) {
+                        make_tracker(announce_str.AsString());
+                    }
                 }
             }
+        } else if (auto announce_opt = GetMeta().TryAt("announce"); announce_opt) {
+            make_tracker(announce_opt.value().get().AsString());
+        } else {
+            return false;
         }
-    } else if (auto announce_opt = GetMeta().TryAt("announce"); announce_opt){
-        make_tracker(announce_opt.value().get().AsString());
-    } else {
+    } catch (std::exception & exc) {
+        std::cerr << exc.what() << std::endl;
         return false;
     }
 

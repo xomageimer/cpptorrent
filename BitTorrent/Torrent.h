@@ -5,7 +5,6 @@
 #include <memory>
 #include <fstream>
 #include <filesystem>
-#include <queue>
 #include <utility>
 #include <thread>
 
@@ -43,8 +42,10 @@ namespace bittorrent {
         size_t t_downloaded {};
         size_t t_left {};
 
-        std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
         friend class tracker::Tracker;
+        std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
+        tracker::Response data_from_tracker;
+
         size_t port = 6881;                    // TODO надо иначе хендлить и создавать порты
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::Peer> master_peer;
