@@ -24,6 +24,8 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
     FillTrackers();
 }
 
+// TODO создаем проток где будет крутится io_service::run, делаем реквест ко всем трекерам
+// TODO возвращаем boost::future<Response> и потом уже обрабатываем их в основном потоке (например с помощью when_any и then -> boost::thread)!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event event) {
     if (!HasTrackers())
         return false;
@@ -45,7 +47,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
             switch (policy) {               // в случае успеха получаем ID и ставим трекер вперед
                 case launch::any: {
-                    std::cout << cur_resp.tracker_id << std::endl;
+//                    std::cout << cur_resp.tracker_id << std::endl;
                     return true;
                 }
                 case launch::best: {

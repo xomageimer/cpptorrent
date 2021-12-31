@@ -9,8 +9,9 @@
 #include <utility>
 #include <thread>
 
-#include "bencode_lib.h"
 #include "Tracker.h"
+#include "TrackerRequester.h"
+#include "bencode_lib.h"
 #include "random_generator.h"
 
 // Объект с котором работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
@@ -43,6 +44,7 @@ namespace bittorrent {
         size_t t_left {};
 
         std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
+        friend class tracker::Tracker;
         size_t port = 6881;                    // TODO надо иначе хендлить и создавать порты
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::Peer> master_peer;

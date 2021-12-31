@@ -1,11 +1,20 @@
-#include "AsyncTracker.h"
+#include "TrackerRequester.h"
 
 #include <iostream>
+#include <utility>
 
 #include "Tracker.h"
 #include "auxiliary.h"
 
-void network::AsyncTracker::Connect(const tracker::Query &query) {
+void network::TrackerRequester::SetResponse() {
+
+}
+
+void network::TrackerRequester::SetException(const network::BadConnect &exc) {
+
+}
+
+void network::httpRequester::Connect(const tracker::Query &query) {
     ba::ip::tcp::resolver::query resolver_query(tracker_->GetUrl().Host, tracker_->GetUrl().Port);
     boost::system::error_code ec;
     ba::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(resolver_query, ec);
@@ -16,19 +25,19 @@ void network::AsyncTracker::Connect(const tracker::Query &query) {
     do_connect(endpoint_iterator, query);
 }
 
-void network::AsyncTracker::do_connect(
-        const boost::asio::ip::basic_resolver<boost::asio::ip::tcp, boost::asio::executor>::iterator &endpoint_iterator, const tracker::Query &query) {
-    boost::asio::async_connect(socket_, endpoint_iterator,
-                               [&, this](boost::system::error_code ec, ba::ip::tcp::resolver::iterator){
+void network::httpRequester::do_connect(
+        boost::asio::ip::basic_resolver<boost::asio::ip::tcp, boost::asio::executor>::iterator endpoint_iterator, const tracker::Query &query) {
+    boost::asio::async_connect(socket_, std::move(endpoint_iterator),
+                               [query, this](boost::system::error_code ec, ba::ip::tcp::resolver::iterator){
                                    if (!ec){
                                        do_request(query);
                                    } else {
-                                       throw BadConnect(std::string(ec.message()));
+                                       SetException(BadConnect(std::string(ec.message())));
                                    }
                                });
 }
 
-void network::AsyncTracker::do_request(const tracker::Query &query) {
+void network::httpRequester::do_request(const tracker::Query &query) {
     ba::streambuf request_query;
     std::ostream request_stream(&request_query);
     request_stream << "GET /" << tracker_->GetUrl().Path.value_or("") << "?"
@@ -50,12 +59,12 @@ void network::AsyncTracker::do_request(const tracker::Query &query) {
             do_read_response_status();
         } else {
             socket_.close();
-            throw BadConnect(std::string(ec.message()));
+            SetException(BadConnect(std::string(ec.message())));
         }
     });
 }
 
-void network::AsyncTracker::do_read_response_status() {
+void network::httpRequester::do_read_response_status() {
     boost::asio::async_read_until(socket_,
                                   response,
                                   "\r\n",
@@ -86,12 +95,12 @@ void network::AsyncTracker::do_read_response_status() {
                                       else
                                       {
                                           socket_.close();
-                                          throw BadConnect(std::string(ec.message()));
+                                          SetException(BadConnect(std::string(ec.message())));
                                       }
                                   });
 }
 
-void network::AsyncTracker::do_read_response_header()  {
+void network::httpRequester::do_read_response_header()  {
     boost::asio::async_read_until(socket_,
                                   response,
                                   "\r\n\r\n",
@@ -99,25 +108,20 @@ void network::AsyncTracker::do_read_response_header()  {
                                   {
                                       if (!ec)
                                       {
-                                          std::istream response_stream(&response);
-                                          std::string header;
-                                          while (std::getline(response_stream, header) && header != "\r")
-                                              std::cout << header << "\n" << std::flush;
-                                          std::cout << "\n" << std::flush;
-
-                                          if (response.size() > 0)
-                                              std::cout << &response << std::flush;
-
                                           do_read_response_body();
                                       }
-                                      else
+                                      else if (ec != boost::asio::error::eof)
                                       {
+                                          socket_.close();
+                                          SetException(BadConnect(std::string(ec.message())));
+                                      } else {
+                                          SetResponse();
                                           socket_.close();
                                       }
                                   });
 }
 
-void network::AsyncTracker::do_read_response_body() {
+void network::httpRequester::do_read_response_body() {
     boost::asio::async_read(socket_,
                             response,
                             [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
@@ -126,10 +130,13 @@ void network::AsyncTracker::do_read_response_body() {
                                 {
                                     do_read_response_header();
                                 }
-                                else
+                                else if (ec != boost::asio::error::eof)
                                 {
                                     socket_.close();
-                                    throw BadConnect(std::string(ec.message()));
+                                    SetException(BadConnect(std::string(ec.message())));
+                                } else {
+                                    SetResponse();
+                                    socket_.close();
                                 }
                             });
 }

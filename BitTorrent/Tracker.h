@@ -9,12 +9,20 @@
 #include <utility>
 #include <memory>
 
-#include "AsyncTracker.h"
+#include <boost/asio.hpp>
+#define BOOST_THREAD_PROVIDES_FUTURE
+#define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
+#define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
+#include <boost/thread.hpp>
+
 #include "bencode_lib.h"
 #include "Peer.h"
 
 namespace bittorrent {
     struct Torrent;
+}
+namespace network {
+    struct TrackerRequester;
 }
 
 namespace tracker {
@@ -67,13 +75,6 @@ namespace tracker {
         std::optional<std::string> warning_message;
         std::optional<std::chrono::seconds> min_interval;
     };
-
-    struct Tracker;
-    struct Requester {
-    public:
-        virtual std::pair<std::string, std::optional<Response>> operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) = 0; // first = ошибка (failure reason) или second = response
-    };
-
     struct Url {
         std::string Protocol;
         std::string Host;
@@ -89,16 +90,10 @@ namespace tracker {
         Url tracker_url;
         bittorrent::Torrent & torrent;
 
-        std::shared_ptr<Requester> request;
+        std::shared_ptr<network::TrackerRequester> request;
     public:
         Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
-        Response Request(boost::asio::io_service & service, const tracker::Query &query){
-            auto answer = (*request)(service, query, *this);
-            if (!answer.second){
-                throw network::BadConnect(answer.first);
-            }
-            return answer.second.value();
-        }
+        boost::future<Response> Request(boost::asio::io_service & service, const tracker::Query &query);
 
         std::shared_ptr<Tracker> Get() { return shared_from_this(); }
 
@@ -106,17 +101,6 @@ namespace tracker {
         size_t GetPort() const;
         std::string const & GetInfoHash() const;
         size_t GetMasterPeerId() const;
-    };
-
-    struct httpRequester : public Requester {
-        // TODO сделать реквестер для https с помощью OpenSSL
-        std::pair<std::string, std::optional<Response>> operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) override;
-    };
-
-    struct udpRequester : public Requester {
-        std::pair<std::string, std::optional<Response>> operator()(boost::asio::io_service & service, const tracker::Query &query, const tracker::Tracker & tracker) override {
-            return {"No impl for UDP", std::nullopt}; // TODO Make udp request
-        };
     };
 }
 
