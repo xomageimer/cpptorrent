@@ -15,20 +15,22 @@ void network::TrackerRequester::SetResponse() {
     {
         return;
     }
-    std::stringstream ss (urls_parts.back());
+    std::cout << urls_parts.front() << std::endl;
+
+    std::stringstream ss (urls_parts.front());
     auto bencoder = bencode::Deserialize::Load(ss);
     const auto& bencode_resp = bencoder.GetRoot();
 
     tracker::Response resp;
-    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
-        resp.tracker_id = tracker_id_opt.value().get().AsString();
-    if (auto interval_opt = bencode_resp.TryAt("interval"); interval_opt)
-        resp.interval = std::chrono::seconds(interval_opt.value().get().AsNumber());
-    if (auto min_interval_opt = bencode_resp.TryAt("min_interval"); min_interval_opt)
-        resp.min_interval = std::chrono::seconds(min_interval_opt.value().get().AsNumber());
+//    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
+//        resp.tracker_id = tracker_id_opt.value().get().AsString();
+//    if (auto interval_opt = bencode_resp.TryAt("interval"); interval_opt)
+//        resp.interval = std::chrono::seconds(interval_opt.value().get().AsNumber());
+//    if (auto min_interval_opt = bencode_resp.TryAt("min_interval"); min_interval_opt)
+//        resp.min_interval = std::chrono::seconds(min_interval_opt.value().get().AsNumber());
 
-    resp.complete = bencode_resp["complete"].AsNumber();
-    resp.incomplete = bencode_resp["incomplete"].AsNumber();
+//    resp.complete = bencode_resp["complete"].AsNumber();
+//    resp.incomplete = bencode_resp["incomplete"].AsNumber();
 
     // TODO додеалть респоунс
 
@@ -41,15 +43,13 @@ void network::TrackerRequester::SetException(const network::BadConnect &exc) {
 
 void network::httpRequester::Connect(const tracker::Query &query) {
     ba::ip::tcp::resolver::query resolver_query(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port);
-    boost::system::error_code ec;
-    ba::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(resolver_query, ec);
-
-    if (ec) {
-        SetException(BadConnect(ec.message()));
-        return;
-    }
-
-    do_connect(endpoint_iterator, query);
+    resolver.async_resolve(resolver_query, [query, this](boost::system::error_code ec, ba::ip::tcp::resolver::iterator endpoint_iterator) {
+        if (ec) {
+            SetException(BadConnect(ec.message()));
+            return;
+        }
+        do_connect(std::move(endpoint_iterator), query);
+    });
 }
 
 void network::httpRequester::do_connect(
@@ -81,7 +81,7 @@ void network::httpRequester::do_request(const tracker::Query &query) {
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
 
-    std::cerr << tracker_.lock()->GetUrl().Host << std::endl;
+//    std::cout << request_stream.rdbuf() << std::endl;
     boost::asio::async_write(socket_, request_query,  [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();

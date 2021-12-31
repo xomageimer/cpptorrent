@@ -37,6 +37,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         for (auto & tracker : active_trackers) {
             results.push_back(tracker->Request(service, query));
         }
+        std::cout << "END OF CONNECT" << std::endl;
 
         t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); });
         switch (policy) {
