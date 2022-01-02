@@ -5,6 +5,8 @@
 using namespace std;
 
 int main() {
+//    bencode::Document doc =
+
     bittorrent::Torrent torrent (std::filesystem::current_path()/"No Country for Old Men.torrent");
     if (!torrent.TryConnect(bittorrent::launch::any, tracker::Event::Empty))    // TODO при первом вызове вызываем best
                                                                                             // TODO мы сохраняем статус торрента куда-нибудь и при повторном скачивании проверяем метаинфу и тогда вызывает any (лучшие трекеры уже будут спереди)

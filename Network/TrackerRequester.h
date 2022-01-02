@@ -21,7 +21,7 @@ namespace tracker {
 }
 
 namespace network {
-    struct BadConnect : boost::exception {
+    struct BadConnect : public boost::exception, public std::exception {
     private:
         std::string exception;
     public:

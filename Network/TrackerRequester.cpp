@@ -110,14 +110,9 @@ void network::httpRequester::do_read_response_status() {
 
                                           if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
                                               SetException(BadConnect("Invalid response\n"));
-                                              return ;
-                                          }
-                                          if (status_code != 200) {
+                                          } else if (status_code != 200) {
                                               SetException(BadConnect("Response returned with status code " + std::to_string(status_code) + "\n"));
-                                              return ;
-                                          }
-
-                                          do_read_response_header();
+                                          } else do_read_response_header();
                                       }
                                       else
                                       {

@@ -35,6 +35,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
+            std::cout << tracker->GetUrl().Host << std::endl;
             results.push_back(tracker->Request(service, query));
         }
 
@@ -51,18 +52,19 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                         auto results = result_args.get();
                         auto any_res = results.begin();
                         for (; any_res != results.end(); any_res++){
-                            std::cout << any_res->is_ready() << std::endl;
                             if (any_res->is_ready())
                                 break;
                         }
-                        try {
+                        if (!any_res->has_exception()) {
                             result.set_value(any_res->get());
-                        } catch (std::exception & excep) {
+                        } else {
                             results.erase(any_res);
                             if (!results.empty())
                                 boost::when_any(results.begin(), results.end())
-                                        .then(std::move(*this)).get();
-                            else { result.set_exception(excep); }
+                                        .then(std::move(*this));
+                            else {
+                                result.set_exception(any_res->get_exception_ptr());
+                            }
                         }
                     }
                 };
@@ -95,13 +97,13 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
 
         std::cout << data_from_tracker.complete << std::endl;
         return true;
-    } catch (...) {
+    } catch (boost::exception & excp) {
         std::cout << "service gonna stop from catch" << std::endl;
         service.stop();
         resolver.cancel();
         t.join();
 
-        std::cerr << "EXCEPTION" << std::endl;
+        std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;
     }
 }
