@@ -6,6 +6,7 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #include <boost/thread.hpp>
+#include <boost/exception/all.hpp>
 
 #include <utility>
 
@@ -20,43 +21,48 @@ namespace tracker {
 }
 
 namespace network {
-    struct BadConnect : std::runtime_error {
+    struct BadConnect : boost::exception {
+    private:
+        std::string exception;
     public:
-        explicit BadConnect(const std::string &arg) : runtime_error(arg) {};
-        [[nodiscard]] const char *what() const noexcept override { return std::runtime_error::what(); }
+        explicit BadConnect(std::string arg) : exception(std::move(arg)) {};
+        [[nodiscard]] const char *what() const noexcept { return exception.data(); }
     };
 
     struct TrackerRequester {
     public:
+        explicit TrackerRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
+                : tracker_(tracker), socket_(io_service), resolver_(resolver) {}
         virtual void Connect(const tracker::Query &query) = 0;
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
     protected:
         boost::promise<tracker::Response> promise_of_resp;
         boost::asio::streambuf response;
 
-        virtual void SetResponse();
-        virtual void SetException(const network::BadConnect &exc);
+        ba::ip::tcp::resolver & resolver_;
+        ba::ip::tcp::socket socket_;
+        std::weak_ptr<tracker::Tracker> tracker_;
+
+        void SetResponse();
+        void SetException(const network::BadConnect &exc);
     };
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::io_service & io_service)
-                : tracker_(tracker), socket_(io_service), resolver(io_service) {}
+        explicit httpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
+                : TrackerRequester(std::move(tracker), io_service, resolver) {}
         void Connect(const tracker::Query &query) override;
     private:
-        void do_connect(ba::ip::tcp::resolver::iterator endpoint_iterator, const tracker::Query &query);
+        void do_connect(ba::ip::tcp::resolver::iterator const & endpoints, const tracker::Query &query);
         void do_request(const tracker::Query &query);
         void do_read_response_status();
         void do_read_response_header();
         void do_read_response_body();
-    private:
-        ba::ip::tcp::resolver resolver;
-        ba::ip::tcp::socket socket_;
-
-        std::weak_ptr<tracker::Tracker> tracker_;
     };
 
     struct udpRequester : public TrackerRequester {
+        explicit udpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
+                : TrackerRequester(std::move(tracker), io_service, resolver) {}
         void Connect(const tracker::Query &query) override {
              promise_of_resp.set_exception(network::BadConnect("No impl for UDP."));
         };

@@ -5,7 +5,7 @@
 
 #include "auxiliary.h"
 
-bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
+bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : resolver(service) {
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");
@@ -37,27 +37,38 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         for (auto & tracker : active_trackers) {
             results.push_back(tracker->Request(service, query));
         }
-        std::cout << "END OF CONNECT" << std::endl;
 
-        t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); });
+        t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); std::cout << "service stopped" << std::endl;});
         switch (policy) {
             case launch::any: {
+                boost::promise<tracker::Response> total_res;
                 struct DoneCheck {
+                private:
+                    boost::promise<tracker::Response> & result;
                 public:
-                    tracker::Response operator()(boost::future<std::vector<boost::future<tracker::Response>>> result_args){
+                    explicit DoneCheck(boost::promise<tracker::Response> & res) : result(res) {}
+                    void operator()(boost::future<std::vector<boost::future<tracker::Response>>> result_args) {
                         auto results = result_args.get();
                         auto any_res = results.begin();
-                        if (!any_res->has_exception() || results.empty()) {
-                            return std::move(any_res->get());
-                        } else {
-                            results.erase(results.begin(), results.begin() + 1);
-                            return std::move(boost::when_any(results.begin(), results.end())
-                                    .then(DoneCheck{*this}).get());
+                        for (; any_res != results.end(); any_res++){
+                            std::cout << any_res->is_ready() << std::endl;
+                            if (any_res->is_ready())
+                                break;
+                        }
+                        try {
+                            result.set_value(any_res->get());
+                        } catch (std::exception & excep) {
+                            results.erase(any_res);
+                            if (!results.empty())
+                                boost::when_any(results.begin(), results.end())
+                                        .then(std::move(*this)).get();
+                            else { result.set_exception(excep); }
                         }
                     }
                 };
-                data_from_tracker = boost::when_any(results.begin(), results.end())
-                        .then(DoneCheck{}).get();
+                boost::when_any(results.begin(), results.end())
+                        .then(DoneCheck{total_res});
+                data_from_tracker = total_res.get_future().get();
             }
             case launch::best: {
                 data_from_tracker = boost::when_all(results.begin(), results.end())
@@ -77,16 +88,20 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                 }).get();
             }
         }
+        std::cout << "service gonna stop from try" << std::endl;
         service.stop();
+        resolver.cancel();
         t.join();
 
         std::cout << data_from_tracker.complete << std::endl;
         return true;
-    } catch (network::BadConnect const &bc) {
+    } catch (...) {
+        std::cout << "service gonna stop from catch" << std::endl;
         service.stop();
+        resolver.cancel();
         t.join();
 
-        std::cerr << bc.what() << std::endl;
+        std::cerr << "EXCEPTION" << std::endl;
         return false;
     }
 }
@@ -137,4 +152,8 @@ tracker::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
 
 boost::asio::io_service & bittorrent::Torrent::GetService() const {
     return service;
+}
+
+ba::ip::tcp::resolver &bittorrent::Torrent::GetResolver() const {
+    return resolver;
 }

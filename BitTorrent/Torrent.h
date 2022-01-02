@@ -51,9 +51,11 @@ namespace bittorrent {
         std::shared_ptr<bittorrent::Peer> master_peer;
 
         mutable boost::asio::io_service service;
+        mutable ba::ip::tcp::resolver resolver;
     private:
         bool FillTrackers();
         [[nodiscard]] boost::asio::io_service & GetService() const;
+        [[nodiscard]] ba::ip::tcp::resolver & GetResolver() const;
     };
 }
 

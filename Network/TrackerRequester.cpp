@@ -7,20 +7,20 @@
 
 void network::TrackerRequester::SetResponse() {
     std::string resp_str{(std::istreambuf_iterator<char>(&response)), std::istreambuf_iterator<char>()} ;
-    std::vector<std::string> urls_parts;
-    boost::regex expression(
-            "^d(?:.|\\n)*e\\Z"
-    );
-    if (!boost::regex_split(std::back_inserter(urls_parts), resp_str, expression))
-    {
-        return;
-    }
-    std::cout << urls_parts.front() << std::endl;
-
-    std::stringstream ss (urls_parts.front());
-    auto bencoder = bencode::Deserialize::Load(ss);
-    const auto& bencode_resp = bencoder.GetRoot();
-
+//    std::vector<std::string> urls_parts;
+//    boost::regex expression(
+//            "^d(?:.|\\n)*e\\Z"
+//    );
+//    if (!boost::regex_split(std::back_inserter(urls_parts), resp_str, expression))
+//    {
+//        return;
+//    }
+    std::cout << resp_str << std::endl;
+//
+//    std::stringstream ss (urls_parts.front()) ;
+//    auto bencoder = bencode::Deserialize::Load(ss);
+//    const auto& bencode_resp = bencoder.GetRoot();
+//
     tracker::Response resp;
 //    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
 //        resp.tracker_id = tracker_id_opt.value().get().AsString();
@@ -35,26 +35,28 @@ void network::TrackerRequester::SetResponse() {
     // TODO додеалть респоунс
 
     promise_of_resp.set_value(std::move(resp));
+    socket_.close();
 }
 
 void network::TrackerRequester::SetException(const network::BadConnect &exc) {
     promise_of_resp.set_exception(exc);
+    socket_.close();
 }
 
 void network::httpRequester::Connect(const tracker::Query &query) {
-    ba::ip::tcp::resolver::query resolver_query(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port);
-    resolver.async_resolve(resolver_query, [query, this](boost::system::error_code ec, ba::ip::tcp::resolver::iterator endpoint_iterator) {
-        if (ec) {
+    resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port, [query, this](boost::system::error_code ec,
+                                                         ba::ip::tcp::resolver::iterator endpoint_iterator) {
+        if (!ec) {
+            do_connect(endpoint_iterator, query);
+        } else {
             SetException(BadConnect(ec.message()));
-            return;
         }
-        do_connect(std::move(endpoint_iterator), query);
     });
 }
 
 void network::httpRequester::do_connect(
-        boost::asio::ip::basic_resolver<boost::asio::ip::tcp, boost::asio::executor>::iterator endpoint_iterator, const tracker::Query &query) {
-    boost::asio::async_connect(socket_, std::move(endpoint_iterator),
+        ba::ip::tcp::resolver::iterator const & endpoints, const tracker::Query &query) {
+    boost::asio::async_connect(socket_, endpoints,
                                [query, this](boost::system::error_code ec, ba::ip::tcp::resolver::iterator){
                                    if (!ec){
                                        do_request(query);
@@ -67,7 +69,6 @@ void network::httpRequester::do_connect(
 void network::httpRequester::do_request(const tracker::Query &query) {
     ba::streambuf request_query;
     std::ostream request_stream(&request_query);
-    std::cerr << tracker_.expired() << std::endl;
     request_stream << "GET /" << tracker_.lock()->GetUrl().Path.value_or("") << "?"
 
                    << "info_hash=" << UrlEncode(tracker_.lock()->GetInfoHash())
@@ -81,12 +82,10 @@ void network::httpRequester::do_request(const tracker::Query &query) {
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
 
-//    std::cout << request_stream.rdbuf() << std::endl;
     boost::asio::async_write(socket_, request_query,  [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();
         } else {
-            socket_.close();
             SetException(BadConnect(std::string(ec.message())));
         }
     });
@@ -110,19 +109,18 @@ void network::httpRequester::do_read_response_status() {
                                           std::getline(response_stream, status_message);
 
                                           if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
-                                              socket_.close();
-                                              throw BadConnect("Invalid response\n");
+                                              SetException(BadConnect("Invalid response\n"));
+                                              return ;
                                           }
                                           if (status_code != 200) {
-                                              socket_.close();
-                                              throw BadConnect("Response returned with status code " + std::to_string(status_code) + "\n");
+                                              SetException(BadConnect("Response returned with status code " + std::to_string(status_code) + "\n"));
+                                              return ;
                                           }
 
                                           do_read_response_header();
                                       }
                                       else
                                       {
-                                          socket_.close();
                                           SetException(BadConnect(std::string(ec.message())));
                                       }
                                   });
@@ -140,11 +138,7 @@ void network::httpRequester::do_read_response_header()  {
                                       }
                                       else if (ec != boost::asio::error::eof)
                                       {
-                                          socket_.close();
                                           SetException(BadConnect(std::string(ec.message())));
-                                      } else {
-                                          SetResponse();
-                                          socket_.close();
                                       }
                                   });
 }
@@ -158,13 +152,11 @@ void network::httpRequester::do_read_response_body() {
                                 {
                                     do_read_response_header();
                                 }
-                                else if (ec != boost::asio::error::eof)
+                                else if (ec == boost::asio::error::eof)
                                 {
-                                    socket_.close();
-                                    SetException(BadConnect(std::string(ec.message())));
-                                } else {
                                     SetResponse();
-                                    socket_.close();
+                                } else {
+                                    SetException(BadConnect(std::string(ec.message())));
                                 }
                             });
 }
