@@ -55,8 +55,11 @@ namespace network {
         void Connect(const tracker::Query &query) override;
     private:
         void do_resolve(const tracker::Query &query);
-        void do_connect(ba::ip::tcp::endpoint endpoints, const tracker::Query& query);
-        void do_write(const tracker::Query &query);
+        void do_connect(ba::ip::tcp::resolver::iterator endpoints, const tracker::Query& query);
+        void do_request(const tracker::Query &query);
+        void do_read_response_status();
+        void do_read_response_header();
+        void do_read_response_body();
     };
 
     struct udpRequester : public TrackerRequester {
