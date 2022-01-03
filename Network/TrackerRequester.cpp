@@ -66,7 +66,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::endpoint endpoints, const t
                                     if (!ec) {
                                         do_write(query);
                                     } else {
-
+                                        SetException(ec.message());
                                     }
                                });
 }
