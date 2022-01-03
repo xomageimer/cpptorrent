@@ -27,7 +27,7 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : 
 bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event event) {
     if (!HasTrackers())
         return false;
-    service.reset();
+//    service.reset();
     tracker::Query query {event, t_uploaded, t_downloaded, t_left};
 
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
@@ -35,7 +35,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
-            std::cout << tracker->GetUrl().Host << std::endl;
             results.push_back(tracker->Request(service, query));
         }
 
@@ -151,8 +150,16 @@ bool bittorrent::Torrent::FillTrackers() {
     return true;
 }
 
-std::shared_ptr<bittorrent::Peer> bittorrent::Torrent::GetMasterPeer() const {
-    return master_peer;
+std::string const &bittorrent::Torrent::GetInfoHash() const  {
+    if (!url_info_hash)
+        url_info_hash.emplace(UrlEncode(meta_info.info_hash));
+    return url_info_hash.value();
+}
+
+std::string const & bittorrent::Torrent::GetMasterPeerKey() const {
+    if (!url_master_peer_key)
+        url_master_peer_key.emplace(UrlEncode(GetSHA1(std::to_string(master_peer->GetKey()))));
+    return url_master_peer_key.value();
 }
 
 tracker::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {

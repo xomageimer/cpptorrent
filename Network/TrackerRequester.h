@@ -52,8 +52,8 @@ namespace network {
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
-                : TrackerRequester(std::move(tracker), io_service, resolver) {}
+        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
+                : TrackerRequester(tracker, io_service, resolver) {}
         void Connect(const tracker::Query &query) override;
     private:
         void do_resolve();
@@ -65,8 +65,8 @@ namespace network {
     };
 
     struct udpRequester : public TrackerRequester {
-        explicit udpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
-                : TrackerRequester(std::move(tracker), io_service, resolver) {}
+        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
+                : TrackerRequester(tracker, io_service, resolver) {}
         void Connect(const tracker::Query &query) override {
              promise_of_resp.set_exception(network::BadConnect("No impl for UDP."));
         };

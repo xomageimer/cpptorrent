@@ -43,8 +43,8 @@ std::string const &tracker::Tracker::GetInfoHash() const {
     return torrent.GetInfoHash();
 }
 
-size_t tracker::Tracker::GetMasterPeerId() const {
-    return torrent.GetMasterPeer()->GetKey();
+std::string const & tracker::Tracker::GetMasterPeerId() const {
+    return torrent.GetMasterPeerKey();
 }
 
 size_t tracker::Tracker::GetPort() const {

@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <utility>
+#include <iterator>
 
 #include "auxiliary.h"
 
@@ -45,19 +46,25 @@ void network::TrackerRequester::SetException(const std::string &exc) {
 
 void network::httpRequester::Connect(const tracker::Query &query) {
     std::ostream request_stream(&request_);
-    request_stream << "GET /" << tracker_.lock()->GetUrl().Path.value_or("") << "?"
 
-                   << "info_hash=" << UrlEncode(tracker_.lock()->GetInfoHash())
-                   << "&peer_id=" << UrlEncode(std::to_string(tracker_.lock()->GetMasterPeerId()))
-                   << "&port=" << tracker_.lock()->GetPort() << "&uploaded=" << query.uploaded << "&downloaded="
+    auto tracker_ptr = tracker_.lock();
+//    std::string request_str = "/announce?info_hash=%AFWo%87r%DA%82%B7%F5%8B%B6%21%1C%2AF%3B%F8%7BV%20&peer_id=16246984497716370399&port=6881&uploaded=0&downloaded=0&left=0&compact=1";
+    request_stream << "GET /" << tracker_ptr->GetUrl().Path.value_or("") << "?"
+
+                   << "info_hash=" << tracker_ptr->GetInfoHash()
+                   << "&peer_id=" << tracker_ptr->GetMasterPeerId()
+                   << "&port=" << tracker_ptr->GetPort() << "&uploaded=" << query.uploaded << "&downloaded="
                    << query.downloaded << "&left=" << query.left << "&compact=1"
-                   << ((query.event != tracker::Event::Empty) ? "&event=" + tracker::events_str.at(query.event) : "")
 
                    << " HTTP/1.0\r\n"
-                   << "Host: " << tracker_.lock()->GetUrl().Host << "\r\n"
+                   << "Host: " << tracker_ptr->GetUrl().Host << "\r\n"
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
 
+//    boost::asio::streambuf::const_buffers_type bufs = request_.data();
+//    std::string str(boost::asio::buffers_begin(bufs),
+//                    boost::asio::buffers_begin(bufs) + request_.size());
+//    std::cout << str << std::endl;
     do_resolve();
 }
 
@@ -106,7 +113,7 @@ void network::httpRequester::do_read_response_status() {
                                           std::istream response_stream(&response_);
                                           std::string http_version;
                                           response_stream >> http_version;
-                                          std::cerr << tracker_.lock()->GetUrl().Host << " " << http_version << std::endl;
+                                          std::cerr << tracker_.lock()->GetUrl().Host << ":" << tracker_.lock()->GetUrl().Port << " " << http_version << std::endl;
                                           unsigned int status_code;
                                           response_stream >> status_code;
                                           std::string status_message;

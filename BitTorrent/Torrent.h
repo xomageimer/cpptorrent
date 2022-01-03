@@ -30,16 +30,19 @@ namespace bittorrent {
         explicit Torrent(std::filesystem::path const & torrent_file_path);
         bool TryConnect(bittorrent::launch policy = bittorrent::launch::best, tracker::Event event = tracker::Event::Empty);
 
-        [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash;}
+        [[nodiscard]] std::string const & GetInfoHash() const;
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] tracker::Query GetDefaultTrackerQuery() const;
-        [[nodiscard]] std::shared_ptr<bittorrent::Peer> GetMasterPeer() const;
+        [[nodiscard]] std::string const & GetMasterPeerKey() const;
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
     private:
         mutable boost::asio::io_service service; // обязательно в самом верху
         mutable ba::ip::tcp::resolver resolver;
+
+        mutable std::optional<std::string> url_master_peer_key;
+        mutable std::optional<std::string> url_info_hash;
 
         size_t t_uploaded {};
         size_t t_downloaded {};
