@@ -45,7 +45,7 @@ namespace network {
         std::weak_ptr<tracker::Tracker> tracker_;
 
         void SetResponse();
-        void SetException(const network::BadConnect &exc);
+        void SetException(const std::string &exc);
     };
 
     struct httpRequester : public TrackerRequester {
@@ -53,6 +53,10 @@ namespace network {
         explicit httpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
                 : TrackerRequester(std::move(tracker), io_service, resolver) {}
         void Connect(const tracker::Query &query) override;
+    private:
+        void do_resolve(const tracker::Query &query);
+        void do_connect(ba::ip::tcp::endpoint endpoints, const tracker::Query& query);
+        void do_write(const tracker::Query &query);
     };
 
     struct udpRequester : public TrackerRequester {

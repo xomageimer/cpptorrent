@@ -38,17 +38,39 @@ void network::TrackerRequester::SetResponse() {
     socket_.close();
 }
 
-void network::TrackerRequester::SetException(const network::BadConnect &exc) {
-    promise_of_resp.set_exception(exc);
+void network::TrackerRequester::SetException(const std::string &exc) {
+    promise_of_resp.set_exception(network::BadConnect(exc));
     socket_.close();
 }
 
 void network::httpRequester::Connect(const tracker::Query &query) {
-    resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
-                            [&](boost::system::error_code const & ec,
-                                    ba::ip::tcp::endpoint enpoints){
-        if (!ec) {
+    do_resolve(query);
+}
 
-        }
-    });
+void network::httpRequester::do_resolve(const tracker::Query &query) {
+    resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
+                            [query, this](boost::system::error_code const & ec,
+                                ba::ip::tcp::endpoint endpoints){
+                                if (!ec) {
+                                    do_connect(endpoints, query);
+                                } else {
+                                    SetException(ec.message());
+                                }
+                            });
+}
+
+
+void network::httpRequester::do_connect(ba::ip::tcp::endpoint endpoints, const tracker::Query& query) {
+    boost::asio::async_connect(socket_, endpoints,
+                               [query, this](boost::system::error_code const & ec){
+                                    if (!ec) {
+                                        do_write(query);
+                                    } else {
+
+                                    }
+                               });
+}
+
+void network::httpRequester::do_write(const tracker::Query &query) {
+
 }
