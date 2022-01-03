@@ -37,11 +37,13 @@ namespace network {
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
         virtual ~TrackerRequester() = default;
     protected:
-        boost::promise<tracker::Response> promise_of_resp;
-        boost::asio::streambuf response;
-
         ba::ip::tcp::resolver & resolver_;
         ba::ip::tcp::socket socket_;
+
+        boost::asio::streambuf request_;
+        boost::asio::streambuf response_;
+
+        boost::promise<tracker::Response> promise_of_resp;
         std::weak_ptr<tracker::Tracker> tracker_;
 
         void SetResponse();
@@ -54,9 +56,9 @@ namespace network {
                 : TrackerRequester(std::move(tracker), io_service, resolver) {}
         void Connect(const tracker::Query &query) override;
     private:
-        void do_resolve(const tracker::Query &query);
-        void do_connect(ba::ip::tcp::resolver::iterator endpoints, const tracker::Query& query);
-        void do_request(const tracker::Query &query);
+        void do_resolve();
+        void do_connect(ba::ip::tcp::resolver::iterator endpoints);
+        void do_request();
         void do_read_response_status();
         void do_read_response_header();
         void do_read_response_body();

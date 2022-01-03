@@ -35,12 +35,14 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
+            std::cout << tracker->GetUrl().Host << std::endl;
             results.push_back(tracker->Request(service, query));
         }
 
         t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); std::cout << "service stopped" << std::endl;});
         switch (policy) {
             case launch::any: {
+                boost::promise<tracker::Response> total_res;
                 struct DoneCheck {
                 private:
                     boost::promise<tracker::Response> & result;
@@ -66,7 +68,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                         }
                     }
                 };
-                boost::promise<tracker::Response> total_res;
                 boost::when_any(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
                         .then(DoneCheck{total_res});
                 data_from_tracker = total_res.get_future().get();
@@ -79,10 +80,14 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                     tracker::Response resp;
                     int i = 0;
                     for (auto & el : results){
-                        if (el.get().peers.size() > resp.peers.size()) {
-                            auto to_swap = std::next(active_trackers.begin(), i);
-                            active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
-                            resp = el.get();
+                        if (!el.has_exception()) {
+                            auto cur_resp = el.get();
+                            if (cur_resp.peers.size() > resp.peers.size()) {
+                                resp = cur_resp;
+
+                                auto to_swap = std::next(active_trackers.begin(), i);
+                                active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
+                            }
                         }
                         i++;
                     }
@@ -92,17 +97,18 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             }
         }
         std::cout << "service gonna stop from try" << std::endl;
-        service.stop();
         resolver.cancel();
+        service.stop();
         t.join();
 
         std::cout << data_from_tracker.complete << std::endl;
         return true;
     } catch (boost::exception & excp) {
         std::cout << "service gonna stop from catch" << std::endl;
-        service.stop();
         resolver.cancel();
-        t.join();
+        service.stop();
+        if (t.joinable())
+            t.join();
 
         std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;

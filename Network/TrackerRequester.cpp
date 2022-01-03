@@ -35,45 +35,16 @@ void network::TrackerRequester::SetResponse() {
     // TODO додеалть респоунс
 
     promise_of_resp.set_value(std::move(resp));
-    socket_.close();
+//    socket_.close();
 }
 
 void network::TrackerRequester::SetException(const std::string &exc) {
     promise_of_resp.set_exception(network::BadConnect(exc));
-    socket_.close();
+//    socket_.close();
 }
 
 void network::httpRequester::Connect(const tracker::Query &query) {
-    do_resolve(query);
-}
-
-void network::httpRequester::do_resolve(const tracker::Query &query) {
-    resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
-                            [query, this](boost::system::error_code const & ec,
-                                          ba::ip::tcp::resolver::iterator endpoints){
-                                if (!ec) {
-                                    do_connect(endpoints, query);
-                                } else {
-                                    SetException(ec.message());
-                                }
-                            });
-}
-
-
-void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints, const tracker::Query& query) {
-    boost::asio::async_connect(socket_, endpoints,
-                               [query, this](boost::system::error_code const & ec, ba::ip::tcp::resolver::iterator){
-                                    if (!ec) {
-                                        do_request(query);
-                                    } else {
-                                        SetException(ec.message());
-                                    }
-                               });
-}
-
-void network::httpRequester::do_request(const tracker::Query &query) {
-    ba::streambuf request_query;
-    std::ostream request_stream(&request_query);
+    std::ostream request_stream(&request_);
     request_stream << "GET /" << tracker_.lock()->GetUrl().Path.value_or("") << "?"
 
                    << "info_hash=" << UrlEncode(tracker_.lock()->GetInfoHash())
@@ -87,7 +58,35 @@ void network::httpRequester::do_request(const tracker::Query &query) {
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
 
-    boost::asio::async_write(socket_, request_query, [this](boost::system::error_code ec, std::size_t /*length*/){
+    do_resolve();
+}
+
+void network::httpRequester::do_resolve() {
+    resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
+                            [this](boost::system::error_code const & ec,
+                                          ba::ip::tcp::resolver::iterator endpoints){
+                                if (!ec) {
+                                    do_connect(std::move(endpoints));
+                                } else {
+                                    SetException(ec.message());
+                                }
+                            });
+}
+
+
+void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints) {
+    boost::asio::async_connect(socket_, endpoints,
+                               [this](boost::system::error_code const & ec, ba::ip::tcp::resolver::iterator){
+                                    if (!ec) {
+                                        do_request();
+                                    } else {
+                                        SetException(ec.message());
+                                    }
+                               });
+}
+
+void network::httpRequester::do_request() {
+    boost::asio::async_write(socket_, request_, [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();
         } else {
@@ -98,16 +97,16 @@ void network::httpRequester::do_request(const tracker::Query &query) {
 
 void network::httpRequester::do_read_response_status() {
     boost::asio::async_read_until(socket_,
-                                  response,
+                                  response_,
                                   "\r\n",
                                   [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
                                   {
                                       if (!ec)
                                       {
-                                          std::istream response_stream(&response);
+                                          std::istream response_stream(&response_);
                                           std::string http_version;
                                           response_stream >> http_version;
-                                          std::cerr << http_version << std::endl;
+                                          std::cerr << tracker_.lock()->GetUrl().Host << " " << http_version << std::endl;
                                           unsigned int status_code;
                                           response_stream >> status_code;
                                           std::string status_message;
@@ -115,14 +114,9 @@ void network::httpRequester::do_read_response_status() {
 
                                           if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
                                               SetException("Invalid response\n");
-                                              return ;
-                                          }
-                                          if (status_code != 200) {
+                                          } else if (status_code != 200) {
                                               SetException("Response returned with status code " + std::to_string(status_code) + "\n");
-                                              return ;
-                                          }
-
-                                          do_read_response_header();
+                                          } else do_read_response_header();
                                       }
                                       else
                                       {
@@ -133,7 +127,7 @@ void network::httpRequester::do_read_response_status() {
 
 void network::httpRequester::do_read_response_header() {
     boost::asio::async_read_until(socket_,
-                                  response,
+                                  response_,
                                   "\r\n\r\n",
                                   [this](boost::system::error_code ec, std::size_t /*length*/)
                                   {
@@ -150,7 +144,7 @@ void network::httpRequester::do_read_response_header() {
 
 void network::httpRequester::do_read_response_body() {
     boost::asio::async_read(socket_,
-                            response,
+                            response_,
                             [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
                             {
                                 if (!ec)
