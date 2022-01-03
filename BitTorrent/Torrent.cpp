@@ -35,14 +35,12 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
-            std::cout << tracker->GetUrl().Host << std::endl;
             results.push_back(tracker->Request(service, query));
         }
 
         t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); std::cout << "service stopped" << std::endl;});
         switch (policy) {
             case launch::any: {
-                boost::promise<tracker::Response> total_res;
                 struct DoneCheck {
                 private:
                     boost::promise<tracker::Response> & result;
@@ -68,12 +66,14 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                         }
                     }
                 };
-                boost::when_any(results.begin(), results.end())
+                boost::promise<tracker::Response> total_res;
+                boost::when_any(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
                         .then(DoneCheck{total_res});
                 data_from_tracker = total_res.get_future().get();
+                break;
             }
             case launch::best: {
-                data_from_tracker = boost::when_all(results.begin(), results.end())
+                data_from_tracker = boost::when_all(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
                         .then([&](boost::future<std::vector<boost::future<tracker::Response>>> ready_results){
                     auto results = ready_results.get();
                     tracker::Response resp;
@@ -88,6 +88,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                     }
                     return resp;
                 }).get();
+                break;
             }
         }
         std::cout << "service gonna stop from try" << std::endl;

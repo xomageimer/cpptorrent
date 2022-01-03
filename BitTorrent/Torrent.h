@@ -38,6 +38,9 @@ namespace bittorrent {
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
     private:
+        mutable boost::asio::io_service service; // обязательно в самом верху
+        mutable ba::ip::tcp::resolver resolver;
+
         size_t t_uploaded {};
         size_t t_downloaded {};
         size_t t_left {};
@@ -49,9 +52,6 @@ namespace bittorrent {
         size_t port = 6881;                    // TODO надо иначе хендлить и создавать порты
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::Peer> master_peer;
-
-        mutable boost::asio::io_service service;
-        mutable ba::ip::tcp::resolver resolver;
     private:
         bool FillTrackers();
         [[nodiscard]] boost::asio::io_service & GetService() const;

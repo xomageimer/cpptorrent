@@ -13,7 +13,7 @@ std::string GetSHA1(const std::string &p_arg){
 
     char str_hash[sizeof(unsigned) * 5];
     memcpy(str_hash, (char *)&hash, sizeof(unsigned) * 5);
-    return str_hash;
+    return std::string(str_hash, std::size(str_hash));
 }
 
 static std::string encode_impl(std::string::value_type symb) {

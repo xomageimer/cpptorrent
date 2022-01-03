@@ -26,15 +26,16 @@ namespace network {
         std::string exception;
     public:
         explicit BadConnect(std::string arg) : exception(std::move(arg)) {};
-        [[nodiscard]] const char *what() const noexcept { return exception.data(); }
+        [[nodiscard]] const char *what() const noexcept override { return exception.data(); }
     };
 
     struct TrackerRequester {
     public:
-        explicit TrackerRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
+        explicit TrackerRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
                 : tracker_(tracker), socket_(io_service), resolver_(resolver) {}
         virtual void Connect(const tracker::Query &query) = 0;
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
+        virtual ~TrackerRequester() = default;
     protected:
         boost::promise<tracker::Response> promise_of_resp;
         boost::asio::streambuf response;
@@ -52,12 +53,6 @@ namespace network {
         explicit httpRequester(std::shared_ptr<tracker::Tracker> tracker, boost::asio::io_service & io_service, ba::ip::tcp::resolver & resolver)
                 : TrackerRequester(std::move(tracker), io_service, resolver) {}
         void Connect(const tracker::Query &query) override;
-    private:
-        void do_connect(ba::ip::tcp::resolver::iterator const & endpoints, const tracker::Query &query);
-        void do_request(const tracker::Query &query);
-        void do_read_response_status();
-        void do_read_response_header();
-        void do_read_response_body();
     };
 
     struct udpRequester : public TrackerRequester {
