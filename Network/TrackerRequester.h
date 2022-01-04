@@ -45,13 +45,16 @@ namespace network {
         std::weak_ptr<tracker::Tracker> tracker_;
 
         virtual void SetResponse() = 0;
-        virtual void SetException(const std::string &exc);
+        virtual void SetException(const std::string &exc) {
+            promise_of_resp.set_exception(network::BadConnect(exc));
+            Disconnect();
+        }
     };
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::ip::tcp::resolver & resolver)
-                : TrackerRequester(tracker), resolver_(resolver) {}
+        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & service)
+                : resolver_(service), TrackerRequester(tracker) {}
 
         void Connect(ba::io_service & io_service, const tracker::Query &query) override;
         void Disconnect() override {
@@ -71,15 +74,14 @@ namespace network {
         ba::streambuf request_;
         ba::streambuf response_;
 
-        ba::ip::tcp::resolver & resolver_;
+        ba::ip::tcp::resolver resolver_;
         std::optional<ba::ip::tcp::socket> socket_;
     };
 
-    // TODO добавить глоабальный таймаут и в случае чего делать SetException
     struct udpRequester : public TrackerRequester {
     public:
-        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::ip::udp::resolver & resolver)
-                : resolver_(resolver), TrackerRequester(tracker) {}
+        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & service)
+                : resolver_(service), timeout_(service), TrackerRequester(tracker) {}
 
         void Connect(ba::io_service & io_service, const tracker::Query &query) override;
         void Disconnect() override {
@@ -88,23 +90,47 @@ namespace network {
         };
     private:
         void do_resolve();
-        void do_connect(ba::ip::udp::resolver::iterator endpoints, uint8_t * buff);
-        void do_read_connect_response();
 
-        ba::ip::udp::resolver & resolver_;
+        void do_try_connect();
+        void do_connect();
+
+        void do_try_announce();
+        void do_announce();
+
+        template <typename F>
+        void check_deadline(F && func);
+        void UpdateEndpoint() {
+            endpoints_it_++;
+            attempts_ = 0;
+            socket_->close();
+            if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
+                timer_stopped_ = true;
+                SetException("all endpoints were polled but without success");
+            }
+        }
+
+        void SetResponse() override {}
+
+        ba::ip::udp::resolver resolver_;
         std::optional<ba::ip::udp::socket> socket_;
+        ba::ip::udp::resolver::iterator endpoints_it_;
+
+        size_t attempts_ = 0;
+        ba::deadline_timer timeout_;
+        std::atomic<bool> timer_stopped_ = false;
 
         tracker::Query query_;
 
+        uint8_t response[98]{};
         struct connect_request {
             be::big_int64_buf_t protocol_id {0x41727101980};
             be::big_int32_buf_t action {0};
             be::big_int32_buf_t transaction_id{};
         };
         struct connect_response {
+            be::big_int64_buf_t connection_id{};
             be::big_int32_buf_t action {0};
             be::big_int32_buf_t transaction_id{};
-            be::big_int64_buf_t connection_id{};
         };
 //        struct announce_request {
 //            be::big_int64_buf_t connection_id{};
@@ -137,6 +163,22 @@ namespace network {
         };
         // TODO add scrape
     };
+
+    template <typename F>
+    void network::udpRequester::check_deadline(F && func) {
+        if (timer_stopped_)
+            return;
+
+        if (timeout_.expires_at() <= ba::deadline_timer::traits_type::now())
+        {
+            attempts_++;
+            func();
+        }
+
+        timeout_.async_wait([=](){
+            check_deadline(std::forward<F>(func));
+        });
+    }
 }
 
 #endif //CPPTORRENT_TRACKERREQUESTER_H

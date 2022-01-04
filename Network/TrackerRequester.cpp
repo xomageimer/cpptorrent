@@ -7,6 +7,7 @@
 #include "random_generator.h"
 #include "auxiliary.h"
 
+// HTTP
 void network::httpRequester::SetResponse() {
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
     std::vector<std::string> bencode_response;
@@ -43,11 +44,6 @@ void network::httpRequester::SetResponse() {
 
 
     promise_of_resp.set_value(std::move(resp));
-    Disconnect();
-}
-
-void network::TrackerRequester::SetException(const std::string &exc) {
-    promise_of_resp.set_exception(network::BadConnect(exc));
     Disconnect();
 }
 
@@ -174,7 +170,7 @@ void network::httpRequester::do_read_response_body() {
                             });
 }
 
-// TODO использовать query
+// UDP
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     if (!socket_)
         socket_.emplace(io_service);
@@ -188,35 +184,63 @@ void network::udpRequester::do_resolve() {
                             [this](boost::system::error_code const & ec,
                                    ba::ip::udp::resolver::iterator endpoints){
                                 if (!ec) {
-                                    uint8_t buff[16];
-                                    connect_request c_req;
-                                    c_req.transaction_id = static_cast<int>(random_generator::Random().GetNumber<size_t>());
-                                    std::memcpy(&buff, &c_req, sizeof(c_req));
+                                    endpoints_it_ = std::move(endpoints);
 
-                                    for (auto it = endpoints; it != ba::ip::udp::resolver::iterator(); it++) {
-                                        do_connect(it, buff);
-                                    }
+                                    ba::ip::udp::endpoint endpoint = *endpoints_it_;
+                                    socket_->open(endpoint.protocol());
+                                    do_try_connect();
                                 } else {
                                     SetException("Unable to resolve host: " + ec.message());
                                 }
                             });
 }
 
-void network::udpRequester::do_connect(ba::ip::udp::resolver::iterator endpoint_it, uint8_t * buff) {
-    ba::ip::udp::endpoint endpoint = *endpoint_it;
-    socket_->open(endpoint.protocol());
+void network::udpRequester::do_try_connect() {
+    if (attempts_ > 8) {
+        UpdateEndpoint();
+        ba::ip::udp::endpoint endpoint = *endpoints_it_;
+        socket_->open(endpoint.protocol());
+    }
+
+    do_connect();
+    timeout_.async_wait([=](){
+        check_deadline([this] {do_try_connect();});
+    });
+}
+
+void network::udpRequester::do_connect() {
+    uint8_t buff[16];
+    connect_request c_req;
+    c_req.transaction_id = static_cast<int>(random_generator::Random().GetNumber<size_t>());
+    std::memcpy(&buff, &c_req, sizeof(c_req));
+    ba::ip::udp::endpoint endpoint = *endpoints_it_;
 
     socket_->async_send_to(
-                ba::buffer(buff, sizeof(connect_request)), endpoint,
-               [&] (boost::system::error_code const & ec, size_t bytes_transferred){
-                    if (!ec && bytes_transferred == 16) {
-                        do_read_connect_response();
+               ba::buffer(buff, sizeof(connect_request)), endpoint,
+               [=] (boost::system::error_code const & ec, size_t bytes_transferred){
+                    if (ec || bytes_transferred != sizeof(connect_request)) {
+                        attempts_ = 9;
+                        do_try_connect();
                     }
                 }
             );
+
+    timeout_.expires_from_now(boost::posix_time::seconds(static_cast<int>(15 * std::pow(2, attempts_))));
+    socket_->async_receive_from(
+            ba::buffer(buff, sizeof(connect_response)), endpoint,
+            [=] (boost::system::error_code const & ec, size_t bytes_trasferred) {
+                if (!ec && bytes_trasferred == sizeof(connect_response)) {
+                    do_try_announce();
+                }
+            }
+    );
 }
 
-void network::udpRequester::do_read_connect_response() {
-    uint8_t buff[16];
+void network::udpRequester::do_try_announce() {
+
+}
+
+
+void network::udpRequester::do_announce() {
 
 }

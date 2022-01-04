@@ -39,8 +39,6 @@ namespace bittorrent {
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
     private:
         mutable boost::asio::io_service service; // обязательно в самом верху
-        mutable ba::ip::tcp::resolver tcp_resolver;
-        mutable ba::ip::udp::resolver udp_resolver;
 
         size_t t_uploaded {};
         size_t t_downloaded {};
@@ -56,8 +54,6 @@ namespace bittorrent {
     private:
         bool FillTrackers();
         [[nodiscard]] boost::asio::io_service & GetService() const;
-        [[nodiscard]] ba::ip::tcp::resolver & GetTCPResolver() const;
-        [[nodiscard]] ba::ip::udp::resolver & GetUDPResolver() const;
     };
 }
 
