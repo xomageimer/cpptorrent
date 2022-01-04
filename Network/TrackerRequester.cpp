@@ -3,40 +3,38 @@
 #include <iostream>
 #include <utility>
 
+#include "Tracker.h"
 #include "auxiliary.h"
 
 void network::TrackerRequester::SetResponse() {
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
-    std::vector<std::string> urls_parts;
+    std::vector<std::string> bencode_response;
     boost::regex expression(
             "(^d(?:.|\\n)*e\\Z)"
     );
-    if (!boost::regex_split(std::back_inserter(urls_parts), resp_str, expression))
+    if (!boost::regex_split(std::back_inserter(bencode_response), resp_str, expression))
     {
-        return;
+        SetException("Bad response, can't split to bencode format");
     }
-    for (auto & el : urls_parts) {
-        std::cout << el << std::endl;
-        std::cout << "_______________" << std::endl;
-    }
-//    std::cout << resp_str << std::endl;
-//
-//    std::stringstream ss (urls_parts.front()) ;
-//    auto bencoder = bencode::Deserialize::Load(ss);
-//    const auto& bencode_resp = bencoder.GetRoot();
-//
+//    std::cout << bencode_response.back() << std::endl;
+
+    std::stringstream ss (bencode_response.back()) ;
+    auto bencoder = bencode::Deserialize::Load(ss);
+    const auto& bencode_resp = bencoder.GetRoot();
+
     tracker::Response resp;
-//    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
-//        resp.tracker_id = tracker_id_opt.value().get().AsString();
-//    if (auto interval_opt = bencode_resp.TryAt("interval"); interval_opt)
-//        resp.interval = std::chrono::seconds(interval_opt.value().get().AsNumber());
-//    if (auto min_interval_opt = bencode_resp.TryAt("min_interval"); min_interval_opt)
-//        resp.min_interval = std::chrono::seconds(min_interval_opt.value().get().AsNumber());
 
-//    resp.complete = bencode_resp["complete"].AsNumber();
-//    resp.incomplete = bencode_resp["incomplete"].AsNumber();
+    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
+        resp.tracker_id = tracker_id_opt.value().get().AsString();
+    if (auto interval_opt = bencode_resp.TryAt("interval"); interval_opt)
+        resp.interval = std::chrono::seconds(interval_opt.value().get().AsNumber());
+    if (auto min_interval_opt = bencode_resp.TryAt("min_interval"); min_interval_opt)
+        resp.min_interval = std::chrono::seconds(min_interval_opt.value().get().AsNumber());
 
-    // TODO додеалть респоунс
+    resp.complete = bencode_resp["complete"].AsNumber();
+    resp.incomplete = bencode_resp["incomplete"].AsNumber();
+
+
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
@@ -57,6 +55,7 @@ void network::httpRequester::Connect(ba::io_service & io_service, const tracker:
                    << "&peer_id=" << UrlEncode(GetSHA1(std::to_string(tracker_ptr->GetMasterPeerId())))
                    << "&port=" << tracker_ptr->GetPort() << "&uploaded=" << query.uploaded << "&downloaded="
                    << query.downloaded << "&left=" << query.left << "&compact=1"
+                   << ((query.event != tracker::Event::Empty) ? tracker::events_str.at(query.event) : "")
 
                    << " HTTP/1.0\r\n"
                    << "Host: " << tracker_ptr->GetUrl().Host << "\r\n"

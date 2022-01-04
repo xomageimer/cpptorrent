@@ -21,20 +21,23 @@ tracker::Tracker::Tracker(std::string tracker_url_arg,
             // path
             "\\/?([^?#]*)"
     );
-    // TODO мб рефлексию вместо этого {
     if (!boost::regex_split(std::back_inserter(urls_parts), tracker_url_arg, expression))
     {
-        // TODO добавить ошибку / исключение
-        return;
+        throw std::logic_error("Bad url, can't take it apart");
     }
 
-    tracker_url.Protocol = urls_parts[0];
-    tracker_url.Host = urls_parts[1];
-    tracker_url.Port = urls_parts[2];
-    if (urls_parts.size() > 3)
-        tracker_url.Path = urls_parts[3];
-
-    // TODO }
+    auto deserialize = [&](auto & object) {
+        size_t i = 0;
+        boost::hana::for_each(bh::keys(object), [&](auto key) {
+            if (i == urls_parts.size())
+                return;
+            else {
+                auto& member = bh::at_key(object, key);
+                member = urls_parts[i++];
+            }
+        });
+    };
+    deserialize(tracker_url);
 }
 
 std::string const &tracker::Tracker::GetInfoHash() const {

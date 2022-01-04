@@ -16,8 +16,18 @@
 #include <boost/thread.hpp>
 #include <boost/regex.hpp>
 
+#include <boost/hana/assert.hpp>
+#include <boost/hana/core/to.hpp>
+#include <boost/hana/define_struct.hpp>
+#include <boost/hana/pair.hpp>
+#include <boost/hana/for_each.hpp>
+#include <boost/hana/at_key.hpp>
+#include <boost/hana/keys.hpp>
+
 #include "bencode_lib.h"
 #include "Peer.h"
+
+namespace bh = boost::hana;
 
 namespace bittorrent {
     struct Torrent;
@@ -44,46 +54,49 @@ namespace tracker {
             {tracker::Event::Stopped, "stopped"}
     };
     struct Query {
-        Event event = Event::Empty;
-        size_t port {};
-        size_t uploaded{};
-        size_t downloaded{};
-        size_t left{};
-        bool compact{true};
-        bool no_peer_id{false};
+        BOOST_HANA_DEFINE_STRUCT(Query,
+                                 (Event, event),
+                                 (size_t, port),
+                                 (size_t, uploaded),
+                                 (size_t, downloaded),
+                                 (size_t, left),
+                                 (bool, compact),
+                                 (bool, no_peer_id),
 
-        // TODO сделать это рефлексией, чтобы бегать по опиональным объектам в виде цикла или чего-то такого (неявно их добовлять к аргументам URLа)
-        // optional
-        std::optional<std::string> ip;
-        std::optional<size_t> numwant;
-        std::optional<std::string> key;
-        std::optional<std::string> trackerid;
+                                 (std::optional<std::string>, ip),
+                                 (std::optional<size_t>, numwant),
+                                 (std::optional<std::string>, key),
+                                 (std::optional<std::string>, trackerid)
+        );
+
     };
     struct Response {
-        std::chrono::seconds interval = std::chrono::seconds(900);
-        std::string tracker_id;
-        size_t complete;
-        size_t incomplete;
-
         struct peer_image{
             bittorrent::Peer dict; // PEERS with keys: peer_id, ip, port
             std::string bin; // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
         };
+
+        std::chrono::seconds interval;
+        std::string tracker_id;
+        size_t complete;
+        size_t incomplete;
         std::vector<peer_image> peers;
 
-        // TODO сделать это рефлексией
-        // optional
         std::optional<std::string> warning_message;
         std::optional<std::chrono::seconds> min_interval;
+
+        Response() : interval(std::chrono::seconds(900)) {}
     };
     struct Url {
-        std::string Protocol;
-        std::string Host;
-        std::string Port;
+        BOOST_HANA_DEFINE_STRUCT(Url,
+                                 (std::string, Protocol),
+                                 (std::string, Host),
+                                 (std::string, Port),
 
-        std::optional<std::string> Path;
-        std::optional<std::string> File;
-        std::optional<std::string> Parameters;
+                                 (std::optional<std::string>, Path),
+                                 (std::optional<std::string>, File),
+                                 (std::optional<std::string>, Parameters)
+        );
     };
 
     struct Tracker : std::enable_shared_from_this<Tracker> {
