@@ -5,7 +5,7 @@
 
 #include "auxiliary.h"
 
-bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : resolver(service) {
+bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : tcp_resolver(service), udp_resolver(service) {
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");
@@ -27,10 +27,12 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : 
 bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event event) {
     if (!HasTrackers())
         return false;
-//    service.reset();
+    service.reset();
     tracker::Query query {event, t_uploaded, t_downloaded, t_left};
 
+#ifdef OS_WIN
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+#endif
     std::thread t;
     try {
         std::vector<boost::future<tracker::Response>> results;
@@ -38,7 +40,13 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             results.push_back(tracker->Request(service, query));
         }
 
-        t = std::thread([&]{ SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); service.run(); std::cout << "service stopped" << std::endl;});
+        t = std::thread([&]{
+#ifdef OS_WIN
+            SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+#endif
+            service.run();
+            std::cout << "service stopped" << std::endl;
+        });
         switch (policy) {
             case launch::any: {
                 boost::promise<tracker::Response> total_res;
@@ -96,7 +104,8 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             }
         }
         std::cout << "service gonna stop from try" << std::endl;
-        resolver.cancel();
+        tcp_resolver.cancel();
+        udp_resolver.cancel();
         service.stop();
         t.join();
 
@@ -104,7 +113,8 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         return true;
     } catch (boost::exception & excp) {
         std::cout << "service gonna stop from catch" << std::endl;
-        resolver.cancel();
+        tcp_resolver.cancel();
+        udp_resolver.cancel();
         service.stop();
         if (t.joinable())
             t.join();
@@ -150,18 +160,6 @@ bool bittorrent::Torrent::FillTrackers() {
     return true;
 }
 
-std::string const &bittorrent::Torrent::GetInfoHash() const  {
-    if (!url_info_hash)
-        url_info_hash.emplace(UrlEncode(meta_info.info_hash));
-    return url_info_hash.value();
-}
-
-std::string const & bittorrent::Torrent::GetMasterPeerKey() const {
-    if (!url_master_peer_key)
-        url_master_peer_key.emplace(UrlEncode(GetSHA1(std::to_string(master_peer->GetKey()))));
-    return url_master_peer_key.value();
-}
-
 tracker::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
     return tracker::Query{.event = tracker::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left};
 }
@@ -170,6 +168,10 @@ boost::asio::io_service & bittorrent::Torrent::GetService() const {
     return service;
 }
 
-ba::ip::tcp::resolver &bittorrent::Torrent::GetResolver() const {
-    return resolver;
+ba::ip::tcp::resolver &bittorrent::Torrent::GetTCPResolver() const {
+    return tcp_resolver;
+}
+
+ba::ip::udp::resolver &bittorrent::Torrent::GetUDPResolver() const {
+    return udp_resolver;
 }

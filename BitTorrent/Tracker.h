@@ -101,7 +101,7 @@ namespace tracker {
         Url const & GetUrl() const { return tracker_url; }
         size_t GetPort() const;
         std::string const & GetInfoHash() const;
-        std::string const & GetMasterPeerId() const;
+        size_t GetMasterPeerId() const;
     private:
         friend class bittorrent::Torrent;
         void MakeRequester();

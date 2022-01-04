@@ -6,8 +6,6 @@
 
 namespace ba = boost::asio;
 
-// TODO потом перенести логику в приватные методы, а тут решать по протоколу какой (http или https) алгоритм обработки выбрать
-
 tracker::Tracker::Tracker(std::string tracker_url_arg,
                           bittorrent::Torrent & torrent_arg)
     : torrent(torrent_arg)
@@ -43,7 +41,7 @@ std::string const &tracker::Tracker::GetInfoHash() const {
     return torrent.GetInfoHash();
 }
 
-std::string const & tracker::Tracker::GetMasterPeerId() const {
+size_t tracker::Tracker::GetMasterPeerId() const {
     return torrent.GetMasterPeerKey();
 }
 
@@ -58,7 +56,7 @@ boost::future<tracker::Response> tracker::Tracker::Request(boost::asio::io_servi
 
 void tracker::Tracker::MakeRequester() {
     if (tracker_url.Protocol == "udp")
-        request = std::make_shared<network::udpRequester>(Get(), torrent.GetService(), torrent.GetResolver());
+        request = std::make_shared<network::udpRequester>(Get(), torrent.GetService(), torrent.GetTCPResolver());
     else
-        request = std::make_shared<network::httpRequester>(Get(), torrent.GetService(), torrent.GetResolver());
+        request = std::make_shared<network::httpRequester>(Get(), torrent.GetService(), torrent.GetUDPResolver());
 }
