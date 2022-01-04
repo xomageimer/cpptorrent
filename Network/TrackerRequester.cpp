@@ -4,9 +4,10 @@
 #include <utility>
 
 #include "Tracker.h"
+#include "random_generator.h"
 #include "auxiliary.h"
 
-void network::TrackerRequester::SetResponse() {
+void network::httpRequester::SetResponse() {
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
     std::vector<std::string> bencode_response;
     boost::regex expression(
@@ -16,24 +17,29 @@ void network::TrackerRequester::SetResponse() {
     {
         SetException("Bad response, can't split to bencode format");
     }
-//    std::cout << bencode_response.back() << std::endl;
+    std::cout << bencode_response.back() << std::endl;
 
     std::stringstream ss (bencode_response.back()) ;
     auto bencoder = bencode::Deserialize::Load(ss);
-    const auto& bencode_resp = bencoder.GetRoot();
+    const auto& bencode_resp = bencoder.GetRoot().AsDict();
 
     tracker::Response resp;
 
-    if (auto tracker_id_opt = bencode_resp.TryAt("tracker_id"); tracker_id_opt)
-        resp.tracker_id = tracker_id_opt.value().get().AsString();
-    if (auto interval_opt = bencode_resp.TryAt("interval"); interval_opt)
-        resp.interval = std::chrono::seconds(interval_opt.value().get().AsNumber());
-    if (auto min_interval_opt = bencode_resp.TryAt("min_interval"); min_interval_opt)
-        resp.min_interval = std::chrono::seconds(min_interval_opt.value().get().AsNumber());
+    if (bencode_resp.count("tracker_id"))
+        resp.tracker_id = bencode_resp.at("tracker_id").AsString();
+    if (bencode_resp.count("interval"))
+        resp.interval = std::chrono::seconds(bencode_resp.at("interval").AsNumber());
+    if (bencode_resp.count("complete"))
+        resp.complete = bencode_resp.at("complete").AsNumber();
+    if (bencode_resp.count("incomplete"))
+        resp.incomplete = bencode_resp.at("incomplete").AsNumber();
 
-    resp.complete = bencode_resp["complete"].AsNumber();
-    resp.incomplete = bencode_resp["incomplete"].AsNumber();
-
+    if (auto it = bencode_resp.begin(); (it = bencode_resp.find("min_interval"), it != bencode_resp.end())
+                                        || (it = bencode_resp.find("min interval"), it != bencode_resp.end()))
+        resp.min_interval = std::chrono::seconds(it->second.AsNumber());
+    if (auto it = bencode_resp.begin(); (it = bencode_resp.find("warning_message"), it != bencode_resp.end())
+                                        || (it = bencode_resp.find("warning message"), it != bencode_resp.end()))
+        resp.warning_message = it->second.AsString();
 
 
     promise_of_resp.set_value(std::move(resp));
@@ -168,19 +174,49 @@ void network::httpRequester::do_read_response_body() {
                             });
 }
 
+// TODO использовать query
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     if (!socket_)
         socket_.emplace(io_service);
 
-
-
-    SetException("NIGGA");
+    query_ = query;
+    do_resolve();
 }
 
 void network::udpRequester::do_resolve() {
+    resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
+                            [this](boost::system::error_code const & ec,
+                                   ba::ip::udp::resolver::iterator endpoints){
+                                if (!ec) {
+                                    uint8_t buff[16];
+                                    connect_request c_req;
+                                    c_req.transaction_id = static_cast<int>(random_generator::Random().GetNumber<size_t>());
+                                    std::memcpy(&buff, &c_req, sizeof(c_req));
 
+                                    for (auto it = endpoints; it != ba::ip::udp::resolver::iterator(); it++) {
+                                        do_connect(it, buff);
+                                    }
+                                } else {
+                                    SetException("Unable to resolve host: " + ec.message());
+                                }
+                            });
 }
 
-void network::udpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints) {
+void network::udpRequester::do_connect(ba::ip::udp::resolver::iterator endpoint_it, uint8_t * buff) {
+    ba::ip::udp::endpoint endpoint = *endpoint_it;
+    socket_->open(endpoint.protocol());
+
+    socket_->async_send_to(
+                ba::buffer(buff, sizeof(connect_request)), endpoint,
+               [&] (boost::system::error_code const & ec, size_t bytes_transferred){
+                    if (!ec && bytes_transferred == 16) {
+                        do_read_connect_response();
+                    }
+                }
+            );
+}
+
+void network::udpRequester::do_read_connect_response() {
+    uint8_t buff[16];
 
 }

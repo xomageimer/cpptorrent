@@ -7,7 +7,6 @@
 std::string GetSHA1(const std::string& p_arg);
 std::string UrlEncode(std::string const & url_to_encode);
 
-
 template <typename T, typename Enable = void>
 struct is_optional : std::false_type {};
 
