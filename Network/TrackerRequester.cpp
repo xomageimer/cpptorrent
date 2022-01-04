@@ -39,13 +39,15 @@ void network::TrackerRequester::SetResponse() {
     // TODO додеалть респоунс
 
     promise_of_resp.set_value(std::move(resp));
+    Disconnect();
 }
 
 void network::TrackerRequester::SetException(const std::string &exc) {
     promise_of_resp.set_exception(network::BadConnect(exc));
+    Disconnect();
 }
 
-void network::httpRequester::Connect(const tracker::Query &query) {
+void network::httpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     std::ostream request_stream(&request_);
 
     auto tracker_ptr = tracker_.lock();
@@ -64,6 +66,8 @@ void network::httpRequester::Connect(const tracker::Query &query) {
 //    std::string str(ba::buffers_begin(bufs),
 //                    ba::buffers_begin(bufs) + request_.size());
 //    std::cout << str << std::endl;
+    if (!socket_)
+        socket_.emplace(io_service);
     do_resolve();
 }
 
@@ -80,8 +84,8 @@ void network::httpRequester::do_resolve() {
 }
 
 void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints) {
-    ba::async_connect(socket_, endpoints,
-                               [this](boost::system::error_code const & ec, ba::ip::tcp::resolver::iterator){
+    ba::async_connect(*socket_, endpoints,
+                               [this](boost::system::error_code const & ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&){
                                     if (!ec) {
                                         do_request();
                                     } else {
@@ -91,7 +95,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
 }
 
 void network::httpRequester::do_request() {
-    ba::async_write(socket_, request_, [this](boost::system::error_code ec, std::size_t /*length*/){
+    ba::async_write(*socket_, request_, [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();
         } else {
@@ -101,7 +105,7 @@ void network::httpRequester::do_request() {
 }
 
 void network::httpRequester::do_read_response_status() {
-    ba::async_read_until(socket_,
+    ba::async_read_until(*socket_,
                                   response_,
                                   "\r\n",
                                   [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
@@ -131,7 +135,7 @@ void network::httpRequester::do_read_response_status() {
 }
 
 void network::httpRequester::do_read_response_header() {
-    ba::async_read_until(socket_,
+    ba::async_read_until(*socket_,
                                   response_,
                                   "\r\n\r\n",
                                   [this](boost::system::error_code ec, std::size_t /*length*/)
@@ -148,7 +152,7 @@ void network::httpRequester::do_read_response_header() {
 }
 
 void network::httpRequester::do_read_response_body() {
-    ba::async_read(socket_,
+    ba::async_read(*socket_,
                             response_,
                             [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
                             {
@@ -165,7 +169,12 @@ void network::httpRequester::do_read_response_body() {
                             });
 }
 
-void network::udpRequester::Connect(const tracker::Query &query) {
+void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
+    if (!socket_)
+        socket_.emplace(io_service);
+
+
+
     SetException("NIGGA");
 }
 

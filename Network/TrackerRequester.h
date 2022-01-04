@@ -36,7 +36,7 @@ namespace network {
         explicit TrackerRequester(const std::shared_ptr<tracker::Tracker>& tracker)
                 : tracker_(tracker) {}
 
-        virtual void Connect(const tracker::Query &query) = 0;
+        virtual void Connect(ba::io_service & io_service, const tracker::Query &query) = 0;
         virtual void Disconnect() = 0;
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
         virtual ~TrackerRequester() = default;
@@ -56,10 +56,14 @@ namespace network {
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & io_service, ba::ip::tcp::resolver & resolver)
-                : TrackerRequester(tracker), socket_(io_service), resolver_(resolver) {}
+        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::ip::tcp::resolver & resolver)
+                : TrackerRequester(tracker), resolver_(resolver) {}
 
-        void Connect(const tracker::Query &query) override;
+        void Connect(ba::io_service & io_service, const tracker::Query &query) override;
+        void Disconnect() override {
+            socket_->close();
+            socket_.reset();
+        };
     private:
         void do_resolve() override;
         void do_connect(ba::ip::tcp::resolver::iterator endpoints) override;
@@ -74,16 +78,20 @@ namespace network {
 
     struct udpRequester : public TrackerRequester {
     public:
-        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::io_service & io_service, ba::ip::udp::resolver & resolver)
-                : socket_(io_service), resolver_(resolver), TrackerRequester(tracker) {}
+        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::ip::udp::resolver & resolver)
+                : resolver_(resolver), TrackerRequester(tracker) {}
 
-        void Connect(const tracker::Query &query) override;
+        void Connect(ba::io_service & io_service, const tracker::Query &query) override;
+        void Disconnect() override {
+            socket_->close();
+            socket_.reset();
+        };
     private:
         void do_resolve() override;
         void do_connect(ba::ip::tcp::resolver::iterator endpoints) override;
 
         ba::ip::udp::resolver & resolver_;
-        ba::ip::udp::socket socket_;
+        std::optional<ba::ip::udp::socket> socket_;
 
         struct connect_request {
             be::big_int64_buf_t protocol_id {0x41727101980};
@@ -99,8 +107,8 @@ namespace network {
             be::big_int64_buf_t connection_id;
             be::big_int32_buf_t action {1};
             be::big_int32_buf_t transaction_id;
-            be::big_int8_buf_t info_hash[20];
-            be::big_int8_buf_t peer_id[20];
+            int8_t info_hash[20];
+            int8_t peer_id[20];
             be::big_int64_buf_t downloaded;
             be::big_int64_buf_t left;
             be::big_int64_buf_t uploaded;
