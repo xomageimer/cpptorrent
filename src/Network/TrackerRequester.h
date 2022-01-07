@@ -19,8 +19,6 @@
 namespace ba = boost::asio;
 namespace be = boost::endian;
 
-#define MTU 1500
-
 namespace tracker {
     struct Tracker;
     struct Query;
@@ -86,24 +84,27 @@ namespace network {
     struct udpRequester : public TrackerRequester {
     public:
         explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & service)
-                : resolver_(service), timeout_(service), TrackerRequester(tracker) {}
+                : resolver_(service), connect_timeout_(service), announce_timeout_(service), TrackerRequester(tracker) {}
 
         void Connect(ba::io_service & io_service, const tracker::Query &query) override;
         void Disconnect() override {
+            announce_timeout_.cancel();
+            connect_timeout_.cancel();
             socket_->close();
-            socket_.reset();
         };
     private:
         void do_resolve();
 
         void do_try_connect();
         void do_connect();
+        void do_connect_response();
 
         void do_try_announce();
         void do_announce();
+        void do_announce_response();
 
-        template <typename F>
-        void check_deadline(F func);
+        void connect_deadline();
+        void announce_deadline();
         void UpdateEndpoint();
 
         void SetResponse() override {}
@@ -115,16 +116,22 @@ namespace network {
         std::optional<ba::ip::udp::socket> socket_;
         ba::ip::udp::resolver::iterator endpoints_it_;
 
-
         uint8_t buff[16];
-        uint8_t request[98];
 
+        static const inline int MTU = 1500;
+        uint8_t request[98];
         uint8_t response[MTU];
 
+        static const inline int MAX_CONNECT_ATTEMPTS = 4;
+        static const inline int MAX_ANNOUNCE_ATTEMPTS = 3;
         size_t attempts_ = 0;
         size_t announce_attempts_ = 0;
-        ba::deadline_timer timeout_;
-        std::atomic<bool> timer_stopped_ = false;
+
+        static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
+        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(15000)};
+        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(10000)};
+        ba::deadline_timer connect_timeout_;
+        ba::deadline_timer announce_timeout_;
 
         tracker::Query query_;
 
@@ -140,18 +147,6 @@ namespace network {
         } c_resp;
         // TODO add scrape
     };
-
-    template <typename F>
-    void network::udpRequester::check_deadline(F func) {
-        if (timer_stopped_)
-            return;
-
-        if (timeout_.expires_at() <= ba::deadline_timer::traits_type::now())
-        {
-            socket_->cancel();
-            func();
-        }
-    }
 }
 
 #endif //CPPTORRENT_TRACKERREQUESTER_H

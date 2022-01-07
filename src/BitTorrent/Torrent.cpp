@@ -1,3 +1,7 @@
+#if defined(WIN) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
+#define OS_WIN
+#endif
+
 #include "Torrent.h"
 
 #include <random>
@@ -48,13 +52,13 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             service.run();
             std::cout << "service stopped" << std::endl;
         });
-        t2 = std::thread([&]{
-#ifdef OS_WIN
-            SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-#endif
-            service.run();
-            std::cout << "service stopped" << std::endl;
-        });
+//        t2 = std::thread([&]{
+//#ifdef OS_WIN
+//            SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+//#endif
+//            service.run();
+//            std::cout << "service stopped" << std::endl;
+//        });
         switch (policy) {
             case launch::any: {
                 boost::promise<tracker::Response> total_res;
@@ -113,7 +117,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         std::cout << "service gonna stop from try" << std::endl;
         service.stop();
         t.join();
-        t2.join();
+//        t2.join();
 
         std::cout << data_from_tracker.complete << std::endl;
         return true;

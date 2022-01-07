@@ -1,3 +1,5 @@
+//#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
+
 #include "TrackerRequester.h"
 
 #include <iostream>
@@ -191,94 +193,149 @@ void network::udpRequester::do_resolve() {
 
                                     make_announce_request();
                                     make_connect_request();
+
                                     do_try_connect();
+                                    connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
+                                        if (!ec) {
+                                            connect_deadline();
+                                        }
+                                    });
                                 } else {
                                     SetException("Unable to resolve host: " + ec.message());
                                 }
                             });
 }
 
+
 void network::udpRequester::do_try_connect() {
-    if (attempts_ > 8) {
+    std::cerr << "connect attempt: " << attempts_ << std::endl;
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
+
+    if (attempts_ >= MAX_CONNECT_ATTEMPTS) {
         UpdateEndpoint();
-        if (endpoints_it_ == ba::ip::udp::resolver::iterator())
-            return;
-
-        ba::ip::udp::endpoint endpoint = *endpoints_it_;
-        socket_->open(endpoint.protocol());
     }
-
-    do_connect();
-    static auto func = [this] {do_try_connect();};
-    timer_stopped_ = false;
-    timeout_.async_wait( boost::bind(&udpRequester::check_deadline<decltype(func)>, this, func));
-
-    attempts_++;
+    if (endpoints_it_ != ba::ip::udp::resolver::iterator()) {
+        do_connect();
+        attempts_++;
+    }
 }
 
 void network::udpRequester::do_connect() {
-    std::memcpy(&buff, &c_req, sizeof(connect_request));
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
 
+    std::memcpy(&buff, &c_req, sizeof(connect_request));
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
                ba::buffer(buff, sizeof(connect_request)), endpoint,
                [this] (boost::system::error_code const & ec, size_t bytes_transferred){
+                   std::cerr << "send successfull completly" << std::endl;
                     if (ec || bytes_transferred != sizeof(connect_request)) {
-                        timer_stopped_ = true;
-                        attempts_ = 9;
-                        do_try_connect();
+                        attempts_ = MAX_CONNECT_ATTEMPTS;
+                    } else {
+                        do_connect_response();
                     }
                 }
             );
-    timeout_.expires_from_now(boost::posix_time::seconds(static_cast<int>(15 * std::pow(2, attempts_))));
+    connect_timeout_.expires_from_now(connection_waiting_time + epsilon);
+}
+
+void network::udpRequester::do_connect_response() {
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
+
+    ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_receive_from(
             ba::buffer(buff, sizeof(connect_response)), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_trasferred) {
-                if (!ec && bytes_trasferred == sizeof(connect_response) && be::big_int32_buf_t{buff[4]}.value() == c_req.transaction_id.value() && buff[0] != 0) {
-                    std::memcpy(&c_resp, &buff,sizeof(connect_response));
+                std::cerr << "receive successfull completly" << std::endl;
+                int val;
+                std::memcpy(&val, &buff[4], 4);
+                be::native_to_big_inplace(val);
+
+                if (!ec && bytes_trasferred == sizeof(connect_response) && val == c_req.transaction_id.value() && buff[0] == 0) {
+                    connect_timeout_.cancel();
+
+                    std::memcpy(&c_resp, &buff, sizeof(connect_response));
                     do_try_announce();
+                    announce_timeout_.async_wait( [this](boost::system::error_code const & ec){
+                        if (!ec) {
+                            announce_deadline();
+                        }
+                    });
+                    connect_timeout_.expires_from_now(boost::posix_time::pos_infin);
                 }
             }
     );
 }
 
 void network::udpRequester::do_try_announce() {
-    if (announce_attempts_ > 6) {
-        announce_attempts_ = 0;
-        do_try_connect();
-    } else {
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
 
+    if (announce_attempts_ >= MAX_ANNOUNCE_ATTEMPTS) {
+        announce_attempts_ = 0;
+
+        do_try_connect();
+        connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
+            if (!ec) {
+                connect_deadline();
+            }
+        });
+        announce_timeout_.expires_from_now(boost::posix_time::pos_infin);
+    } else {
         do_announce();
-        static auto func = [this] {do_try_announce();};
-        timeout_.async_wait( boost::bind(&udpRequester::check_deadline<decltype(func)>, this, func));
 
         announce_attempts_++;
     }
 }
 
-
 void network::udpRequester::do_announce() {
-    ba::ip::udp::endpoint endpoint = *endpoints_it_;
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
 
     std::memcpy(&request[0], &c_resp.connection_id, sizeof(c_resp.connection_id));
     std::memcpy(&request[12], &c_resp.transaction_id, sizeof(c_resp.transaction_id));
 
+    ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred){
-                if (ec || bytes_transferred != sizeof(connect_request)) {
-                    timer_stopped_ = true;
-                    attempts_ = 9;
-                    do_try_connect();
+                std::cerr << "announce send successfull completly" << std::endl;
+                if (ec || bytes_transferred != sizeof(request)) {
+                    announce_attempts_ = MAX_ANNOUNCE_ATTEMPTS;
+                } else {
+                    do_announce_response();
                 }
             }
     );
-    timeout_.expires_from_now(boost::posix_time::seconds(10));
+    announce_timeout_.expires_from_now(announce_waiting_time + epsilon);
+}
+
+void network::udpRequester::do_announce_response() {
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
+
+    ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_receive_from(
             ba::buffer(response, MTU), endpoint,
-            [this] (boost::system::error_code const & ec, size_t bytes_trasferred) {
-                if (!ec && bytes_trasferred == 20 && be::big_int32_buf_t{response[4]}.value() == c_req.transaction_id.value() && response[8] != 0) {
-                    std::cout << response << std::endl;
+            [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
+                std::cerr << "announce get successfull completly" << std::endl;
+                int val;
+                std::memcpy(&val, &response[4], 4);
+                be::native_to_big_inplace(val);
+
+                std::cerr << "_________________________________"
+                          << "\n!ec: " << !ec
+                          << "\nbytes_transferred: " << bytes_transferred
+                          << "\nval == c_req.transaction_id.value(): " << (val == c_req.transaction_id.value())
+                          << "\nresponse[0] != 0: " << (response[0] != 0)
+                          << "\nresponse[0] = " << std::hex << be::big_to_native(int32_t(response[0]))
+                          << "\n_________________________________" << std::endl;
+                if (!ec && bytes_transferred >= 20 && val == c_req.transaction_id.value() && response[0] != 0) {
+                    announce_timeout_.cancel();
+                    SetResponse();
                 }
             }
     );
@@ -314,10 +371,49 @@ void network::udpRequester::make_announce_request() {
 }
 
 void network::udpRequester::UpdateEndpoint() {
-    endpoints_it_++;
     attempts_ = 0;
-    socket_->close();
+    endpoints_it_++;
+
+    socket_->cancel();
     if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
         SetException("all endpoints were polled but without success");
     }
+}
+
+void network::udpRequester::connect_deadline() {
+    std::cerr << "connect timer" << std::endl;
+
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+        return;
+
+    if (connect_timeout_.expires_at() <= ba::deadline_timer::traits_type::now())
+    {
+        socket_->cancel();
+        do_try_connect();
+    }
+
+    connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
+        if (!ec) {
+            connect_deadline();
+        }
+    });
+}
+
+void network::udpRequester::announce_deadline() {
+    std::cerr << "announce timer" << std::endl;
+
+    if (endpoints_it_ ==  ba::ip::udp::resolver::iterator())
+        return;
+
+    if (announce_timeout_.expires_at() <=  ba::deadline_timer::traits_type::now())
+    {
+        socket_->cancel();
+        do_try_announce();
+    }
+
+    announce_timeout_.async_wait( [this](boost::system::error_code const & ec){
+        if (!ec) {
+            announce_deadline();
+        }
+    });
 }
