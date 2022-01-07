@@ -65,7 +65,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                     explicit DoneCheck(boost::promise<tracker::Response> & res) : result(res) {}
                     void operator()(boost::future<std::vector<boost::future<tracker::Response>>> result_args) {
                         auto results = result_args.get();
-                        auto any_res = std::find_if(results.begin(), results.end(), [](const boost::future<std::string>& f)
+                        auto any_res = std::find_if(results.begin(), results.end(), [](const boost::future<tracker::Response>& f)
                         {
                             return f.is_ready();
                         });
