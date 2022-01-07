@@ -1,6 +1,8 @@
 #ifndef CPPTORRENT_TRACKERREQUESTER_H
 #define CPPTORRENT_TRACKERREQUESTER_H
 
+#define BOOST_ASIO_ENABLE_CANCELIO
+
 #include <boost/asio.hpp>
 #define BOOST_THREAD_PROVIDES_FUTURE
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
@@ -8,6 +10,7 @@
 #include <boost/thread.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/endian/buffers.hpp>
+#include <boost/endian/conversion.hpp>
 
 #include <utility>
 
@@ -15,6 +18,8 @@
 
 namespace ba = boost::asio;
 namespace be = boost::endian;
+
+#define MTU 1500
 
 namespace tracker {
     struct Tracker;
@@ -98,86 +103,54 @@ namespace network {
         void do_announce();
 
         template <typename F>
-        void check_deadline(F && func);
-        void UpdateEndpoint() {
-            endpoints_it_++;
-            attempts_ = 0;
-            socket_->close();
-            if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
-                timer_stopped_ = true;
-                SetException("all endpoints were polled but without success");
-            }
-        }
+        void check_deadline(F func);
+        void UpdateEndpoint();
 
         void SetResponse() override {}
+
+        void make_announce_request();
+        void make_connect_request();
 
         ba::ip::udp::resolver resolver_;
         std::optional<ba::ip::udp::socket> socket_;
         ba::ip::udp::resolver::iterator endpoints_it_;
 
+
+        uint8_t buff[16];
+        uint8_t request[98];
+
+        uint8_t response[MTU];
+
         size_t attempts_ = 0;
+        size_t announce_attempts_ = 0;
         ba::deadline_timer timeout_;
         std::atomic<bool> timer_stopped_ = false;
 
         tracker::Query query_;
 
-        uint8_t response[98]{};
         struct connect_request {
             be::big_int64_buf_t protocol_id {0x41727101980};
             be::big_int32_buf_t action {0};
             be::big_int32_buf_t transaction_id{};
-        };
+        } c_req;
         struct connect_response {
             be::big_int64_buf_t connection_id{};
             be::big_int32_buf_t action {0};
             be::big_int32_buf_t transaction_id{};
-        };
-//        struct announce_request {
-//            be::big_int64_buf_t connection_id{};
-//            be::big_int32_buf_t action {1};
-//            be::big_int32_buf_t transaction_id{};
-//            int8_t info_hash[20]{};
-//            int8_t peer_id[20]{};
-//            be::big_int64_buf_t downloaded{};
-//            be::big_int64_buf_t left{};
-//            be::big_int64_buf_t uploaded{};
-//            be::big_int32_buf_t event {0};
-//            be::big_int32_buf_t ip {0};
-//            be::big_int32_buf_t key{};
-//            be::big_int32_buf_t numwant {-1};
-//            be::big_int16_buf_t port{};
-//        };
-        struct announce_response {
-            be::big_int32_buf_t action {1};
-            be::big_int32_buf_t transaction_id{};
-            be::big_int32_buf_t interval{};
-            be::big_int32_buf_t leechers{};
-            be::big_int32_buf_t seeders{};
-            be::big_int32_buf_t ip{};
-            be::big_int32_buf_t port{};
-        };
-        struct error_response {
-            be::big_int32_buf_t action {3};
-            be::big_int32_buf_t transaction_id;
-            std::string message;
-        };
+        } c_resp;
         // TODO add scrape
     };
 
     template <typename F>
-    void network::udpRequester::check_deadline(F && func) {
+    void network::udpRequester::check_deadline(F func) {
         if (timer_stopped_)
             return;
 
         if (timeout_.expires_at() <= ba::deadline_timer::traits_type::now())
         {
-            attempts_++;
+            socket_->cancel();
             func();
         }
-
-        timeout_.async_wait([=](){
-            check_deadline(std::forward<F>(func));
-        });
     }
 }
 

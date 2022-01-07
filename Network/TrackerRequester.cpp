@@ -42,6 +42,7 @@ void network::httpRequester::SetResponse() {
                                         || (it = bencode_resp.find("warning message"), it != bencode_resp.end()))
         resp.warning_message = it->second.AsString();
 
+    // TODO добавлять пиров
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
@@ -185,9 +186,11 @@ void network::udpRequester::do_resolve() {
                                    ba::ip::udp::resolver::iterator endpoints){
                                 if (!ec) {
                                     endpoints_it_ = std::move(endpoints);
-
                                     ba::ip::udp::endpoint endpoint = *endpoints_it_;
                                     socket_->open(endpoint.protocol());
+
+                                    make_announce_request();
+                                    make_connect_request();
                                     do_try_connect();
                                 } else {
                                     SetException("Unable to resolve host: " + ec.message());
@@ -198,38 +201,41 @@ void network::udpRequester::do_resolve() {
 void network::udpRequester::do_try_connect() {
     if (attempts_ > 8) {
         UpdateEndpoint();
+        if (endpoints_it_ == ba::ip::udp::resolver::iterator())
+            return;
+
         ba::ip::udp::endpoint endpoint = *endpoints_it_;
         socket_->open(endpoint.protocol());
     }
 
     do_connect();
-    timeout_.async_wait([=](){
-        check_deadline([this] {do_try_connect();});
-    });
+    static auto func = [this] {do_try_connect();};
+    timer_stopped_ = false;
+    timeout_.async_wait( boost::bind(&udpRequester::check_deadline<decltype(func)>, this, func));
+
+    attempts_++;
 }
 
 void network::udpRequester::do_connect() {
-    uint8_t buff[16];
-    connect_request c_req;
-    c_req.transaction_id = static_cast<int>(random_generator::Random().GetNumber<size_t>());
-    std::memcpy(&buff, &c_req, sizeof(c_req));
-    ba::ip::udp::endpoint endpoint = *endpoints_it_;
+    std::memcpy(&buff, &c_req, sizeof(connect_request));
 
+    ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
                ba::buffer(buff, sizeof(connect_request)), endpoint,
-               [=] (boost::system::error_code const & ec, size_t bytes_transferred){
+               [this] (boost::system::error_code const & ec, size_t bytes_transferred){
                     if (ec || bytes_transferred != sizeof(connect_request)) {
+                        timer_stopped_ = true;
                         attempts_ = 9;
                         do_try_connect();
                     }
                 }
             );
-
     timeout_.expires_from_now(boost::posix_time::seconds(static_cast<int>(15 * std::pow(2, attempts_))));
     socket_->async_receive_from(
             ba::buffer(buff, sizeof(connect_response)), endpoint,
-            [=] (boost::system::error_code const & ec, size_t bytes_trasferred) {
-                if (!ec && bytes_trasferred == sizeof(connect_response)) {
+            [this] (boost::system::error_code const & ec, size_t bytes_trasferred) {
+                if (!ec && bytes_trasferred == sizeof(connect_response) && be::big_int32_buf_t{buff[4]}.value() == c_req.transaction_id.value() && buff[0] != 0) {
+                    std::memcpy(&c_resp, &buff,sizeof(connect_response));
                     do_try_announce();
                 }
             }
@@ -237,10 +243,81 @@ void network::udpRequester::do_connect() {
 }
 
 void network::udpRequester::do_try_announce() {
+    if (announce_attempts_ > 6) {
+        announce_attempts_ = 0;
+        do_try_connect();
+    } else {
 
+        do_announce();
+        static auto func = [this] {do_try_announce();};
+        timeout_.async_wait( boost::bind(&udpRequester::check_deadline<decltype(func)>, this, func));
+
+        announce_attempts_++;
+    }
 }
 
 
 void network::udpRequester::do_announce() {
+    ba::ip::udp::endpoint endpoint = *endpoints_it_;
 
+    std::memcpy(&request[0], &c_resp.connection_id, sizeof(c_resp.connection_id));
+    std::memcpy(&request[12], &c_resp.transaction_id, sizeof(c_resp.transaction_id));
+
+    socket_->async_send_to(
+            ba::buffer(request, sizeof(request)), endpoint,
+            [this] (boost::system::error_code const & ec, size_t bytes_transferred){
+                if (ec || bytes_transferred != sizeof(connect_request)) {
+                    timer_stopped_ = true;
+                    attempts_ = 9;
+                    do_try_connect();
+                }
+            }
+    );
+    timeout_.expires_from_now(boost::posix_time::seconds(10));
+    socket_->async_receive_from(
+            ba::buffer(response, MTU), endpoint,
+            [this] (boost::system::error_code const & ec, size_t bytes_trasferred) {
+                if (!ec && bytes_trasferred == 20 && be::big_int32_buf_t{response[4]}.value() == c_req.transaction_id.value() && response[8] != 0) {
+                    std::cout << response << std::endl;
+                }
+            }
+    );
+}
+
+void network::udpRequester::make_connect_request() {
+    c_req.transaction_id = be::native_to_big(static_cast<int>(random_generator::Random().GetNumber<size_t>()));
+}
+
+// TODO сделать более читабельно + убрать дубли + переделать всё в функции вида native_to_big
+void network::udpRequester::make_announce_request() {
+    request[8] = 1;
+    std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
+    std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
+
+    static auto BE = [&](auto native_val) {
+        auto a = native_val;
+        be::native_to_big_inplace(a);
+        return a;
+    };
+
+    size_t i64_tmp;
+    std::memcpy(&request[56], (i64_tmp = BE(query_.downloaded), &i64_tmp), sizeof(query_.downloaded));
+    std::memcpy(&request[64], (i64_tmp = BE(query_.left), &i64_tmp), sizeof(query_.left));
+    std::memcpy(&request[72], (i64_tmp = BE(query_.uploaded), &i64_tmp), sizeof(query_.uploaded));
+
+    int i32_tmp;
+    std::memcpy(&request[80], (i32_tmp = BE(static_cast<int>(query_.event)), &i32_tmp), sizeof(i32_tmp));
+    std::memcpy(&request[84], (query_.ip ? (i32_tmp = BE(IpToInt(query_.ip.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
+    std::memcpy(&request[88], (query_.key ? (i32_tmp = BE(std::stoi(query_.key.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
+    std::memcpy(&request[92], (query_.numwant ? (i32_tmp = BE(static_cast<int>(query_.numwant.value())), &i32_tmp) : (i32_tmp = BE(-1), &i32_tmp)), sizeof(i32_tmp));
+    std::memcpy(&request[96], (query_.trackerid ? (i32_tmp = BE(std::stoi(query_.trackerid.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
+}
+
+void network::udpRequester::UpdateEndpoint() {
+    endpoints_it_++;
+    attempts_ = 0;
+    socket_->close();
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
+        SetException("all endpoints were polled but without success");
+    }
 }

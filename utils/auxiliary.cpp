@@ -36,3 +36,7 @@ std::string UrlEncode(const std::string &url_to_encode){
     return std::move(qstr);
 }
 
+int IpToInt(const std::string &ip_address) {
+    return 0;
+}
+
