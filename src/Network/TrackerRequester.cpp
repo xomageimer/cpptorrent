@@ -191,8 +191,8 @@ void network::udpRequester::do_resolve() {
                                     ba::ip::udp::endpoint endpoint = *endpoints_it_;
                                     socket_->open(endpoint.protocol());
 
-                                    make_announce_request();
                                     make_connect_request();
+                                    make_announce_request();
 
                                     do_try_connect();
                                     connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
@@ -208,7 +208,6 @@ void network::udpRequester::do_resolve() {
 
 
 void network::udpRequester::do_try_connect() {
-    std::cerr << "connect attempt: " << attempts_ << std::endl;
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -333,7 +332,12 @@ void network::udpRequester::do_announce_response() {
                           << "\nresponse[0] != 0: " << (response[0] != 0)
                           << "\nresponse[0] = " << std::hex << be::big_to_native(int32_t(response[0]))
                           << "\n_________________________________" << std::endl;
-                if (!ec && bytes_transferred >= 20 && val == c_req.transaction_id.value() && response[0] != 0) {
+                if (ec) {
+                    std::cerr << "ec message: " << ec.message() << std::endl;
+                } else if (!ec) {
+                    std::cout << std::string(response + 8, response + bytes_transferred + 1);
+                }
+                else if (!ec && bytes_transferred >= 20 && val == c_req.transaction_id.value() && response[0] != 0) {
                     announce_timeout_.cancel();
                     SetResponse();
                 }
@@ -348,6 +352,11 @@ void network::udpRequester::make_connect_request() {
 // TODO сделать более читабельно + убрать дубли + переделать всё в функции вида native_to_big
 void network::udpRequester::make_announce_request() {
     request[8] = 1;
+
+    for (auto & el : tracker_.lock()->GetInfoHash()){
+        std::cerr << (int)el;
+    }
+    std::cerr << std::endl;
     std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
     std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
 
@@ -367,7 +376,7 @@ void network::udpRequester::make_announce_request() {
     std::memcpy(&request[84], (query_.ip ? (i32_tmp = BE(IpToInt(query_.ip.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
     std::memcpy(&request[88], (query_.key ? (i32_tmp = BE(std::stoi(query_.key.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
     std::memcpy(&request[92], (query_.numwant ? (i32_tmp = BE(static_cast<int>(query_.numwant.value())), &i32_tmp) : (i32_tmp = BE(-1), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[96], (query_.trackerid ? (i32_tmp = BE(std::stoi(query_.trackerid.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
+    std::memcpy(&request[96], (query_.trackerid ? (i32_tmp = BE(std::stoi(query_.trackerid.value())), &i32_tmp) : (i32_tmp = BE(12345), &i32_tmp)), sizeof(i32_tmp));
 }
 
 void network::udpRequester::UpdateEndpoint() {

@@ -120,7 +120,7 @@ namespace network {
 
         static const inline int MTU = 1500;
         uint8_t request[98];
-        uint8_t response[MTU];
+        uint8_t response[MTU] {};
 
         static const inline int MAX_CONNECT_ATTEMPTS = 4;
         static const inline int MAX_ANNOUNCE_ATTEMPTS = 3;
@@ -128,8 +128,8 @@ namespace network {
         size_t announce_attempts_ = 0;
 
         static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
-        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(15000)};
-        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(10000)};
+        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(15)};
+        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(10)};
         ba::deadline_timer connect_timeout_;
         ba::deadline_timer announce_timeout_;
 
