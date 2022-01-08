@@ -174,48 +174,6 @@ void network::httpRequester::do_read_response_body() {
 }
 
 // UDP
-
-template <typename T>
-struct swap_endian {
-    static_assert (CHAR_BIT == 8, "CHAR_BIT != 8");
-private:
-    union value_type
-    {
-        T full;
-        unsigned char u8[sizeof(T)];
-    } dest;
-
-public:
-    explicit swap_endian(T u) {
-        value_type source{};
-        source.full = u;
-
-        for (size_t k = 0; k < sizeof(T); k++){
-            dest.u8[k] = source.u8[sizeof(T) - k - 1];
-        }
-    }
-    explicit swap_endian(const unsigned char * u_arr) {
-        value_type source{};
-        for (size_t k = 0; k < sizeof(T); k++) {
-            source.u8[k] = u_arr[k];
-        }
-
-        for (size_t k = 0; k < sizeof(T); k++){
-            dest.u8[k] = source.u8[sizeof(T) - k - 1];
-        }
-    }
-
-    void AsArray(uint8_t * arr) const {
-        for (size_t k = 0; k < sizeof(T); k++) {
-            arr[k] = dest.u8[k];
-        }
-    }
-    [[nodiscard]] T AsValue() const {
-        return dest.full;
-    }
-};
-
-
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     if (!socket_)
         socket_.emplace(io_service);
@@ -373,7 +331,9 @@ void network::udpRequester::do_announce_response() {
                 uint32_t val;
                 std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
-                std::cerr << "_________________________________"
+
+
+                std::cerr << std::dec << "_________________________________"
                           << "\n!ec: " << !ec
                           << "\nbytes_transferred: " << bytes_transferred
                           << "\nval == c_resp.transaction_id.value(): " << (val == c_resp.transaction_id)
@@ -383,6 +343,7 @@ void network::udpRequester::do_announce_response() {
                 if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 1) {
                     announce_timeout_.cancel();
 
+                    response[bytes_transferred] = '\0';
                     SetResponse();
                 } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 3){
                     std::cerr << "catch error from tracker announce: " << static_cast<const unsigned char*>(&response[8]) << std::endl;
@@ -458,4 +419,18 @@ void network::udpRequester::announce_deadline() {
             }
         });
     }
+}
+
+void network::udpRequester::SetResponse() {
+    tracker::Response resp;
+
+    resp.interval = std::chrono::seconds(swap_endian<uint32_t>(&response[8]).AsValue());
+    for (size_t i = 20; response[i] != (uint8_t)'\0'; i+=6){
+        uint8_t peer[6];
+        swap_endian<uint32_t>(&response[i]).AsArray(&peer[0]);
+        swap_endian<uint16_t>(&response[i + 4]).AsArray(&peer[0]);
+        resp.peers.push_back({{}, std::string(std::begin(peer), std::end(peer))});
+    }
+    promise_of_resp.set_value({});
+    Disconnect();
 }

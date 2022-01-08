@@ -106,12 +106,7 @@ namespace network {
         void announce_deadline();
         void UpdateEndpoint();
 
-        void SetResponse() override {
-            std::cerr << "RESPONSE CATCHED:" << std::endl;
-            std::cerr << static_cast<const unsigned char*>(&response[8]) << std::endl;
-            Disconnect();
-            promise_of_resp.set_value({});
-        }
+        void SetResponse() override;
 
         void make_announce_request();
         void make_connect_request();
