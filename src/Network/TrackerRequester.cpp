@@ -336,16 +336,11 @@ void network::udpRequester::do_announce_response() {
                 std::cerr << std::dec << "_________________________________"
                           << "\n!ec: " << !ec
                           << "\nbytes_transferred: " << bytes_transferred
-                          << "\nval == c_req.transaction_id.value(): " << (val == c_req.transaction_id.value())
-                          << "\nresponse[0] != 0: " << (response[0] != 0)
-                          << "\nresponse[0] = " << std::hex << be::big_to_native(int32_t(response[0]))
-                          << "\n_________________________________" << std::endl;
-                if (ec) {
-                    std::cerr << "ec message: " << ec.message() << std::endl;
-                } else if (!ec) {
-                    std::cout << std::string(response + 8, response + bytes_transferred + 1);
-                }
-                else if (!ec && bytes_transferred >= 20 && val == c_req.transaction_id.value() && response[0] != 0) {
+                          << "\nval == c_resp.transaction_id.value(): " << (val == c_resp.transaction_id)
+                          << "\nresponse[0] != 0: " << (swap_endian<uint32_t>(&response[0]).AsValue() != 0)
+                          << "\nresponse[0] = " << std::hex << swap_endian<uint32_t>(&response[0]).AsValue()
+                          << "\n________________________________" << std::endl;
+                if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 1) {
                     announce_timeout_.cancel();
 
                     response[bytes_transferred] = '\0';
@@ -363,32 +358,19 @@ void network::udpRequester::make_connect_request() {
 }
 
 void network::udpRequester::make_announce_request() {
-    request[8] = 1;
+    swap_endian((uint32_t)1).AsArray(&request[8]);
 
-    for (auto & el : tracker_.lock()->GetInfoHash()){
-        std::cerr << (int)el;
-    }
-    std::cerr << std::endl;
     std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
     std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
 
-    static auto BE = [&](auto native_val) {
-        auto a = native_val;
-        be::native_to_big_inplace(a);
-        return a;
-    };
-
-    size_t i64_tmp;
-    std::memcpy(&request[56], (i64_tmp = BE(query_.downloaded), &i64_tmp), sizeof(query_.downloaded));
-    std::memcpy(&request[64], (i64_tmp = BE(query_.left), &i64_tmp), sizeof(query_.left));
-    std::memcpy(&request[72], (i64_tmp = BE(query_.uploaded), &i64_tmp), sizeof(query_.uploaded));
-
-    int i32_tmp;
-    std::memcpy(&request[80], (i32_tmp = BE(static_cast<int>(query_.event)), &i32_tmp), sizeof(i32_tmp));
-    std::memcpy(&request[84], (query_.ip ? (i32_tmp = BE(IpToInt(query_.ip.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[88], (query_.key ? (i32_tmp = BE(std::stoi(query_.key.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[92], (query_.numwant ? (i32_tmp = BE(static_cast<int>(query_.numwant.value())), &i32_tmp) : (i32_tmp = BE(-1), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[96], (query_.trackerid ? (i32_tmp = BE(std::stoi(query_.trackerid.value())), &i32_tmp) : (i32_tmp = BE(12345), &i32_tmp)), sizeof(i32_tmp));
+    swap_endian(query_.downloaded).AsArray(&request[56]);
+    swap_endian(query_.left).AsArray(&request[64]);
+    swap_endian(query_.uploaded).AsArray(&request[72]);
+    swap_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
+    swap_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
+    swap_endian((query_.key ? std::stoi(query_.key.value()) : -1)).AsArray(&request[88]);
+    swap_endian((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
+    swap_endian( (query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
 }
 
 void network::udpRequester::UpdateEndpoint() {
