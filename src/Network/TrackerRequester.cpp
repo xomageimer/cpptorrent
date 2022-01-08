@@ -1,4 +1,4 @@
-//#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
+#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 
 #include "TrackerRequester.h"
 
@@ -322,11 +322,6 @@ void network::udpRequester::do_try_announce() {
         announce_attempts_ = 0;
 
         do_try_connect();
-        connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
-            if (!ec) {
-                connect_deadline();
-            }
-        });
     } else {
         announce_attempts_++;
         do_announce();
@@ -389,7 +384,7 @@ void network::udpRequester::do_announce_response() {
 
                     SetResponse();
                 } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 3){
-                    std::cerr << "catch error from tracker announce: " << static_cast<const unsigned char*>(&response[8]);
+                    std::cerr << "catch error from tracker announce: " << static_cast<const unsigned char*>(&response[8]) << std::endl;
                 }
             }
     );
