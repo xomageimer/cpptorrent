@@ -9,15 +9,14 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #include <boost/thread.hpp>
 #include <boost/exception/all.hpp>
-#include <boost/endian/buffers.hpp>
-#include <boost/endian/conversion.hpp>
+//#include <boost/endian/buffers.hpp>
+//#include <boost/endian/conversion.hpp>
 
 #include <utility>
 
 #include "Tracker.h"
 
 namespace ba = boost::asio;
-namespace be = boost::endian;
 
 namespace tracker {
     struct Tracker;
@@ -107,7 +106,11 @@ namespace network {
         void announce_deadline();
         void UpdateEndpoint();
 
-        void SetResponse() override {}
+        void SetResponse() override {
+            std::cerr << "RESPONSE CATCHED:" << std::endl;
+            std::cerr << static_cast<const unsigned char*>(&response[8]) << std::endl;
+            Disconnect();
+        }
 
         void make_announce_request();
         void make_connect_request();
@@ -128,22 +131,22 @@ namespace network {
         size_t announce_attempts_ = 0;
 
         static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
-        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(15000)};
-        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(10000)};
+        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(15)};
+        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(10)};
         ba::deadline_timer connect_timeout_;
         ba::deadline_timer announce_timeout_;
 
         tracker::Query query_;
 
         struct connect_request {
-            be::big_int64_buf_t protocol_id {0x41727101980};
-            be::big_int32_buf_t action {0};
-            be::big_int32_buf_t transaction_id{};
+            uint64_t protocol_id;
+            uint32_t action {0};
+            uint32_t transaction_id{};
         } c_req;
         struct connect_response {
-            be::big_int64_buf_t connection_id{};
-            be::big_int32_buf_t action {0};
-            be::big_int32_buf_t transaction_id{};
+            uint64_t connection_id{};
+            uint32_t action {0};
+            uint32_t transaction_id{};
         } c_resp;
         // TODO add scrape
     };

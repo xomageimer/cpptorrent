@@ -174,6 +174,48 @@ void network::httpRequester::do_read_response_body() {
 }
 
 // UDP
+
+template <typename T>
+struct swap_endian {
+    static_assert (CHAR_BIT == 8, "CHAR_BIT != 8");
+private:
+    union value_type
+    {
+        T full;
+        unsigned char u8[sizeof(T)];
+    } dest;
+
+public:
+    explicit swap_endian(T u) {
+        value_type source{};
+        source.full = u;
+
+        for (size_t k = 0; k < sizeof(T); k++){
+            dest.u8[k] = source.u8[sizeof(T) - k - 1];
+        }
+    }
+    explicit swap_endian(const unsigned char * u_arr) {
+        value_type source{};
+        for (size_t k = 0; k < sizeof(T); k++) {
+            source.u8[k] = u_arr[k];
+        }
+
+        for (size_t k = 0; k < sizeof(T); k++){
+            dest.u8[k] = source.u8[sizeof(T) - k - 1];
+        }
+    }
+
+    void AsArray(uint8_t * arr) const {
+        for (size_t k = 0; k < sizeof(T); k++) {
+            arr[k] = dest.u8[k];
+        }
+    }
+    [[nodiscard]] T AsValue() const {
+        return dest.full;
+    }
+};
+
+
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     if (!socket_)
         socket_.emplace(io_service);
@@ -191,15 +233,10 @@ void network::udpRequester::do_resolve() {
                                     ba::ip::udp::endpoint endpoint = *endpoints_it_;
                                     socket_->open(endpoint.protocol());
 
-                                    make_announce_request();
                                     make_connect_request();
+                                    make_announce_request();
 
                                     do_try_connect();
-                                    connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
-                                        if (!ec) {
-                                            connect_deadline();
-                                        }
-                                    });
                                 } else {
                                     SetException("Unable to resolve host: " + ec.message());
                                 }
@@ -208,7 +245,6 @@ void network::udpRequester::do_resolve() {
 
 
 void network::udpRequester::do_try_connect() {
-    std::cerr << "connect attempt: " << attempts_ << std::endl;
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -216,14 +252,21 @@ void network::udpRequester::do_try_connect() {
         UpdateEndpoint();
     }
     if (endpoints_it_ != ba::ip::udp::resolver::iterator()) {
-        do_connect();
         attempts_++;
+        std::cerr << "connect attempt: " << attempts_ << std::endl;
+        do_connect();
+        connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
+            if (!ec) {
+                connect_deadline();
+            }
+        });
     }
 }
 
 void network::udpRequester::do_connect() {
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
+
 
     std::memcpy(&buff, &c_req, sizeof(connect_request));
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
@@ -248,23 +291,24 @@ void network::udpRequester::do_connect_response() {
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_receive_from(
             ba::buffer(buff, sizeof(connect_response)), endpoint,
-            [this] (boost::system::error_code const & ec, size_t bytes_trasferred) {
-                std::cerr << "receive successfull completly" << std::endl;
-                int val;
-                std::memcpy(&val, &buff[4], 4);
-                be::native_to_big_inplace(val);
+            [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
+                if (ec) {
+                    std::cerr << ec.message() << std::endl;
+                    return;
+                }
+                uint32_t value;
+                std::memcpy(&value, &buff[4], sizeof(connect_request::transaction_id));
 
-                if (!ec && bytes_trasferred == sizeof(connect_response) && val == c_req.transaction_id.value() && buff[0] == 0) {
+                std::cerr << "receive successfull completly" << std::endl;
+
+                std::cerr << bytes_transferred << std::endl;
+                std::cerr << value << " == " << c_req.transaction_id << " -> " << ( value == c_req.transaction_id) << std::endl;
+
+                if (!ec && bytes_transferred == sizeof(connect_response) && value == c_req.transaction_id && buff[0] == 0) {
                     connect_timeout_.cancel();
 
                     std::memcpy(&c_resp, &buff, sizeof(connect_response));
                     do_try_announce();
-                    announce_timeout_.async_wait( [this](boost::system::error_code const & ec){
-                        if (!ec) {
-                            announce_deadline();
-                        }
-                    });
-                    connect_timeout_.expires_from_now(boost::posix_time::pos_infin);
                 }
             }
     );
@@ -283,11 +327,14 @@ void network::udpRequester::do_try_announce() {
                 connect_deadline();
             }
         });
-        announce_timeout_.expires_from_now(boost::posix_time::pos_infin);
     } else {
-        do_announce();
-
         announce_attempts_++;
+        do_announce();
+        announce_timeout_.async_wait([this](boost::system::error_code const & ec){
+            if (!ec) {
+                announce_deadline();
+            }
+        });
     }
 }
 
@@ -321,53 +368,52 @@ void network::udpRequester::do_announce_response() {
     socket_->async_receive_from(
             ba::buffer(response, MTU), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
+                if (ec){
+                    std::cerr << ec.message() << std::endl;
+                    return;
+                }
+
                 std::cerr << "announce get successfull completly" << std::endl;
-                int val;
-                std::memcpy(&val, &response[4], 4);
-                be::native_to_big_inplace(val);
+                uint32_t val;
+                std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
                 std::cerr << "_________________________________"
                           << "\n!ec: " << !ec
                           << "\nbytes_transferred: " << bytes_transferred
-                          << "\nval == c_req.transaction_id.value(): " << (val == c_req.transaction_id.value())
-                          << "\nresponse[0] != 0: " << (response[0] != 0)
-                          << "\nresponse[0] = " << std::hex << be::big_to_native(int32_t(response[0]))
-                          << "\n_________________________________" << std::endl;
-                if (!ec && bytes_transferred >= 20 && val == c_req.transaction_id.value() && response[0] != 0) {
+                          << "\nval == c_resp.transaction_id.value(): " << (val == c_resp.transaction_id)
+                          << "\nresponse[0] != 0: " << (swap_endian<uint32_t>(&response[0]).AsValue() != 0)
+                          << "\nresponse[0] = " << std::hex << swap_endian<uint32_t>(&response[0]).AsValue()
+                          << "\n________________________________" << std::endl;
+                if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 1) {
                     announce_timeout_.cancel();
+
                     SetResponse();
+                } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 3){
+                    std::cerr << "catch error from tracker announce: " << static_cast<const unsigned char*>(&response[8]);
                 }
             }
     );
 }
 
 void network::udpRequester::make_connect_request() {
-    c_req.transaction_id = be::native_to_big(static_cast<int>(random_generator::Random().GetNumber<size_t>()));
+    c_req.transaction_id = swap_endian( static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
+    c_req.protocol_id = swap_endian( static_cast<uint64_t>(0x41727101980)).AsValue();
 }
 
-// TODO сделать более читабельно + убрать дубли + переделать всё в функции вида native_to_big
 void network::udpRequester::make_announce_request() {
-    request[8] = 1;
+    swap_endian((uint32_t)1).AsArray(&request[8]);
+
     std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
     std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
 
-    static auto BE = [&](auto native_val) {
-        auto a = native_val;
-        be::native_to_big_inplace(a);
-        return a;
-    };
-
-    size_t i64_tmp;
-    std::memcpy(&request[56], (i64_tmp = BE(query_.downloaded), &i64_tmp), sizeof(query_.downloaded));
-    std::memcpy(&request[64], (i64_tmp = BE(query_.left), &i64_tmp), sizeof(query_.left));
-    std::memcpy(&request[72], (i64_tmp = BE(query_.uploaded), &i64_tmp), sizeof(query_.uploaded));
-
-    int i32_tmp;
-    std::memcpy(&request[80], (i32_tmp = BE(static_cast<int>(query_.event)), &i32_tmp), sizeof(i32_tmp));
-    std::memcpy(&request[84], (query_.ip ? (i32_tmp = BE(IpToInt(query_.ip.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[88], (query_.key ? (i32_tmp = BE(std::stoi(query_.key.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[92], (query_.numwant ? (i32_tmp = BE(static_cast<int>(query_.numwant.value())), &i32_tmp) : (i32_tmp = BE(-1), &i32_tmp)), sizeof(i32_tmp));
-    std::memcpy(&request[96], (query_.trackerid ? (i32_tmp = BE(std::stoi(query_.trackerid.value())), &i32_tmp) : (i32_tmp = BE(0), &i32_tmp)), sizeof(i32_tmp));
+    swap_endian(query_.downloaded).AsArray(&request[56]);
+    swap_endian(query_.left).AsArray(&request[64]);
+    swap_endian(query_.uploaded).AsArray(&request[72]);
+    swap_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
+    swap_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
+    swap_endian((query_.key ? std::stoi(query_.key.value()) : -1)).AsArray(&request[88]);
+    swap_endian((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
+    swap_endian( (query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
 }
 
 void network::udpRequester::UpdateEndpoint() {
@@ -390,13 +436,13 @@ void network::udpRequester::connect_deadline() {
     {
         socket_->cancel();
         do_try_connect();
+    } else {
+        connect_timeout_.async_wait([this](boost::system::error_code const &ec) {
+            if (!ec) {
+                connect_deadline();
+            }
+        });
     }
-
-    connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
-        if (!ec) {
-            connect_deadline();
-        }
-    });
 }
 
 void network::udpRequester::announce_deadline() {
@@ -409,11 +455,11 @@ void network::udpRequester::announce_deadline() {
     {
         socket_->cancel();
         do_try_announce();
+    } else {
+        announce_timeout_.async_wait([this](boost::system::error_code const &ec) {
+            if (!ec) {
+                announce_deadline();
+            }
+        });
     }
-
-    announce_timeout_.async_wait( [this](boost::system::error_code const & ec){
-        if (!ec) {
-            announce_deadline();
-        }
-    });
 }
