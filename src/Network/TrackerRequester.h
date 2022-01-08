@@ -110,6 +110,7 @@ namespace network {
             std::cerr << "RESPONSE CATCHED:" << std::endl;
             std::cerr << static_cast<const unsigned char*>(&response[8]) << std::endl;
             Disconnect();
+            promise_of_resp.set_value({});
         }
 
         void make_announce_request();
@@ -144,9 +145,9 @@ namespace network {
             uint32_t transaction_id{};
         } c_req;
         struct connect_response {
-            uint64_t connection_id{};
             uint32_t action {0};
             uint32_t transaction_id{};
+            uint64_t connection_id{};
         } c_resp;
         // TODO add scrape
     };

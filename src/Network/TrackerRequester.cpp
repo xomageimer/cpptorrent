@@ -1,4 +1,4 @@
-#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
+//#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 
 #include "TrackerRequester.h"
 
@@ -307,7 +307,8 @@ void network::udpRequester::do_connect_response() {
                 if (!ec && bytes_transferred == sizeof(connect_response) && value == c_req.transaction_id && buff[0] == 0) {
                     connect_timeout_.cancel();
 
-                    std::memcpy(&c_resp, &buff, sizeof(connect_response));
+                    std::memcpy(&c_resp, buff, sizeof(connect_response));
+
                     do_try_announce();
                 }
             }
