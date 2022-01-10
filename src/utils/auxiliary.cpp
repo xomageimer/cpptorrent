@@ -5,13 +5,22 @@
 #include <boost/function_output_iterator.hpp>
 #include <boost/compute/detail/sha1.hpp>
 
+bool is_little_endian()
+{
+    int num = 1;
+    return (*reinterpret_cast<char *>(&num) == 1);
+}
+
 std::string GetSHA1(const std::string &p_arg){
     boost::uuids::detail::sha1 sha1;
     sha1.process_bytes(p_arg.data(), p_arg.size());
     unsigned hash[5] = {0};
     sha1.get_digest(hash);
-    for (auto & el : hash)
-        el = swap_endian(el).AsValue();
+
+    if (is_little_endian()) {
+        for (auto &el: hash)
+            el = swap_endian(el).AsValue();
+    }
 
     char str_hash[sizeof(unsigned) * 5];
 
