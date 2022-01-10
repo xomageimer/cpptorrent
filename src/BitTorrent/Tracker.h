@@ -42,7 +42,7 @@ namespace tracker {
 //        HTTP,
 //        HTTPS
 //    };
-    enum class Event {
+    enum class Event : int32_t {
         Empty = 0,
         Completed = 1,
         Started = 2,

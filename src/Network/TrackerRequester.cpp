@@ -307,18 +307,6 @@ void network::udpRequester::do_announce() {
     std::memcpy(&request[0], &c_resp.connection_id, sizeof(c_resp.connection_id));
     std::memcpy(&request[12], &c_resp.transaction_id, sizeof(c_resp.transaction_id));
 
-    std::cout << "connection_id: " << std::dec << swap_endian<uint64_t>(&request[0]).AsValue() << std::endl;
-    std::cout << "action: " << swap_endian<uint32_t>(&request[8]).AsValue() << std::endl;
-    std::cout << "transaction_id: " << swap_endian<uint32_t>(&request[12]).AsValue() << std::endl;
-    std::cout << "downloaded: " << swap_endian<uint64_t>(&request[56]).AsValue() << std::endl;
-    std::cout << "left: " << swap_endian<uint64_t>(&request[64]).AsValue() << std::endl;
-    std::cout << "uploaded: " << swap_endian<uint64_t>(&request[72]).AsValue() << std::endl;
-    std::cout << "event: " << swap_endian<uint32_t>(&request[80]).AsValue() << std::endl;
-    std::cout << "IP address: " << swap_endian<uint32_t>(&request[84]).AsValue() << std::endl;
-    std::cout << "key: " << swap_endian<uint32_t>(&request[88]).AsValue() << std::endl;
-    std::cout << "num_want: " << swap_endian<int32_t>(&request[92]).AsValue() << std::endl;
-    std::cout << "port: " << swap_endian<uint32_t>(&request[96]).AsValue() << std::endl << std::endl;
-
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
@@ -351,6 +339,10 @@ void network::udpRequester::do_announce_response() {
                 uint32_t val;
                 std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
+                uint32_t action;
+                if (is_little_endian()) action = swap_endian<uint32_t>(&response[0]).AsValue();
+                else std::memcpy(&action, &response[0], sizeof(uint32_t));
+
                 std::cout << std::dec << "_________________________________"
                           << "\n!ec: " << !ec
                           << "\nbytes_transferred: " << bytes_transferred
@@ -358,12 +350,12 @@ void network::udpRequester::do_announce_response() {
                           << "\nresponse[0] != 0: " << (swap_endian<uint32_t>(&response[0]).AsValue() != 0)
                           << "\nresponse[0] = " << std::hex << swap_endian<uint32_t>(&response[0]).AsValue()
                           << "\n________________________________" << std::endl;
-                if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 1) {
+                if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && action == 1) {
                     announce_timeout_.cancel();
 
                     response[bytes_transferred] = '\0';
                     SetResponse();
-                } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && swap_endian<uint32_t>(&response[0]).AsValue() == 3){
+                } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && action == 3){
                     std::cerr << "catch error from tracker announce: " << static_cast<const unsigned char*>(&response[8]) << std::endl;
                 }
             }
@@ -371,24 +363,42 @@ void network::udpRequester::do_announce_response() {
 }
 
 void network::udpRequester::make_connect_request() {
-    c_req.transaction_id = swap_endian( static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
-    c_req.protocol_id = swap_endian( static_cast<uint64_t>(0x41727101980)).AsValue();
+    if (is_little_endian()) {
+        c_req.transaction_id = swap_endian(static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
+        c_req.protocol_id = swap_endian(static_cast<uint64_t>(0x41727101980)).AsValue();
+    } else {
+        c_req.transaction_id = static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>());
+        c_req.protocol_id = 0x41727101980;
+    }
 }
 
 void network::udpRequester::make_announce_request() {
-    swap_endian((uint32_t)1).AsArray(&request[8]);
-
     std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
     std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
 
-    swap_endian(query_.downloaded).AsArray(&request[56]);
-    swap_endian(query_.left).AsArray(&request[64]);
-    swap_endian(query_.uploaded).AsArray(&request[72]);
-    swap_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
-    swap_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
-    swap_endian((query_.key ? std::stoi(query_.key.value()) : 0)).AsArray(&request[88]);
-    swap_endian<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
-    swap_endian( (query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
+    if (is_little_endian()) {
+        swap_endian((uint32_t)1).AsArray(&request[8]);
+        swap_endian(query_.downloaded).AsArray(&request[56]);
+        swap_endian(query_.left).AsArray(&request[64]);
+        swap_endian(query_.uploaded).AsArray(&request[72]);
+        swap_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
+        swap_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
+        swap_endian((query_.key ? std::stoi(query_.key.value()) : 0)).AsArray(&request[88]);
+        swap_endian<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
+        swap_endian((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
+    } else {
+        uint32_t int32_tmp;
+        uint64_t int64_tmp;
+        std::memcpy(&request[8], (int32_tmp = 1, &int32_tmp), sizeof(int32_tmp));
+        std::memcpy(&request[56], (int64_tmp = query_.downloaded, &int64_tmp), sizeof(int64_tmp));
+        std::memcpy(&request[64], (int64_tmp = query_.left, &int64_tmp), sizeof(int64_tmp));
+        std::memcpy(&request[72], (int64_tmp = query_.uploaded, &int64_tmp), sizeof(int64_tmp));
+        std::memcpy(&request[80], (int32_tmp = static_cast<int>(query_.event), &int32_tmp), sizeof(int32_tmp));
+        std::memcpy(&request[84], (int32_tmp = (query_.ip ? IpToInt(query_.ip.value()) : 0), &int32_tmp), sizeof(int32_tmp));
+        std::memcpy(&request[88], (int32_tmp = (query_.key ? std::stoi(query_.key.value()) : 0), &int32_tmp), sizeof(int32_tmp));
+        std::memcpy(&request[92], (int32_tmp = (query_.numwant ? static_cast<int>(query_.numwant.value()) : -1), &int32_tmp), sizeof(int32_tmp));
+        std::memcpy(&request[96], (int32_tmp = (query_.trackerid ? std::stoi(query_.trackerid.value()) : 0), &int32_tmp), sizeof(int32_tmp));
+    }
 }
 
 void network::udpRequester::UpdateEndpoint() {

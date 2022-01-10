@@ -9,8 +9,6 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #include <boost/thread.hpp>
 #include <boost/exception/all.hpp>
-//#include <boost/endian/buffers.hpp>
-//#include <boost/endian/conversion.hpp>
 
 #include <utility>
 

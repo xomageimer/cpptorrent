@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 
+bool is_little_endian();
+
 std::string GetSHA1(const std::string& p_arg);
 std::string UrlEncode(std::string const & url_to_encode);
 int IpToInt(std::string const & ip_address);
