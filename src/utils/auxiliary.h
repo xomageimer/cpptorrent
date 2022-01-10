@@ -19,14 +19,14 @@ private:
         T full;
         unsigned char u8[sizeof(T)];
     } dest;
-    static inline const bool is_little = is_little_endian();
+    static inline const bool is_native_are_little = is_little_endian();
 public:
     explicit as_big_endian(T u) {
         value_type source{};
         source.full = u;
 
         for (size_t k = 0; k < sizeof(T); k++){
-            if (is_little)
+            if (is_native_are_little)
                 dest.u8[k] = source.u8[sizeof(T) - k - 1];
             else dest.u8[k] = source.u8[k];
         }
@@ -38,7 +38,7 @@ public:
         }
 
         for (size_t k = 0; k < sizeof(T); k++){
-            if (is_little)
+            if (is_native_are_little)
                 dest.u8[k] = source.u8[sizeof(T) - k - 1];
             else dest.u8[k] = source.u8[k];
         }

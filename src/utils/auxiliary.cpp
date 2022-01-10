@@ -17,9 +17,19 @@ std::string GetSHA1(const std::string &p_arg){
     unsigned hash[5] = {0};
     sha1.get_digest(hash);
 
-    if (is_little_endian()) {
-        for (auto &el: hash)
-            el = as_big_endian(el).AsValue();
+    union value_type
+    {
+        unsigned full;
+        unsigned char u8[sizeof(unsigned)];
+    } dest {};
+    for (auto &el: hash) {
+        value_type source{};
+        source.full = el;
+
+        for (size_t k = 0; k < sizeof(unsigned); k++){
+            dest.u8[k] = source.u8[sizeof(unsigned) - k - 1];
+        }
+        el = dest.full;
     }
 
     char str_hash[sizeof(unsigned) * 5];
