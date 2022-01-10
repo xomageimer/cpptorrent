@@ -5,6 +5,7 @@
 #include <string>
 
 std::string GetSHA1(const std::string& p_arg);
+void SHA1toBE(const std::string & sha1_str, uint8_t * arr);
 std::string UrlEncode(std::string const & url_to_encode);
 int IpToInt(std::string const & ip_address);
 
@@ -47,6 +48,7 @@ public:
         return dest.full;
     }
 };
+
 
 template <typename T, typename Enable = void>
 struct is_optional : std::false_type {};

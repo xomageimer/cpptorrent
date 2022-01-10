@@ -174,6 +174,13 @@ void network::httpRequester::do_read_response_body() {
 }
 
 // UDP
+
+namespace std {
+    std::stringstream black_hole;
+}
+#define cerr black_hole
+
+
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     if (!socket_)
         socket_.emplace(io_service);
@@ -224,7 +231,6 @@ void network::udpRequester::do_try_connect() {
 void network::udpRequester::do_connect() {
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
-
 
     std::memcpy(&buff, &c_req, sizeof(connect_request));
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
@@ -299,6 +305,18 @@ void network::udpRequester::do_announce() {
     std::memcpy(&request[0], &c_resp.connection_id, sizeof(c_resp.connection_id));
     std::memcpy(&request[12], &c_resp.transaction_id, sizeof(c_resp.transaction_id));
 
+    std::cout << "connection_id: " << std::dec << swap_endian<uint64_t>(&request[0]).AsValue() << std::endl;
+    std::cout << "action: " << swap_endian<uint32_t>(&request[8]).AsValue() << std::endl;
+    std::cout << "transaction_id: " << swap_endian<uint32_t>(&request[12]).AsValue() << std::endl;
+    std::cout << "downloaded: " << swap_endian<uint64_t>(&request[56]).AsValue() << std::endl;
+    std::cout << "left: " << swap_endian<uint64_t>(&request[64]).AsValue() << std::endl;
+    std::cout << "uploaded: " << swap_endian<uint64_t>(&request[72]).AsValue() << std::endl;
+    std::cout << "event: " << swap_endian<uint32_t>(&request[80]).AsValue() << std::endl;
+    std::cout << "IP address: " << swap_endian<uint32_t>(&request[84]).AsValue() << std::endl;
+    std::cout << "key: " << swap_endian<uint32_t>(&request[88]).AsValue() << std::endl;
+    std::cout << "num_want: " << swap_endian<int32_t>(&request[92]).AsValue() << std::endl;
+    std::cout << "port: " << swap_endian<uint32_t>(&request[96]).AsValue() << std::endl << std::endl;
+
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
@@ -331,9 +349,7 @@ void network::udpRequester::do_announce_response() {
                 uint32_t val;
                 std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
-
-
-                std::cerr << std::dec << "_________________________________"
+                std::cout << std::dec << "_________________________________"
                           << "\n!ec: " << !ec
                           << "\nbytes_transferred: " << bytes_transferred
                           << "\nval == c_resp.transaction_id.value(): " << (val == c_resp.transaction_id)
@@ -360,16 +376,16 @@ void network::udpRequester::make_connect_request() {
 void network::udpRequester::make_announce_request() {
     swap_endian((uint32_t)1).AsArray(&request[8]);
 
-    std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
-    std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
+    SHA1toBE(tracker_.lock()->GetInfoHash(), &request[16]);
+    SHA1toBE(GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())), &request[36]);
 
     swap_endian(query_.downloaded).AsArray(&request[56]);
     swap_endian(query_.left).AsArray(&request[64]);
     swap_endian(query_.uploaded).AsArray(&request[72]);
     swap_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
     swap_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
-    swap_endian((query_.key ? std::stoi(query_.key.value()) : -1)).AsArray(&request[88]);
-    swap_endian((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
+    swap_endian((query_.key ? std::stoi(query_.key.value()) : 0)).AsArray(&request[88]);
+    swap_endian<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
     swap_endian( (query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
 }
 
