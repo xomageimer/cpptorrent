@@ -53,6 +53,8 @@ void network::httpRequester::SetResponse() {
 void network::httpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     std::ostream request_stream(&request_);
 
+    auto my_hash = UrlEncode(tracker_.lock()->GetInfoHash());
+
     auto tracker_ptr = tracker_.lock();
     request_stream << "GET /" << tracker_ptr->GetUrl().Path.value_or("") << "?"
 
@@ -376,8 +378,8 @@ void network::udpRequester::make_connect_request() {
 void network::udpRequester::make_announce_request() {
     swap_endian((uint32_t)1).AsArray(&request[8]);
 
-    SHA1toBE(tracker_.lock()->GetInfoHash(), &request[16]);
-    SHA1toBE(GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())), &request[36]);
+    std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
+    std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
 
     swap_endian(query_.downloaded).AsArray(&request[56]);
     swap_endian(query_.left).AsArray(&request[64]);

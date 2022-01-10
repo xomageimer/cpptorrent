@@ -10,8 +10,11 @@ std::string GetSHA1(const std::string &p_arg){
     sha1.process_bytes(p_arg.data(), p_arg.size());
     unsigned hash[5] = {0};
     sha1.get_digest(hash);
+    for (auto & el : hash)
+        el = swap_endian(el).AsValue();
 
     char str_hash[sizeof(unsigned) * 5];
+
     memcpy(str_hash, (char *)&hash, sizeof(unsigned) * 5);
     return {str_hash, std::size(str_hash)};
 }
@@ -38,16 +41,5 @@ std::string UrlEncode(const std::string &url_to_encode){
 
 int IpToInt(const std::string &ip_address) {
     return 0;
-}
-
-void SHA1toBE(const std::string &sha1_str, uint8_t * arr) {
-    uint8_t arr_hash[20];
-    size_t j = 0;
-    for (auto el : sha1_str){
-        arr_hash[j++] = el;
-    }
-    for (size_t i = 0; i < 20; i+=4){
-        swap_endian<int32_t>(&arr_hash[i]).AsArray(&arr[i]);
-    }
 }
 
