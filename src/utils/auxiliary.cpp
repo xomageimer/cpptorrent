@@ -19,7 +19,7 @@ std::string GetSHA1(const std::string &p_arg){
 
     if (is_little_endian()) {
         for (auto &el: hash)
-            el = swap_endian(el).AsValue();
+            el = as_big_endian(el).AsValue();
     }
 
     char str_hash[sizeof(unsigned) * 5];

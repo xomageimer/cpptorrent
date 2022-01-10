@@ -11,7 +11,7 @@ std::string UrlEncode(std::string const & url_to_encode);
 int IpToInt(std::string const & ip_address);
 
 template <typename T>
-struct swap_endian {
+struct as_big_endian {
     static_assert (CHAR_BIT == 8, "CHAR_BIT != 8");
 private:
     union value_type
@@ -19,24 +19,28 @@ private:
         T full;
         unsigned char u8[sizeof(T)];
     } dest;
-
+    static inline const bool is_little = is_little_endian();
 public:
-    explicit swap_endian(T u) {
+    explicit as_big_endian(T u) {
         value_type source{};
         source.full = u;
 
         for (size_t k = 0; k < sizeof(T); k++){
-            dest.u8[k] = source.u8[sizeof(T) - k - 1];
+            if (is_little)
+                dest.u8[k] = source.u8[sizeof(T) - k - 1];
+            else dest.u8[k] = source.u8[k];
         }
     }
-    explicit swap_endian(const unsigned char * u_arr) {
+    explicit as_big_endian(const unsigned char * u_arr) {
         value_type source{};
         for (size_t k = 0; k < sizeof(T); k++) {
             source.u8[k] = u_arr[k];
         }
 
         for (size_t k = 0; k < sizeof(T); k++){
-            dest.u8[k] = source.u8[sizeof(T) - k - 1];
+            if (is_little)
+                dest.u8[k] = source.u8[sizeof(T) - k - 1];
+            else dest.u8[k] = source.u8[k];
         }
     }
 
