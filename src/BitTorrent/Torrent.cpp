@@ -38,7 +38,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
     std::thread t;
-    std::thread t2;
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
@@ -46,13 +45,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         }
 
         t = std::thread([&]{
-#ifdef OS_WIN
-            SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-#endif
-            service.run();
-            std::cout << "service stopped" << std::endl;
-        });
-        t2 = std::thread([&]{
 #ifdef OS_WIN
             SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
@@ -117,7 +109,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         std::cout << "service gonna stop from try" << std::endl;
         service.stop();
         t.join();
-        t2.join();
 
         std::cout << data_from_tracker.complete << std::endl;
         return true;
@@ -126,8 +117,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         service.stop();
         if (t.joinable())
             t.join();
-        if (t2.joinable())
-            t2.join();
 
         std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;
