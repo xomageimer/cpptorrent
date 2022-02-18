@@ -77,9 +77,9 @@ namespace tracker {
         };
 
         std::chrono::seconds interval;
-        std::string tracker_id;
-        size_t complete;
-        size_t incomplete;
+        std::string tracker_id {};
+        size_t complete {};
+        size_t incomplete {};
         std::vector<peer_image> peers;
 
         std::optional<std::string> warning_message;

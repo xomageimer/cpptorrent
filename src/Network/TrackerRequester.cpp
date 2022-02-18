@@ -9,6 +9,12 @@
 #include "random_generator.h"
 #include "auxiliary.h"
 
+// TODO заменить все cerr на логера и в случае чего отключать его (для этого пусть будут макросы в хедере)
+namespace std {
+    std::stringstream black_hole;
+}
+#define cerr black_hole
+
 // HTTP
 void network::httpRequester::SetResponse() {
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
@@ -51,6 +57,7 @@ void network::httpRequester::SetResponse() {
 }
 
 void network::httpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
+    std::cerr << "print http request " << this->tracker_.lock()->GetUrl().Host << std::endl;
     std::ostream request_stream(&request_);
 
     auto my_hash = UrlEncode(tracker_.lock()->GetInfoHash());
@@ -176,14 +183,9 @@ void network::httpRequester::do_read_response_body() {
 }
 
 // UDP
-
-namespace std {
-    std::stringstream black_hole;
-}
-#define cerr black_hole
-
-
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
+    std::cerr << "Make udp request " << this->tracker_.lock()->GetUrl().Host << std::endl;
+
     if (!socket_)
         socket_.emplace(io_service);
 
@@ -432,12 +434,17 @@ void network::udpRequester::SetResponse() {
     tracker::Response resp;
 
     resp.interval = std::chrono::seconds(as_big_endian<uint32_t>(&response[8]).AsValue());
+
     for (size_t i = 20; response[i] != (uint8_t)'\0'; i+=6){
         uint8_t peer[6];
-        as_big_endian<uint32_t>(&response[i]).AsArray(&peer[0]);
-        as_big_endian<uint16_t>(&response[i + 4]).AsArray(&peer[0]);
-        resp.peers.push_back({{}, std::string(std::begin(peer), std::end(peer))});
+        auto ip = as_big_endian<uint32_t>(&response[i]);
+        auto port = as_big_endian<uint16_t>(&response[i + 4]);
+
+        ip.AsArray(&peer[0]);
+        ip.AsArray(&peer[4]);
+        resp.peers.push_back({bittorrent::Peer{ip.AsValue(), port.AsValue()}, std::string(std::begin(peer), std::end(peer))});
     }
-    promise_of_resp.set_value({});
+
+    promise_of_resp.set_value(resp);
     Disconnect();
 }

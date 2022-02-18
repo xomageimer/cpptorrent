@@ -16,12 +16,6 @@
 
 namespace ba = boost::asio;
 
-namespace tracker {
-    struct Tracker;
-    struct Query;
-    struct Response;
-}
-
 namespace network {
     struct BadConnect : public boost::exception, public std::exception {
     private:
