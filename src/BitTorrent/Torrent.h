@@ -35,6 +35,7 @@ namespace bittorrent {
         [[nodiscard]] size_t GetMasterPeerKey() const { return master_peer->GetKey(); }
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] tracker::Query GetDefaultTrackerQuery() const;
+        [[nodiscard]] const tracker::Response & GetResponse() const;
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
     private:

@@ -50,7 +50,20 @@ void network::httpRequester::SetResponse() {
                                         || (it = bencode_resp.find("warning message"), it != bencode_resp.end()))
         resp.warning_message = it->second.AsString();
 
-    // TODO добавлять пиров
+    auto peers = bencode_resp.at("peers").AsArray();
+    for (auto id = 0; id != peers.size(); id += 6) {
+        uint8_t peer_as_array[6];
+        for (size_t i = id; i < id + 6; i++){
+            peer_as_array[i] = static_cast<uint8_t>(peers[id].AsNumber());
+        }
+
+        auto ip = as_big_endian<uint32_t>(&peer_as_array[0]);
+        auto port = as_big_endian<uint16_t>(&peer_as_array[4]);
+
+        ip.AsArray(&peer_as_array[0]);
+        ip.AsArray(&peer_as_array[4]);
+        resp.peers.push_back({bittorrent::Peer{ip.AsValue(), port.AsValue()}, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
+    }
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
@@ -445,6 +458,6 @@ void network::udpRequester::SetResponse() {
         resp.peers.push_back({bittorrent::Peer{ip.AsValue(), port.AsValue()}, std::string(std::begin(peer), std::end(peer))});
     }
 
-    promise_of_resp.set_value(resp);
+    promise_of_resp.set_value(std::move(resp));
     Disconnect();
 }

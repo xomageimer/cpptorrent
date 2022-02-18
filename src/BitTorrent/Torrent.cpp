@@ -166,3 +166,7 @@ tracker::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
 boost::asio::io_service & bittorrent::Torrent::GetService() const {
     return service;
 }
+
+const tracker::Response & bittorrent::Torrent::GetResponse() const {
+    return data_from_tracker;
+}
