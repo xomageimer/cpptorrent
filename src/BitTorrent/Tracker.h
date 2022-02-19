@@ -37,11 +37,6 @@ namespace network {
 }
 
 namespace tracker {
-//    enum class ProtoType {
-//        UDP,
-//        HTTP,
-//        HTTPS
-//    };
     enum class Event : int32_t {
         Empty = 0,
         Completed = 1,
@@ -72,8 +67,8 @@ namespace tracker {
     };
     struct Response {
         struct peer_image{
-            bittorrent::Peer dict; // PEERS with keys: peer_id, ip, port
-            std::string bin; // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
+            bittorrent::Peer BE_dict; // PEERS with keys: peer_id, ip, port
+            std::string BE_bin; // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
         };
 
         std::chrono::seconds interval;

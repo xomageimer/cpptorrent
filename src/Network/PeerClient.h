@@ -1,16 +1,26 @@
 #ifndef CPPTORRENT_PEERCLIENT_H
 #define CPPTORRENT_PEERCLIENT_H
 
+#include <boost/asio.hpp>
+#define BOOST_THREAD_PROVIDES_FUTURE
+#define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
+#define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
+#include <boost/thread.hpp>
+#include <boost/regex.hpp>
+
 #include <memory>
 
-#include "Tracker.h"
+#include "Peer.h"
 
-struct PeerClient {
-public:
+namespace ba = boost::asio;
 
-private:
+namespace network {
+    struct PeerClient {
+    public:
 
-    std::weak_ptr<tracker::Tracker> tracker_;
-};
+    private:
+//        bittorrent::Torrent & torrent;
+    };
+}
 
 #endif //CPPTORRENT_PEERCLIENT_H

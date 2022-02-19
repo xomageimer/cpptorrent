@@ -10,6 +10,8 @@
 #include "auxiliary.h"
 #include "logger.h"
 
+// TODO лучше всю работу с распарсиванием ответа убрать в класс Tracker, а промис будет от строки или бенкода
+
 // HTTP
 void network::httpRequester::SetResponse() {
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
@@ -48,16 +50,13 @@ void network::httpRequester::SetResponse() {
     auto peers = bencode_resp.at("peers").AsArray();
     for (auto id = 0; id != peers.size(); id += 6) {
         uint8_t peer_as_array[6];
-        for (size_t i = id; i < id + 6; i++){
-            peer_as_array[i] = static_cast<uint8_t>(peers[id].AsNumber());
+        for (size_t i = 0; i < 6; i++){
+            peer_as_array[i] = static_cast<uint8_t>(peers[id + i].AsNumber());
         }
+        uint32_t ip = *(uint32_t *)&peer_as_array[0];
+        uint16_t port = *(uint16_t *)&peer_as_array[4];
 
-        auto ip = as_big_endian<uint32_t>(&peer_as_array[0]);
-        auto port = as_big_endian<uint16_t>(&peer_as_array[4]);
-
-        ip.AsArray(&peer_as_array[0]);
-        ip.AsArray(&peer_as_array[4]);
-        resp.peers.push_back({bittorrent::Peer{ip.AsValue(), port.AsValue()}, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
+        resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
     }
 
     promise_of_resp.set_value(std::move(resp));
@@ -191,6 +190,26 @@ void network::httpRequester::do_read_response_body() {
 }
 
 // UDP
+void network::udpRequester::SetResponse() {
+    tracker::Response resp;
+
+    resp.interval = std::chrono::seconds(as_big_endian<uint32_t>(&response[8]).AsValue());
+
+    for (size_t i = 20; response[i] != (uint8_t)'\0'; i+=6){
+        uint8_t peer[6];
+        for (size_t j = 0; j != 6; j++){
+            peer[j] = response[i + j];
+        }
+        uint32_t ip = *(uint32_t *)&peer[0];
+        uint16_t port = *(uint16_t *)&peer[4];
+
+        resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer), std::end(peer))});
+    }
+
+    promise_of_resp.set_value(std::move(resp));
+    Disconnect();
+}
+
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
     LOG("Make udp request ", this->tracker_.lock()->GetUrl().Host);
 
@@ -442,23 +461,4 @@ void network::udpRequester::announce_deadline() {
             }
         });
     }
-}
-
-void network::udpRequester::SetResponse() {
-    tracker::Response resp;
-
-    resp.interval = std::chrono::seconds(as_big_endian<uint32_t>(&response[8]).AsValue());
-
-    for (size_t i = 20; response[i] != (uint8_t)'\0'; i+=6){
-        uint8_t peer[6];
-        auto ip = as_big_endian<uint32_t>(&response[i]);
-        auto port = as_big_endian<uint16_t>(&response[i + 4]);
-
-        ip.AsArray(&peer[0]);
-        ip.AsArray(&peer[4]);
-        resp.peers.push_back({bittorrent::Peer{ip.AsValue(), port.AsValue()}, std::string(std::begin(peer), std::end(peer))});
-    }
-
-    promise_of_resp.set_value(std::move(resp));
-    Disconnect();
 }

@@ -10,6 +10,13 @@
 #include "auxiliary.h"
 
 bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
+    network::PortChecker pc(GetService());
+    auto new_port = pc(port, max_port_number);
+    if (!new_port) {
+        throw std::logic_error("Ports from 6881 to 6889 are busy!\n");
+    }
+    port = *new_port;
+
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");
@@ -106,14 +113,11 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                 break;
             }
         }
-        std::cout << "service gonna stop from try" << std::endl;
         service.stop();
         t.join();
 
-        std::cout << data_from_tracker.complete << std::endl;
         return true;
     } catch (boost::exception & excp) {
-        std::cout << "service gonna stop from catch" << std::endl;
         service.stop();
         if (t.joinable())
             t.join();

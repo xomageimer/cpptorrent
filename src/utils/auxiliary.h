@@ -54,7 +54,6 @@ public:
     }
 };
 
-
 template <typename T, typename Enable = void>
 struct is_optional : std::false_type {};
 
