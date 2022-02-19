@@ -9,7 +9,7 @@
 
 #include "auxiliary.h"
 
-bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
+bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : master_peer(*this) {
     network::PortChecker pc(GetService());
     auto new_port = pc(port, max_port_number);
     if (!new_port) {
@@ -29,8 +29,6 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
     bencode::Serialize::MakeSerialize(info_hash_bencode, hash_to_s);
     auto hash_info_str = hash_to_s.str();
     meta_info.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
-
-    master_peer = std::make_shared<Peer>();
 
     FillTrackers();
 }

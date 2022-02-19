@@ -12,19 +12,12 @@
 
 #include <utility>
 
+#include "NetExceptions.h"
 #include "Tracker.h"
 
 namespace ba = boost::asio;
 
 namespace network {
-    struct BadConnect : public boost::exception, public std::exception {
-    private:
-        std::string exception;
-    public:
-        explicit BadConnect(std::string arg) : exception(std::move(arg)) {};
-        [[nodiscard]] const char *what() const noexcept override { return exception.data(); }
-    };
-
     struct TrackerRequester {
     public:
         explicit TrackerRequester(const std::shared_ptr<tracker::Tracker>& tracker)

@@ -5,6 +5,10 @@
 #include <cctype>
 
 namespace bittorrent {
+    struct Torrent;
+}
+
+namespace bittorrent {
     struct Peer {
     public:
         Peer();
@@ -14,10 +18,17 @@ namespace bittorrent {
         [[nodiscard]] size_t GetKey() const { return key; }
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] size_t GetIP() const { return ip; }
-    private:
+    protected:
         size_t key;
         uint32_t ip;
         size_t port;
+    };
+
+    struct MasterPeer : public Peer {
+    public:
+        explicit MasterPeer(bittorrent::Torrent & tor) : torrent(tor) {}
+    private:
+        bittorrent::Torrent & torrent;
     };
 }
 

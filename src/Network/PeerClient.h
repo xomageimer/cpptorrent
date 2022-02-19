@@ -10,6 +10,7 @@
 
 #include <memory>
 
+#include "NetExceptions.h"
 #include "Peer.h"
 
 namespace ba = boost::asio;
@@ -19,7 +20,7 @@ namespace network {
     public:
 
     private:
-//        bittorrent::Torrent & torrent;
+
     };
 }
 

@@ -12,7 +12,6 @@
 using namespace std;
 
 int main() {
-    LOG ("START");
     auto start = std::chrono::steady_clock::now();
     try {
         bittorrent::Torrent torrent(std::filesystem::current_path() / "total-war-warhammer-2.torrent");
@@ -26,7 +25,7 @@ int main() {
         return EXIT_FAILURE;
     }
     auto end = std::chrono::steady_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << std::endl;
+    std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "ms " << std::endl;
     // TODO отсюда надо обрабатываться лучший трекер
     return EXIT_SUCCESS;
 }
