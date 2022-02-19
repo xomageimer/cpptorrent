@@ -2,20 +2,21 @@
 #define OS_WIN
 #endif
 
-#include "Torrent.h"
-
 #include <random>
 #include <sstream>
 
-#include "auxiliary.h"
+#include "Torrent.h"
 
-bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : master_peer(*this) {
+#include "auxiliary.h"
+#include "PortChecker.h"
+
+bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
     network::PortChecker pc(GetService());
     auto new_port = pc(port, max_port_number);
     if (!new_port) {
         throw std::logic_error("Ports from 6881 to 6889 are busy!\n");
     }
-    port = *new_port;
+    port = new_port.value();
 
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
@@ -29,6 +30,8 @@ bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) : 
     bencode::Serialize::MakeSerialize(info_hash_bencode, hash_to_s);
     auto hash_info_str = hash_to_s.str();
     meta_info.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
+
+    master_peer = std::make_shared<MasterPeer>(*this);
 
     FillTrackers();
 }

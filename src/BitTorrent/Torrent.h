@@ -9,11 +9,9 @@
 #include <thread>
 
 #include "Tracker.h"
-#include "TrackerRequester.h"
 #include "bencode_lib.h"
 #include "random_generator.h"
 #include "Peer.h"
-#include "PortChecker.h"
 
 // Объект с которым работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
 
@@ -34,7 +32,7 @@ namespace bittorrent {
 
         [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash; }
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
-        [[nodiscard]] size_t GetMasterPeerKey() const { return master_peer.GetKey(); }
+        [[nodiscard]] size_t GetMasterPeerKey() const { return master_peer->GetKey(); }
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] tracker::Query GetDefaultTrackerQuery() const;
         [[nodiscard]] const tracker::Response & GetResponse() const;
@@ -54,7 +52,7 @@ namespace bittorrent {
         static const size_t max_port_number = 6890;
         size_t port = 6881;
         meta_info_file meta_info;
-        bittorrent::MasterPeer master_peer;
+        std::shared_ptr<bittorrent::MasterPeer> master_peer;
     private:
         bool FillTrackers();
         [[nodiscard]] boost::asio::io_service & GetService() const;

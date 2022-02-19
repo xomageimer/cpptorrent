@@ -13,6 +13,7 @@
 #define BOOST_THREAD_PROVIDES_FUTURE
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
+
 #include <boost/thread.hpp>
 #include <boost/regex.hpp>
 
@@ -49,33 +50,25 @@ namespace tracker {
             {tracker::Event::Stopped, "stopped"}
     };
     struct Query {
-        BOOST_HANA_DEFINE_STRUCT(Query,
-                                 (Event, event),
-                                 (size_t, port),
-                                 (size_t, uploaded),
-                                 (size_t, downloaded),
-                                 (size_t, left),
-                                 (bool, compact),
-                                 (bool, no_peer_id),
+         Event event;
+         size_t port;
+         size_t uploaded;
+         size_t downloaded;
+         size_t left;
+         bool compact;
+         bool no_peer_id;
 
-                                 (std::optional<std::string>, ip),
-                                 (std::optional<size_t>, numwant),
-                                 (std::optional<std::string>, key),
-                                 (std::optional<std::string>, trackerid)
-        );
-
+         std::optional<std::string> ip;
+         std::optional<size_t> numwant;
+         std::optional<std::string> key;
+         std::optional<std::string> trackerid;
     };
     struct Response {
-        struct peer_image{
-            bittorrent::Peer BE_dict; // PEERS with keys: peer_id, ip, port
-            std::string BE_bin; // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
-        };
-
         std::chrono::seconds interval;
         std::string tracker_id {};
         size_t complete {};
         size_t incomplete {};
-        std::vector<peer_image> peers;
+        std::vector<bittorrent::PeerImage> peers;
 
         std::optional<std::string> warning_message;
         std::optional<std::chrono::seconds> min_interval;

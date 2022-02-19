@@ -14,7 +14,7 @@ using namespace std;
 int main() {
     auto start = std::chrono::steady_clock::now();
     try {
-        bittorrent::Torrent torrent(std::filesystem::current_path() / "total-war-warhammer-2.torrent");
+        bittorrent::Torrent torrent(std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent");
         if (!torrent.TryConnect(bittorrent::launch::any,
                                 tracker::Event::Empty))    // TODO сначала вызывается any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;
@@ -25,7 +25,7 @@ int main() {
         return EXIT_FAILURE;
     }
     auto end = std::chrono::steady_clock::now();
-    std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "ms " << std::endl;
+    std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "sec " << std::endl;
     // TODO отсюда надо обрабатываться лучший трекер
     return EXIT_SUCCESS;
 }

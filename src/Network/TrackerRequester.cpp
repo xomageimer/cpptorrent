@@ -189,6 +189,8 @@ void network::httpRequester::do_read_response_body() {
                             });
 }
 
+
+// TODO сделать так чтобы каждый из аупишников от одного урла сразу асихнронно тоже обрабатывался
 // UDP
 void network::udpRequester::SetResponse() {
     tracker::Response resp;
