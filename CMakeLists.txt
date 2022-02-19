@@ -14,7 +14,7 @@ endif()
 
 find_package(Boost 1.71.0 COMPONENTS system regex thread REQUIRED)
 
-add_compile_definitions(LOGGER)
+add_compile_definitions(FILE_LOGGER)
 
 add_library(bencode SHARED src/utils/bencode_lib.cpp src/utils/bencode_lib.h)
 add_library(helpers SHARED src/utils/auxiliary.cpp src/utils/auxiliary.h
