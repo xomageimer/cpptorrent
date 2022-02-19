@@ -14,19 +14,24 @@ endif()
 
 find_package(Boost 1.71.0 COMPONENTS system regex thread REQUIRED)
 
+add_compile_definitions(LOGGER)
+
 add_library(bencode SHARED src/utils/bencode_lib.cpp src/utils/bencode_lib.h)
-add_library(helpers SHARED src/utils/auxiliary.cpp src/utils/auxiliary.h)
-add_library(random SHARED src/utils/random_generator.cpp src/utils/random_generator.h)
-add_library(network SHARED src/Network/TrackerRequester.cpp src/Network/TrackerRequester.h src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp)
+add_library(helpers SHARED src/utils/auxiliary.cpp src/utils/auxiliary.h
+        src/utils/random_generator.cpp src/utils/random_generator.h
+        src/utils/logger.cpp src/utils/logger.h)
+add_library(bittorrent SHARED
+        src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp src/Network/PeerClient.h src/Network/PeerClient.cpp
+        src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
-target_link_libraries(network PUBLIC ${Boost_LIBRARIES} helpers bencode random)
+target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} helpers bencode)
 
 if(WIN32)
-    target_link_libraries(network PUBLIC -lws2_32 -lwsock32)
+    target_link_libraries(bittorrent PUBLIC -lws2_32 -lwsock32)
 endif()
 
 add_executable(cpptorrent src/main.cpp)
 
 include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils)
-target_link_libraries(cpptorrent PUBLIC network bencode helpers random)
+target_link_libraries(cpptorrent PUBLIC bittorrent bencode helpers)

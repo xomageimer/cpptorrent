@@ -1,15 +1,18 @@
 #define TORRENT_RELEASE
 #define TORRENT_DEBUG
 #ifdef TORRENT_RELEASE
-    #undef TORRENT_DEBUG
+#undef TORRENT_DEBUG
 #endif
 
 #include "Tracker.h"
 #include "Torrent.h"
 
+#include "logger.h"
+
 using namespace std;
 
 int main() {
+    LOG ("START");
     auto start = std::chrono::steady_clock::now();
     try {
         bittorrent::Torrent torrent(std::filesystem::current_path() / "total-war-warhammer-2.torrent");

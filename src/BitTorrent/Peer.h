@@ -2,7 +2,6 @@
 #define CPPTORRENT_PEER_H
 
 #include <string>
-#include <random>
 #include <cctype>
 
 namespace bittorrent {
@@ -20,9 +19,6 @@ namespace bittorrent {
         uint32_t ip;
         size_t port;
     };
-
-
 }
-
 
 #endif //CPPTORRENT_PEER_H

@@ -8,12 +8,7 @@
 #include "Tracker.h"
 #include "random_generator.h"
 #include "auxiliary.h"
-
-// TODO заменить все cerr на логера и в случае чего отключать его (для этого пусть будут макросы в хедере)
-namespace std {
-    std::stringstream black_hole;
-}
-#define cerr black_hole
+#include "logger.h"
 
 // HTTP
 void network::httpRequester::SetResponse() {
@@ -70,7 +65,8 @@ void network::httpRequester::SetResponse() {
 }
 
 void network::httpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
-    std::cerr << "print http request " << this->tracker_.lock()->GetUrl().Host << std::endl;
+    LOG("print http request ", this->tracker_.lock()->GetUrl().Host);
+
     std::ostream request_stream(&request_);
 
     auto my_hash = UrlEncode(tracker_.lock()->GetInfoHash());
@@ -88,10 +84,7 @@ void network::httpRequester::Connect(ba::io_service & io_service, const tracker:
                    << "Host: " << tracker_ptr->GetUrl().Host << "\r\n"
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
-//    ba::streambuf::const_buffers_type bufs = request_.data();
-//    std::string str(ba::buffers_begin(bufs),
-//                    ba::buffers_begin(bufs) + request_.size());
-//    std::cout << str << std::endl;
+
     if (!socket_)
         socket_.emplace(io_service);
     do_resolve();
@@ -141,7 +134,9 @@ void network::httpRequester::do_read_response_status() {
                                           std::istream response_stream(&response_);
                                           std::string http_version;
                                           response_stream >> http_version;
-                                          std::cerr << tracker_.lock()->GetUrl().Host << ":" << tracker_.lock()->GetUrl().Port << " " << http_version << std::endl;
+
+                                          LOG(tracker_.lock()->GetUrl().Host, ":", tracker_.lock()->GetUrl().Port, " ", http_version);
+
                                           unsigned int status_code;
                                           response_stream >> status_code;
                                           std::string status_message;
@@ -197,7 +192,7 @@ void network::httpRequester::do_read_response_body() {
 
 // UDP
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
-    std::cerr << "Make udp request " << this->tracker_.lock()->GetUrl().Host << std::endl;
+    LOG("Make udp request ", this->tracker_.lock()->GetUrl().Host);
 
     if (!socket_)
         socket_.emplace(io_service);
@@ -235,7 +230,9 @@ void network::udpRequester::do_try_connect() {
     }
     if (endpoints_it_ != ba::ip::udp::resolver::iterator()) {
         attempts_++;
-        std::cerr << "connect attempt: " << attempts_ << std::endl;
+
+        LOG("connect attempt: ", attempts_);
+
         do_connect();
         connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
             if (!ec) {
@@ -254,7 +251,9 @@ void network::udpRequester::do_connect() {
     socket_->async_send_to(
                ba::buffer(buff, sizeof(connect_request)), endpoint,
                [this] (boost::system::error_code const & ec, size_t bytes_transferred){
-                   std::cerr << "send successfull completly" << std::endl;
+
+                   LOG("send successfull completly");
+
                     if (ec || bytes_transferred != sizeof(connect_request)) {
                         attempts_ = MAX_CONNECT_ATTEMPTS;
                     } else {
@@ -274,16 +273,14 @@ void network::udpRequester::do_connect_response() {
             ba::buffer(buff, sizeof(connect_response)), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
                 if (ec) {
-                    std::cerr << ec.message() << std::endl;
+                    LOG(ec.message());
+
                     return;
                 }
                 uint32_t value;
                 std::memcpy(&value, &buff[4], sizeof(connect_request::transaction_id));
 
-                std::cerr << "receive successfull completly" << std::endl;
-
-                std::cerr << bytes_transferred << std::endl;
-                std::cerr << value << " == " << c_req.transaction_id << " -> " << ( value == c_req.transaction_id) << std::endl;
+                LOG("receive successfull completly ", bytes_transferred, '\n', value, " == ", c_req.transaction_id, " -> ", ( value == c_req.transaction_id));
 
                 if (!ec && bytes_transferred == sizeof(connect_response) && value == c_req.transaction_id && buff[0] == 0) {
                     connect_timeout_.cancel();
@@ -326,7 +323,9 @@ void network::udpRequester::do_announce() {
     socket_->async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred){
-                std::cerr << "announce send successfull completly" << std::endl;
+
+                LOG("announce send successfull completly");
+
                 if (ec || bytes_transferred != sizeof(request)) {
                     announce_attempts_ = MAX_ANNOUNCE_ATTEMPTS;
                 } else {
@@ -346,30 +345,32 @@ void network::udpRequester::do_announce_response() {
             ba::buffer(response, MTU), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
                 if (ec){
-                    std::cerr << ec.message() << std::endl;
+
+                    LOG(ec.message());
+
                     return;
                 }
 
-                std::cerr << "announce get successfull completly" << std::endl;
+                LOG("announce get successfull completly");
+
                 uint32_t val;
                 std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
                 uint32_t action = as_big_endian<uint32_t>(&response[0]).AsValue();
 
-                std::cout << std::dec << "_________________________________"
-                          << "\n!ec: " << !ec
-                          << "\nbytes_transferred: " << bytes_transferred
-                          << "\nval == c_resp.transaction_id.value(): " << (val == c_resp.transaction_id)
-                          << "\nresponse[0] != 0: " << (as_big_endian<uint32_t>(&response[0]).AsValue() != 0)
-                          << "\nresponse[0] = " << std::hex << as_big_endian<uint32_t>(&response[0]).AsValue()
-                          << "\n________________________________" << std::endl;
+                LOG( "!ec: ", !ec
+                    , "\nbytes_transferred: ", bytes_transferred
+                    , "\nval == c_resp.transaction_id.value(): ",  (val == c_resp.transaction_id)
+                    , "\nresponse[0] != 0: ", (as_big_endian<uint32_t>(&response[0]).AsValue() != 0)
+                    , "\nresponse[0] = ", std::hex, as_big_endian<uint32_t>(&response[0]).AsValue() );
+
                 if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && action == 1) {
                     announce_timeout_.cancel();
 
                     response[bytes_transferred] = '\0';
                     SetResponse();
                 } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && action == 3){
-                    std::cerr << "catch error from tracker announce: " << static_cast<const unsigned char*>(&response[8]) << std::endl;
+                    LOG("catch error from tracker announce: ", static_cast<const unsigned char*>(&response[8]));
                 }
             }
     );
@@ -406,7 +407,7 @@ void network::udpRequester::UpdateEndpoint() {
 }
 
 void network::udpRequester::connect_deadline() {
-    std::cerr << "connect timer" << std::endl;
+    LOG("connect timer");
 
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
@@ -425,7 +426,7 @@ void network::udpRequester::connect_deadline() {
 }
 
 void network::udpRequester::announce_deadline() {
-    std::cerr << "announce timer" << std::endl;
+    LOG("announce timer");
 
     if (endpoints_it_ ==  ba::ip::udp::resolver::iterator())
         return;
