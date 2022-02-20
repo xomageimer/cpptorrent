@@ -49,8 +49,7 @@ namespace bittorrent {
         std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
         tracker::Response data_from_tracker;
 
-        static const size_t max_port_number = 6890;
-        size_t port = 6881;
+        size_t port = 6881; // TODO config from console!
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::MasterPeer> master_peer;
     private:

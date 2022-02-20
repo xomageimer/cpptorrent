@@ -23,7 +23,6 @@ add_library(helpers SHARED src/utils/auxiliary.cpp src/utils/auxiliary.h
 add_library(bittorrent SHARED
         src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
         src/Network/PeerClient.h src/Network/PeerClient.cpp
-        src/Network/PortChecker.h src/Network/PortChecker.cpp
 
         src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp)
 

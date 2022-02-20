@@ -8,16 +8,8 @@
 #include "Torrent.h"
 
 #include "auxiliary.h"
-#include "PortChecker.h"
 
 bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path) {
-    network::PortChecker pc(GetService());
-    auto new_port = pc(port, max_port_number);
-    if (!new_port) {
-        throw std::logic_error("Ports from 6881 to 6889 are busy!\n");
-    }
-    port = new_port.value();
-
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");

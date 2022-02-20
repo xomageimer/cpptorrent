@@ -49,6 +49,7 @@ namespace bittorrent {
         size_t GetApplicationPort() const;
         bencode::Node const & GetChunkHashes() const;
     private:
+        friend class bittorrent::Torrent;
         bittorrent::Torrent & torrent;
         std::shared_ptr<network::PeerClient> new_client;
     };
