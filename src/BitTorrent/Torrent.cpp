@@ -41,7 +41,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
-            results.push_back(tracker->Request(service, query));
+            results.push_back((tracker->MakeRequester(), tracker->Request(service, query)));
         }
 
         t = std::thread([&]{
@@ -132,7 +132,6 @@ bool bittorrent::Torrent::FillTrackers() {
                 announce_url,
                 *this
         ));
-        trackers.back()->MakeRequester();
     };
 
     try {

@@ -58,7 +58,13 @@ boost::future<tracker::Response> tracker::Tracker::Request(boost::asio::io_servi
 }
 
 void tracker::Tracker::MakeRequester() {
-    if (tracker_url.Protocol == "udp")
+    auto str_tolower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(),
+                       [](unsigned char c){ return std::tolower(c); }
+        );
+        return s;
+    };
+    if (str_tolower(tracker_url.Protocol) == "udp")
         request = std::make_shared<network::udpRequester>(Get(), torrent.GetService());
     else
         request = std::make_shared<network::httpRequester>(Get(), torrent.GetService());
