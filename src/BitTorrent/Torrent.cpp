@@ -49,7 +49,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
             service.run();
-            std::cout << "service stopped" << std::endl;
+            std::cerr << "service stopped" << std::endl;
         });
         switch (policy) {
             case launch::any: {
@@ -106,6 +106,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                 break;
             }
         }
+        std::cerr << "got tracker" << std::endl;
         service.stop();
         t.join();
 
@@ -118,6 +119,10 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;
     }
+}
+
+void bittorrent::Torrent::StartCommunicatingPeers() {
+    master_peer->InitiateJob(GetService(), GetResponse().peers);
 }
 
 bool bittorrent::Torrent::FillTrackers() {
@@ -165,5 +170,8 @@ boost::asio::io_service & bittorrent::Torrent::GetService() const {
 }
 
 const tracker::Response & bittorrent::Torrent::GetResponse() const {
-    return data_from_tracker;
+    if (!data_from_tracker){
+        throw std::logic_error("Trackers have not yet been polled");
+    }
+    return *data_from_tracker;
 }

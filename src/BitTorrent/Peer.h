@@ -24,19 +24,20 @@ namespace bittorrent {
     public:
         Peer();
         Peer(uint32_t ip_address, uint16_t port_number);
-        explicit Peer(size_t key_arg);
+
+        [[maybe_unused]] explicit Peer(size_t key_arg);
 
         [[nodiscard]] size_t GetKey() const { return key; }
 
-        [[nodiscard]] virtual size_t GetPort() const { return port; }
+        [[nodiscard]] virtual uint16_t GetPort() const { return port; }
         [[nodiscard]] size_t GetIP() const { return ip; }
     protected:
         size_t key;
-        uint32_t ip;
-        size_t port;
+        uint32_t ip{};
+        uint16_t port{};
     };
     struct PeerImage{
-        bittorrent::Peer BE_dict; // PEERS with keys: peer_id, ip, port
+        bittorrent::Peer BE_struct; // PEERS with keys: peer_id, ip, port
         std::string BE_bin; // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
     };
 
@@ -51,6 +52,7 @@ namespace bittorrent {
     private:
         friend class bittorrent::Torrent;
         bittorrent::Torrent & torrent;
+
         std::shared_ptr<network::PeerClient> new_client;
     };
 }

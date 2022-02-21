@@ -88,14 +88,10 @@ namespace tracker {
     };
 
     struct Tracker : std::enable_shared_from_this<Tracker> {
-    private:
-        Url tracker_url;
-        bittorrent::Torrent & torrent;
-
-        std::shared_ptr<network::TrackerRequester> request;
     public:
         Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
         boost::future<Response> Request(boost::asio::io_service & service, const tracker::Query &query);
+        void MakeRequester();
 
         auto Get() { return shared_from_this(); }
 
@@ -105,7 +101,10 @@ namespace tracker {
         size_t GetMasterPeerId() const;
     private:
         friend class bittorrent::Torrent;
-        void MakeRequester();
+        Url tracker_url;
+        bittorrent::Torrent & torrent;
+
+        std::shared_ptr<network::TrackerRequester> request;
     };
 }
 

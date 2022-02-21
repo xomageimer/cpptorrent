@@ -29,6 +29,7 @@ namespace bittorrent {
     public:
         explicit Torrent(std::filesystem::path const & torrent_file_path);
         bool TryConnect(bittorrent::launch policy = bittorrent::launch::best, tracker::Event event = tracker::Event::Empty);
+        void StartCommunicatingPeers();
 
         [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash; }
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
@@ -47,7 +48,7 @@ namespace bittorrent {
 
         friend class tracker::Tracker;
         std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
-        tracker::Response data_from_tracker;
+        std::optional<tracker::Response> data_from_tracker;
 
         size_t port = 6881; // TODO config from console!
         meta_info_file meta_info;

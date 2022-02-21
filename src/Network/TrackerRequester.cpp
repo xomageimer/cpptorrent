@@ -59,12 +59,14 @@ void network::httpRequester::SetResponse() {
         resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
     }
 
+    LOG ("Url: ", tracker_.lock()->GetUrl().Host, " Peers size is: ", std::dec, resp.peers.size());
+
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
 }
 
 void network::httpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
-    LOG("print http request ", this->tracker_.lock()->GetUrl().Host);
+    LOG("Make http request ", this->tracker_.lock()->GetUrl().Host);
 
     std::ostream request_stream(&request_);
 
@@ -190,7 +192,7 @@ void network::httpRequester::do_read_response_body() {
 }
 
 
-// TODO сделать так чтобы каждый из аупишников от одного урла сразу асихнронно тоже обрабатывался
+// TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
 // UDP
 void network::udpRequester::SetResponse() {
     tracker::Response resp;
@@ -207,6 +209,8 @@ void network::udpRequester::SetResponse() {
 
         resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer), std::end(peer))});
     }
+
+    LOG ("Url: ", tracker_.lock()->GetUrl().Host, " Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
@@ -380,7 +384,7 @@ void network::udpRequester::do_announce_response() {
                 uint32_t action = as_big_endian<uint32_t>(&response[0]).AsValue();
 
                 LOG( "!ec: ", !ec
-                    , "\nbytes_transferred: ", bytes_transferred
+                    , "\nbytes_transferred: ", std::dec, bytes_transferred
                     , "\nval == c_resp.transaction_id.value(): ",  (val == c_resp.transaction_id)
                     , "\nresponse[0] != 0: ", (as_big_endian<uint32_t>(&response[0]).AsValue() != 0)
                     , "\nresponse[0] = ", std::hex, as_big_endian<uint32_t>(&response[0]).AsValue() );
@@ -395,36 +399,6 @@ void network::udpRequester::do_announce_response() {
                 }
             }
     );
-}
-
-void network::udpRequester::make_connect_request() {
-    c_req.transaction_id = as_big_endian(static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
-    c_req.protocol_id = as_big_endian(static_cast<uint64_t>(0x41727101980)).AsValue();
-}
-
-void network::udpRequester::make_announce_request() {
-    std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
-    std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
-
-    as_big_endian((uint32_t)1).AsArray(&request[8]);
-    as_big_endian(query_.downloaded).AsArray(&request[56]);
-    as_big_endian(query_.left).AsArray(&request[64]);
-    as_big_endian(query_.uploaded).AsArray(&request[72]);
-    as_big_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
-    as_big_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
-    as_big_endian((query_.key ? std::stoi(query_.key.value()) : 0)).AsArray(&request[88]);
-    as_big_endian<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
-    as_big_endian((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
-}
-
-void network::udpRequester::UpdateEndpoint() {
-    attempts_ = 0;
-    endpoints_it_++;
-
-    socket_->cancel();
-    if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
-        SetException("all endpoints were polled but without success");
-    }
 }
 
 void network::udpRequester::connect_deadline() {
@@ -463,4 +437,34 @@ void network::udpRequester::announce_deadline() {
             }
         });
     }
+}
+
+void network::udpRequester::UpdateEndpoint() {
+    attempts_ = 0;
+    endpoints_it_++;
+
+    socket_->cancel();
+    if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
+        SetException("all endpoints were polled but without success");
+    }
+}
+
+void network::udpRequester::make_connect_request() {
+    c_req.transaction_id = as_big_endian(static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
+    c_req.protocol_id = as_big_endian(static_cast<uint64_t>(0x41727101980)).AsValue();
+}
+
+void network::udpRequester::make_announce_request() {
+    std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
+    std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
+
+    as_big_endian((uint32_t)1).AsArray(&request[8]);
+    as_big_endian(query_.downloaded).AsArray(&request[56]);
+    as_big_endian(query_.left).AsArray(&request[64]);
+    as_big_endian(query_.uploaded).AsArray(&request[72]);
+    as_big_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
+    as_big_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
+    as_big_endian((query_.key ? std::stoi(query_.key.value()) : 0)).AsArray(&request[88]);
+    as_big_endian<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
+    as_big_endian((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
 }
