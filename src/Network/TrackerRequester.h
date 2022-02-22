@@ -32,11 +32,19 @@ namespace network {
         boost::promise<tracker::Response> promise_of_resp;
         std::weak_ptr<tracker::Tracker> tracker_;
 
+        std::mutex m_is_set;
+        bool is_set = false;
+
         virtual void SetResponse() = 0;
         virtual void SetException(const std::string &exc) {
+            std::lock_guard lock(m_is_set);
+            if (is_set)
+                return;
+
             LOG(tracker_.lock()->GetUrl().Host, " : ", " get exception");
 
             promise_of_resp.set_exception(network::BadConnect(exc));
+            is_set = true;
             Disconnect();
         }
     };
@@ -72,7 +80,7 @@ namespace network {
         ba::deadline_timer timeout_;
 
         static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
-        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(20000)};
+        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(2000)};
     };
 
     struct udpRequester : public TrackerRequester {

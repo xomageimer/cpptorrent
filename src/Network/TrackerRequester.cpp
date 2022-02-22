@@ -14,6 +14,10 @@
 
 // HTTP
 void network::httpRequester::SetResponse() {
+    std::lock_guard lock(m_is_set);
+    if (is_set)
+        return;
+
     LOG (tracker_.lock()->GetUrl().Host, " : ", "Set response!");
 
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
@@ -64,6 +68,7 @@ void network::httpRequester::SetResponse() {
     LOG (tracker_.lock()->GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
+    is_set = true;
     Disconnect();
 }
 
@@ -99,11 +104,11 @@ void network::httpRequester::do_resolve() {
                                    ba::ip::tcp::resolver::iterator endpoints){
                                 if (!ec) {
                                     do_connect(std::move(endpoints));
-                                    //timeout_.async_wait([this](boost::system::error_code const & ec) {
-                                    //   if (!ec) {
-                                    //        deadline();
-                                    //   }
-                                   // });
+                                    timeout_.async_wait([this](boost::system::error_code const & ec) {
+                                       if (!ec) {
+                                            deadline();
+                                       }
+                                    });
                                 } else {
                                     SetException("Unable to resolve host: " + ec.message());
                                 }
@@ -119,7 +124,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
                                         SetException(ec.message());
                                     }
                                });
-   // timeout_.expires_from_now(connection_waiting_time + epsilon);
+    timeout_.expires_from_now(connection_waiting_time + epsilon);
 }
 
 void network::httpRequester::do_request() {
@@ -155,7 +160,10 @@ void network::httpRequester::do_read_response_status() {
                                               SetException("Invalid response\n");
                                           } else if (status_code != 200) {
                                               SetException("Response returned with status code " + std::to_string(status_code) + "\n");
-                                          } else do_read_response_header();
+                                          } else {
+                                              LOG(tracker_.lock()->GetUrl().Host, " : ", " correct http status");
+                                              do_read_response_header();
+                                          }
                                       }
                                       else
                                       {
@@ -172,6 +180,8 @@ void network::httpRequester::do_read_response_header() {
                                   {
                                       if (!ec)
                                       {
+                                          LOG(tracker_.lock()->GetUrl().Host, " : ", " read response header");
+
                                           do_read_response_body();
                                       }
                                       else if (ec != ba::error::eof)
@@ -188,6 +198,8 @@ void network::httpRequester::do_read_response_body() {
                             {
                                 if (!ec)
                                 {
+                                    LOG(tracker_.lock()->GetUrl().Host, " : ", " read response body");
+
                                     do_read_response_body();
                                 }
                                 else if (ec == ba::error::eof)
@@ -217,6 +229,9 @@ void network::httpRequester::deadline() {
 // TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
 // UDP
 void network::udpRequester::SetResponse() {
+    std::lock_guard lock(m_is_set);
+    if (is_set) return;
+
     tracker::Response resp;
 
     resp.interval = std::chrono::seconds(as_big_endian<uint32_t>(&response[8]).AsValue());
@@ -235,6 +250,7 @@ void network::udpRequester::SetResponse() {
     LOG (tracker_.lock()->GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
+    is_set = true;
     Disconnect();
 }
 

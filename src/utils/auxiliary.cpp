@@ -1,6 +1,7 @@
 #include "auxiliary.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include <boost/function_output_iterator.hpp>
 #include <boost/compute/detail/sha1.hpp>
