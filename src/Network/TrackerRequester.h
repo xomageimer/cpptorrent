@@ -25,7 +25,9 @@ namespace network {
                 : tracker_(tracker) {}
 
         virtual void Connect(ba::io_service & io_service, const tracker::Query &query) = 0;
-        virtual void Disconnect() = 0;
+        virtual void Disconnect() {
+            is_set = true;
+        };
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
         virtual ~TrackerRequester() = default;
     protected:
@@ -44,7 +46,6 @@ namespace network {
             LOG(tracker_.lock()->GetUrl().Host, " : ", " get exception");
 
             promise_of_resp.set_exception(network::BadConnect(exc));
-            is_set = true;
             Disconnect();
         }
     };
@@ -58,6 +59,8 @@ namespace network {
         void Disconnect() override {
             timeout_.cancel();
             socket_->close();
+
+            TrackerRequester::Disconnect();
         };
     private:
         void do_resolve();
@@ -93,6 +96,8 @@ namespace network {
             announce_timeout_.cancel();
             connect_timeout_.cancel();
             socket_->close();
+
+            TrackerRequester::Disconnect();
         };
     private:
         void do_resolve();

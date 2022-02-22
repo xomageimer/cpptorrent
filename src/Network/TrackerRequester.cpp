@@ -68,7 +68,6 @@ void network::httpRequester::SetResponse() {
     LOG (tracker_.lock()->GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
-    is_set = true;
     Disconnect();
 }
 
@@ -99,6 +98,8 @@ void network::httpRequester::Connect(ba::io_service & io_service, const tracker:
 }
 
 void network::httpRequester::do_resolve() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
                             [this](boost::system::error_code const & ec,
                                    ba::ip::tcp::resolver::iterator endpoints){
@@ -116,7 +117,9 @@ void network::httpRequester::do_resolve() {
 }
 
 void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints) {
-    ba::async_connect(*socket_, endpoints,
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
+    ba::async_connect(*socket_, std::move(endpoints),
                                [this](boost::system::error_code const & ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&){
                                     if (!ec) {
                                         do_request();
@@ -128,6 +131,8 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
 }
 
 void network::httpRequester::do_request() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     ba::async_write(*socket_, request_, [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();
@@ -138,6 +143,8 @@ void network::httpRequester::do_request() {
 }
 
 void network::httpRequester::do_read_response_status() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     ba::async_read_until(*socket_,
                                   response_,
                                   "\r\n",
@@ -173,6 +180,8 @@ void network::httpRequester::do_read_response_status() {
 }
 
 void network::httpRequester::do_read_response_header() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     ba::async_read_until(*socket_,
                                   response_,
                                   "\r\n\r\n",
@@ -192,6 +201,8 @@ void network::httpRequester::do_read_response_header() {
 }
 
 void network::httpRequester::do_read_response_body() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     ba::async_read(*socket_,
                             response_,
                             [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
@@ -229,6 +240,8 @@ void network::httpRequester::deadline() {
 // TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
 // UDP
 void network::udpRequester::SetResponse() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     std::lock_guard lock(m_is_set);
     if (is_set) return;
 
@@ -250,7 +263,6 @@ void network::udpRequester::SetResponse() {
     LOG (tracker_.lock()->GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
-    is_set = true;
     Disconnect();
 }
 
@@ -265,6 +277,8 @@ void network::udpRequester::Connect(ba::io_service & io_service, const tracker::
 }
 
 void network::udpRequester::do_resolve() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     resolver_.async_resolve(tracker_.lock()->GetUrl().Host, tracker_.lock()->GetUrl().Port,
                             [this](boost::system::error_code const & ec,
                                    ba::ip::udp::resolver::iterator endpoints){
@@ -285,6 +299,8 @@ void network::udpRequester::do_resolve() {
 
 
 void network::udpRequester::do_try_connect() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -306,6 +322,8 @@ void network::udpRequester::do_try_connect() {
 }
 
 void network::udpRequester::do_connect() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -328,6 +346,8 @@ void network::udpRequester::do_connect() {
 }
 
 void network::udpRequester::do_connect_response() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -357,6 +377,8 @@ void network::udpRequester::do_connect_response() {
 }
 
 void network::udpRequester::do_try_announce() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -376,6 +398,8 @@ void network::udpRequester::do_try_announce() {
 }
 
 void network::udpRequester::do_announce() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -401,6 +425,8 @@ void network::udpRequester::do_announce() {
 }
 
 void network::udpRequester::do_announce_response() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
@@ -479,6 +505,8 @@ void network::udpRequester::announce_deadline() {
 }
 
 void network::udpRequester::UpdateEndpoint() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     attempts_ = 0;
     endpoints_it_++;
 
@@ -489,11 +517,15 @@ void network::udpRequester::UpdateEndpoint() {
 }
 
 void network::udpRequester::make_connect_request() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     c_req.transaction_id = as_big_endian(static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
     c_req.protocol_id = as_big_endian(static_cast<uint64_t>(0x41727101980)).AsValue();
 }
 
 void network::udpRequester::make_announce_request() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", __FUNCTION__);
+
     std::memcpy(&request[16], tracker_.lock()->GetInfoHash().c_str(), 20);
     std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.lock()->GetMasterPeerId())).c_str(), 20);
 
