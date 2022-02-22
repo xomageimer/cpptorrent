@@ -14,6 +14,7 @@
 
 #include "NetExceptions.h"
 #include "Tracker.h"
+#include "logger.h"
 
 namespace ba = boost::asio;
 
@@ -33,6 +34,8 @@ namespace network {
 
         virtual void SetResponse() = 0;
         virtual void SetException(const std::string &exc) {
+            LOG(tracker_.lock()->GetUrl().Host, " : ", " get exception");
+
             promise_of_resp.set_exception(network::BadConnect(exc));
             Disconnect();
         }
@@ -41,12 +44,12 @@ namespace network {
     struct httpRequester : public TrackerRequester {
     public:
         explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & service)
-                : resolver_(service), TrackerRequester(tracker) {}
+                : resolver_(service), timeout_(service), TrackerRequester(tracker) {}
 
         void Connect(ba::io_service & io_service, const tracker::Query &query) override;
         void Disconnect() override {
+            timeout_.cancel();
             socket_->close();
-            socket_.reset();
         };
     private:
         void do_resolve();
@@ -56,6 +59,8 @@ namespace network {
         void do_read_response_header();
         void do_read_response_body();
 
+        void deadline();
+
         void SetResponse() override;
 
         ba::streambuf request_;
@@ -63,6 +68,11 @@ namespace network {
 
         ba::ip::tcp::resolver resolver_;
         std::optional<ba::ip::tcp::socket> socket_;
+
+        ba::deadline_timer timeout_;
+
+        static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
+        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(20000)};
     };
 
     struct udpRequester : public TrackerRequester {
@@ -112,8 +122,8 @@ namespace network {
         size_t announce_attempts_ = 0;
 
         static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
-        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(15000)};
-        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(10000)};
+        static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(1500)};
+        static const inline boost::posix_time::milliseconds announce_waiting_time {boost::posix_time::milliseconds(1000)};
         ba::deadline_timer connect_timeout_;
         ba::deadline_timer announce_timeout_;
 

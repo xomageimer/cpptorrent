@@ -8,12 +8,14 @@
 #include "Tracker.h"
 #include "random_generator.h"
 #include "auxiliary.h"
-#include "logger.h"
 
 // TODO лучше всю работу с распарсиванием ответа убрать в класс Tracker, а промис будет от строки или бенкода
+// TODO все логи отметить их url'ми чтобы удобнее читать вывод логера
 
 // HTTP
 void network::httpRequester::SetResponse() {
+    LOG (tracker_.lock()->GetUrl().Host, " : ", "Set response!");
+
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
     std::vector<std::string> bencode_response;
     boost::regex expression(
@@ -59,14 +61,14 @@ void network::httpRequester::SetResponse() {
         resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
     }
 
-    LOG ("Url: ", tracker_.lock()->GetUrl().Host, " Peers size is: ", std::dec, resp.peers.size());
+    LOG (tracker_.lock()->GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
 }
 
 void network::httpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
-    LOG("Make http request ", this->tracker_.lock()->GetUrl().Host);
+    LOG(tracker_.lock()->GetUrl().Host, " : ","Make http request ");
 
     std::ostream request_stream(&request_);
 
@@ -97,6 +99,11 @@ void network::httpRequester::do_resolve() {
                                    ba::ip::tcp::resolver::iterator endpoints){
                                 if (!ec) {
                                     do_connect(std::move(endpoints));
+                                    //timeout_.async_wait([this](boost::system::error_code const & ec) {
+                                    //   if (!ec) {
+                                    //        deadline();
+                                    //   }
+                                   // });
                                 } else {
                                     SetException("Unable to resolve host: " + ec.message());
                                 }
@@ -112,6 +119,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
                                         SetException(ec.message());
                                     }
                                });
+   // timeout_.expires_from_now(connection_waiting_time + epsilon);
 }
 
 void network::httpRequester::do_request() {
@@ -136,7 +144,7 @@ void network::httpRequester::do_read_response_status() {
                                           std::string http_version;
                                           response_stream >> http_version;
 
-                                          LOG(tracker_.lock()->GetUrl().Host, ":", tracker_.lock()->GetUrl().Port, " ", http_version);
+                                          LOG(tracker_.lock()->GetUrl().Host, " : ", " get response (", tracker_.lock()->GetUrl().Port, " ", http_version, ")");
 
                                           unsigned int status_code;
                                           response_stream >> status_code;
@@ -191,6 +199,20 @@ void network::httpRequester::do_read_response_body() {
                             });
 }
 
+void network::httpRequester::deadline() {
+    LOG(tracker_.lock()->GetUrl().Host, " : ", "deadline was called");
+
+    if (timeout_.expires_at() <=  ba::deadline_timer::traits_type::now()) {
+        socket_->cancel();
+        SetException("timeout for " + std::string(tracker_.lock()->GetUrl().Host));
+    } else {
+        timeout_.async_wait([this](boost::system::error_code const &ec) {
+            if (!ec) {
+                deadline();
+            }
+        });
+    }
+}
 
 // TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
 // UDP
@@ -210,14 +232,14 @@ void network::udpRequester::SetResponse() {
         resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer), std::end(peer))});
     }
 
-    LOG ("Url: ", tracker_.lock()->GetUrl().Host, " Peers size is: ", std::dec, resp.peers.size());
+    LOG (tracker_.lock()->GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
 }
 
 void network::udpRequester::Connect(ba::io_service & io_service, const tracker::Query &query) {
-    LOG("Make udp request ", this->tracker_.lock()->GetUrl().Host);
+    LOG(tracker_.lock()->GetUrl().Host, " : ","Make udp request");
 
     if (!socket_)
         socket_.emplace(io_service);
@@ -256,7 +278,7 @@ void network::udpRequester::do_try_connect() {
     if (endpoints_it_ != ba::ip::udp::resolver::iterator()) {
         attempts_++;
 
-        LOG("connect attempt: ", attempts_);
+        LOG(tracker_.lock()->GetUrl().Host, " : ","connect attempt: ", attempts_);
 
         do_connect();
         connect_timeout_.async_wait([this](boost::system::error_code const & ec) {
@@ -277,7 +299,7 @@ void network::udpRequester::do_connect() {
                ba::buffer(buff, sizeof(connect_request)), endpoint,
                [this] (boost::system::error_code const & ec, size_t bytes_transferred){
 
-                   LOG("send successfull completly");
+                   LOG(tracker_.lock()->GetUrl().Host, " : ","send successfull completly");
 
                     if (ec || bytes_transferred != sizeof(connect_request)) {
                         attempts_ = MAX_CONNECT_ATTEMPTS;
@@ -298,14 +320,14 @@ void network::udpRequester::do_connect_response() {
             ba::buffer(buff, sizeof(connect_response)), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
                 if (ec) {
-                    LOG(ec.message());
+                    LOG(tracker_.lock()->GetUrl().Host, " : ",ec.message());
 
                     return;
                 }
                 uint32_t value;
                 std::memcpy(&value, &buff[4], sizeof(connect_request::transaction_id));
 
-                LOG("receive successfull completly ", bytes_transferred, '\n', value, " == ", c_req.transaction_id, " -> ", ( value == c_req.transaction_id));
+                LOG(tracker_.lock()->GetUrl().Host, " : ","\nreceive successfull completly ", bytes_transferred, '\n', value, " == ", c_req.transaction_id, " -> ", ( value == c_req.transaction_id));
 
                 if (!ec && bytes_transferred == sizeof(connect_response) && value == c_req.transaction_id && buff[0] == 0) {
                     connect_timeout_.cancel();
@@ -349,10 +371,11 @@ void network::udpRequester::do_announce() {
             ba::buffer(request, sizeof(request)), endpoint,
             [this] (boost::system::error_code const & ec, size_t bytes_transferred){
 
-                LOG("announce send successfull completly");
+                LOG(tracker_.lock()->GetUrl().Host, " : ","announce send successfull completly");
 
                 if (ec || bytes_transferred != sizeof(request)) {
                     announce_attempts_ = MAX_ANNOUNCE_ATTEMPTS;
+                    attempts_ = MAX_CONNECT_ATTEMPTS;
                 } else {
                     do_announce_response();
                 }
@@ -371,19 +394,19 @@ void network::udpRequester::do_announce_response() {
             [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
                 if (ec){
 
-                    LOG(ec.message());
+                    LOG(tracker_.lock()->GetUrl().Host, " : ",ec.message());
 
                     return;
                 }
 
-                LOG("announce get successfull completly");
+                LOG(tracker_.lock()->GetUrl().Host, " : ","announce get successfull completly");
 
                 uint32_t val;
                 std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
                 uint32_t action = as_big_endian<uint32_t>(&response[0]).AsValue();
 
-                LOG( "!ec: ", !ec
+                LOG(tracker_.lock()->GetUrl().Host, " : ", "\n!ec: ", !ec
                     , "\nbytes_transferred: ", std::dec, bytes_transferred
                     , "\nval == c_resp.transaction_id.value(): ",  (val == c_resp.transaction_id)
                     , "\nresponse[0] != 0: ", (as_big_endian<uint32_t>(&response[0]).AsValue() != 0)
@@ -395,14 +418,14 @@ void network::udpRequester::do_announce_response() {
                     response[bytes_transferred] = '\0';
                     SetResponse();
                 } else if (!ec && bytes_transferred != 0 && val == c_resp.transaction_id && action == 3){
-                    LOG("catch error from tracker announce: ", static_cast<const unsigned char*>(&response[8]));
+                    LOG(tracker_.lock()->GetUrl().Host, " : ","catch error from tracker announce: ", static_cast<const unsigned char*>(&response[8]));
                 }
             }
     );
 }
 
 void network::udpRequester::connect_deadline() {
-    LOG("connect timer");
+    LOG(tracker_.lock()->GetUrl().Host, " : ","connect timer");
 
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
@@ -421,7 +444,7 @@ void network::udpRequester::connect_deadline() {
 }
 
 void network::udpRequester::announce_deadline() {
-    LOG("announce timer");
+    LOG(tracker_.lock()->GetUrl().Host, " : ","announce timer");
 
     if (endpoints_it_ ==  ba::ip::udp::resolver::iterator())
         return;

@@ -41,7 +41,8 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
-            results.push_back((tracker->MakeRequester(), tracker->Request(service, query)));
+            tracker->MakeRequester();
+            results.push_back(tracker->Request(service, query));
         }
 
         t = std::thread([&]{
@@ -83,6 +84,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
                 data_from_tracker = total_res.get_future().get();
                 break;
             }
+            // TODO best'у нужно давать где-то минуту и в любом случае завершать!
             case launch::best: {
                 data_from_tracker = boost::when_all(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
                         .then([&](boost::future<std::vector<boost::future<tracker::Response>>> ready_results){
