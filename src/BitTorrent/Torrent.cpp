@@ -48,8 +48,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
     try {
         std::vector<boost::future<tracker::Response>> results;
         for (auto & tracker : active_trackers) {
-            tracker->MakeRequester();
-            results.push_back(tracker->Request(service, query));
+            results.push_back(tracker->Request(query));
         }
 
         LOG ("requests were created");
@@ -131,7 +130,8 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
 }
 
 void bittorrent::Torrent::StartCommunicatingPeers() {
-    master_peer->InitiateJob(GetService(), GetResponse().peers);
+    std::cout << GetResponse().peers.size() << std::endl;
+//    master_peer->InitiateJob(GetService(), GetResponse().peers);
 }
 
 bool bittorrent::Torrent::FillTrackers() {

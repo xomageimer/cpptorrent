@@ -17,11 +17,11 @@ int main() {
     auto start = std::chrono::steady_clock::now();
     try {
         bittorrent::Torrent torrent(std::filesystem::current_path() / "total-war-warhammer-2.torrent"); // TODO config from console
-        if (!torrent.TryConnect(bittorrent::launch::best,
+        if (!torrent.TryConnect(bittorrent::launch::any,
                                 tracker::Event::Empty))    // TODO сначала вызывается any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;
-        std::cout << torrent.GetResponse().peers.size() << std::endl;
         std::cout << "make connect" << std::endl;
+        torrent.StartCommunicatingPeers();
     } catch (std::exception & e) {
         std::cerr << "ERROR: " << e.what() << std::endl;
         return EXIT_FAILURE;

@@ -51,12 +51,12 @@ namespace tracker {
     };
     struct Query {
          Event event;
-         size_t port;
-         size_t uploaded;
-         size_t downloaded;
-         size_t left;
-         bool compact;
-         bool no_peer_id;
+         size_t port{};
+         size_t uploaded{};
+         size_t downloaded{};
+         size_t left{};
+         bool compact{};
+         bool no_peer_id{};
 
          std::optional<std::string> ip;
          std::optional<size_t> numwant;
@@ -90,7 +90,7 @@ namespace tracker {
     struct Tracker : std::enable_shared_from_this<Tracker> {
     public:
         Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
-        boost::future<Response> Request(boost::asio::io_service & service, const tracker::Query &query);
+        boost::future<Response> Request(const tracker::Query &query);
         void MakeRequester();
 
         auto Get() { return shared_from_this(); }

@@ -52,7 +52,8 @@ size_t tracker::Tracker::GetPort() const {
     return torrent.GetPort();
 }
 
-boost::future<tracker::Response> tracker::Tracker::Request(boost::asio::io_service &service, const tracker::Query &query) {
+boost::future<tracker::Response> tracker::Tracker::Request(const tracker::Query &query) {
+    MakeRequester();
     request->Connect(query);
     return request->GetResponse();
 }

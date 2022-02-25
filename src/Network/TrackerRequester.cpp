@@ -103,7 +103,7 @@ void network::httpRequester::do_resolve() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     resolver_.async_resolve(tracker_.GetUrl().Host, tracker_.GetUrl().Port,
-                           [this](boost::system::error_code const & ec,
+                           [this](boost::system::error_code ec,
                                    ba::ip::tcp::resolver::iterator endpoints){
                                 if (!ec) {
                                     do_connect(std::move(endpoints));
@@ -122,7 +122,7 @@ void network::httpRequester::do_resolve() {
 void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints) {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    ba::async_connect(*socket_, std::move(endpoints), [this](boost::system::error_code const & ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&){
+    ba::async_connect(*socket_, std::move(endpoints), [this](boost::system::error_code ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&){
                                     if (!ec) {
                                         do_request();
                                     } else {
@@ -236,7 +236,7 @@ void network::httpRequester::deadline() {
     if (timeout_.expires_at() <=  ba::deadline_timer::traits_type::now()) {
        SetException("timeout for " + std::string(tracker_.GetUrl().Host));
     } else {
-        timeout_.async_wait([this](boost::system::error_code const &ec) {
+        timeout_.async_wait([this](boost::system::error_code ec) {
             if (!ec) {
                 deadline();
             }
@@ -287,7 +287,7 @@ void network::udpRequester::do_resolve() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     resolver_.async_resolve(tracker_.GetUrl().Host, tracker_.GetUrl().Port,
-                            [this](boost::system::error_code const & ec,
+                            [this](boost::system::error_code ec,
                                    ba::ip::udp::resolver::iterator endpoints){
                                 if (!ec) {
                                     endpoints_it_ = std::move(endpoints);
@@ -338,7 +338,7 @@ void network::udpRequester::do_connect() {
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
                ba::buffer(buff, sizeof(buff)), endpoint,
-               [this] (boost::system::error_code const & ec, size_t bytes_transferred){
+               [this] (boost::system::error_code ec, size_t bytes_transferred){
                    LOG(tracker_.GetUrl().Host, " : ","send successfull completly");
 
                     if (ec || bytes_transferred < 16) {
@@ -359,7 +359,7 @@ void network::udpRequester::do_connect_response() {
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_receive_from(
             ba::buffer(buff, sizeof(buff)), endpoint,
-            [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
+            [this] (boost::system::error_code ec, size_t bytes_transferred) {
                 if (ec) {
                     LOG(tracker_.GetUrl().Host, " : ",ec.message());
 
@@ -393,7 +393,7 @@ void network::udpRequester::do_try_announce() {
     } else {
         announce_attempts_++;
         do_announce();
-        announce_timeout_.async_wait([this](boost::system::error_code const & ec){
+        announce_timeout_.async_wait([this](boost::system::error_code ec){
             if (!ec) {
                 announce_deadline();
             }
@@ -413,7 +413,7 @@ void network::udpRequester::do_announce() {
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
-            [this] (boost::system::error_code const & ec, size_t bytes_transferred){
+            [this] (boost::system::error_code ec, size_t bytes_transferred){
                 LOG(tracker_.GetUrl().Host, " : ","announce send successfull completly");
 
                 if (ec || bytes_transferred != sizeof(request)) {
@@ -437,7 +437,7 @@ void network::udpRequester::do_announce_response() {
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_->async_receive_from(
             ba::buffer(response, MTU), endpoint,
-            [this] (boost::system::error_code const & ec, size_t bytes_transferred) {
+            [this] (boost::system::error_code ec, size_t bytes_transferred) {
                 if (ec){
                     LOG(tracker_.GetUrl().Host, " : ",ec.message());
                     return;
@@ -478,7 +478,7 @@ void network::udpRequester::connect_deadline() {
         socket_->cancel();
         do_try_connect();
     } else {
-        connect_timeout_.async_wait([this](boost::system::error_code const &ec) {
+        connect_timeout_.async_wait([this](boost::system::error_code ec) {
             if (!ec) {
                 connect_deadline();
             }
@@ -497,7 +497,7 @@ void network::udpRequester::announce_deadline() {
         socket_->cancel();
         do_try_announce();
     } else {
-        announce_timeout_.async_wait([this](boost::system::error_code const &ec) {
+        announce_timeout_.async_wait([this](boost::system::error_code ec) {
             if (!ec) {
                 announce_deadline();
             }
