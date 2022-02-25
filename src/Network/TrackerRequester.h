@@ -121,7 +121,7 @@ namespace network {
         void make_announce_request();
         void make_connect_request();
 
-        uint8_t buff[128];
+        uint8_t buff[32];
         static const inline int MTU = 1500;
         uint8_t request[98];
         uint8_t response[MTU];

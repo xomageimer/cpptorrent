@@ -20,7 +20,7 @@ add_library(bencode SHARED src/utils/bencode_lib.cpp src/utils/bencode_lib.h)
 add_library(helpers SHARED src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/random_generator.cpp src/utils/random_generator.h
         src/utils/logger.cpp src/utils/logger.h)
-add_library(bittorrent SHARED
+add_library(bittorrent STATIC
         src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
         src/Network/PeerClient.h src/Network/PeerClient.cpp
 
