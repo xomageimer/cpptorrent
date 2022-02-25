@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <climits>
 
 bool is_little_endian();
 

@@ -101,10 +101,10 @@ namespace tracker {
         size_t GetMasterPeerId() const;
     private:
         friend class bittorrent::Torrent;
+        std::shared_ptr<network::TrackerRequester> request;
+
         Url tracker_url;
         bittorrent::Torrent & torrent;
-
-        std::shared_ptr<network::TrackerRequester> request;
     };
 }
 

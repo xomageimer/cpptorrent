@@ -16,7 +16,7 @@ int main() {
     LOG ("Start");
     auto start = std::chrono::steady_clock::now();
     try {
-        bittorrent::Torrent torrent(std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent"); // TODO config from console
+        bittorrent::Torrent torrent(std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1_7_0_.torrent"); // TODO config from console
         if (!torrent.TryConnect(bittorrent::launch::best,
                                 tracker::Event::Empty))    // TODO сначала вызывается any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;

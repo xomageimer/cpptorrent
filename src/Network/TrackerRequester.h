@@ -22,28 +22,30 @@ namespace network {
     struct TrackerRequester {
     public:
         explicit TrackerRequester(const std::shared_ptr<tracker::Tracker>& tracker)
-                : tracker_(tracker) {}
+                : tracker_(*tracker) {}
+        TrackerRequester(TrackerRequester const &) = delete;
+        TrackerRequester(TrackerRequester &&) = delete;
 
-        virtual void Connect(ba::io_service & io_service, const tracker::Query &query) = 0;
+        virtual void Connect(const tracker::Query &query) = 0;
         virtual void Disconnect() {
             is_set = true;
-        };
+        }
         [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
-        virtual ~TrackerRequester() = default;
+        virtual ~TrackerRequester() {
+            LOG ("Destruction");
+        }
     protected:
-        boost::promise<tracker::Response> promise_of_resp;
-        std::weak_ptr<tracker::Tracker> tracker_;
-
-        std::mutex m_is_set;
         bool is_set = false;
+
+        boost::promise<tracker::Response> promise_of_resp;
+        tracker::Tracker & tracker_;
 
         virtual void SetResponse() = 0;
         virtual void SetException(const std::string &exc) {
-            std::lock_guard lock(m_is_set);
             if (is_set)
                 return;
 
-            LOG(tracker_.lock()->GetUrl().Host, " : ", " get exception");
+            LOG(tracker_.GetUrl().Host, " : ", " get exception");
 
             promise_of_resp.set_exception(network::BadConnect(exc));
             Disconnect();
@@ -52,10 +54,10 @@ namespace network {
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & service)
-                : resolver_(service), timeout_(service), TrackerRequester(tracker) {}
+        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker,  boost::asio::strand<typename boost::asio::io_service::executor_type> executor)
+                : resolver_(executor), socket_(executor), timeout_(executor), TrackerRequester(tracker) {}
 
-        void Connect(ba::io_service & io_service, const tracker::Query &query) override;
+        void Connect(const tracker::Query &query) override;
         void Disconnect() override {
             timeout_.cancel();
             socket_->close();
@@ -88,10 +90,10 @@ namespace network {
 
     struct udpRequester : public TrackerRequester {
     public:
-        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, ba::io_service & service)
-                : resolver_(service), connect_timeout_(service), announce_timeout_(service), TrackerRequester(tracker) {}
+        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::strand<typename boost::asio::io_service::executor_type> executor)
+                : resolver_(executor), socket_(executor), connect_timeout_(executor), announce_timeout_(executor), TrackerRequester(tracker) {}
 
-        void Connect(ba::io_service & io_service, const tracker::Query &query) override;
+        void Connect(const tracker::Query &query) override;
         void Disconnect() override {
             announce_timeout_.cancel();
             connect_timeout_.cancel();
@@ -119,15 +121,14 @@ namespace network {
         void make_announce_request();
         void make_connect_request();
 
-        ba::ip::udp::resolver resolver_;
-        std::optional<ba::ip::udp::socket> socket_;
-        ba::ip::udp::resolver::iterator endpoints_it_;
-
-        uint8_t buff[16];
-
+        uint8_t buff[128];
         static const inline int MTU = 1500;
         uint8_t request[98];
         uint8_t response[MTU];
+
+        ba::ip::udp::resolver resolver_;
+        std::optional<ba::ip::udp::socket> socket_;
+        ba::ip::udp::resolver::iterator endpoints_it_;
 
         static const inline int MAX_CONNECT_ATTEMPTS = 4;
         static const inline int MAX_ANNOUNCE_ATTEMPTS = 3;

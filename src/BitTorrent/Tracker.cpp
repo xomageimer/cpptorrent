@@ -53,7 +53,7 @@ size_t tracker::Tracker::GetPort() const {
 }
 
 boost::future<tracker::Response> tracker::Tracker::Request(boost::asio::io_service &service, const tracker::Query &query) {
-    request->Connect(torrent.GetService(), query);
+    request->Connect(query);
     return request->GetResponse();
 }
 
@@ -65,7 +65,7 @@ void tracker::Tracker::MakeRequester() {
         return s;
     };
     if (str_tolower(tracker_url.Protocol) == "udp")
-        request = std::make_shared<network::udpRequester>(Get(), torrent.GetService());
+        request = std::make_shared<network::udpRequester>(Get(), make_strand(torrent.GetService()));
     else
-        request = std::make_shared<network::httpRequester>(Get(), torrent.GetService());
+        request = std::make_shared<network::httpRequester>(Get(), make_strand(torrent.GetService()));
 }

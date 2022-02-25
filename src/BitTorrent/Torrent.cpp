@@ -2,10 +2,16 @@
 #define OS_WIN
 #endif
 
+#define BOOST_THREAD_PROVIDES_FUTURE
+#define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
+#define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
+#include <boost/thread.hpp>
+
 #include <random>
 #include <sstream>
 
 #include "Torrent.h"
+#include "logger.h"
 
 #include "auxiliary.h"
 
@@ -37,6 +43,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
 #ifdef OS_WIN
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
+    LOG ("create requests");
     std::thread t;
     try {
         std::vector<boost::future<tracker::Response>> results;
@@ -45,6 +52,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
             results.push_back(tracker->Request(service, query));
         }
 
+        LOG ("requests were created");
         t = std::thread([&]{
 #ifdef OS_WIN
             SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
@@ -115,8 +123,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::launch policy, tracker::Event e
         return true;
     } catch (boost::exception & excp) {
         service.stop();
-        if (t.joinable())
-            t.join();
+        t.join();
 
         std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;
