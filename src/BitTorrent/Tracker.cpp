@@ -6,7 +6,7 @@
 
 namespace ba = boost::asio;
 
-tracker::Tracker::Tracker(std::string tracker_url_arg,
+bittorrent::Tracker::Tracker(std::string tracker_url_arg,
                           bittorrent::Torrent & torrent_arg)
     : torrent(torrent_arg)
 {
@@ -40,25 +40,25 @@ tracker::Tracker::Tracker(std::string tracker_url_arg,
     deserialize(tracker_url);
 }
 
-std::string const &tracker::Tracker::GetInfoHash() const {
+std::string const &bittorrent::Tracker::GetInfoHash() const {
     return torrent.GetInfoHash();
 }
 
-size_t tracker::Tracker::GetMasterPeerId() const {
+const uint8_t * bittorrent::Tracker::GetMasterPeerId() const {
     return torrent.GetMasterPeerKey();
 }
 
-size_t tracker::Tracker::GetPort() const {
+size_t bittorrent::Tracker::GetPort() const {
     return torrent.GetPort();
 }
 
-boost::future<tracker::Response> tracker::Tracker::Request(const tracker::Query &query) {
+boost::future<bittorrent::Response> bittorrent::Tracker::Request(const bittorrent::Query &query) {
     MakeRequester();
     request->Connect(query);
     return request->GetResponse();
 }
 
-void tracker::Tracker::MakeRequester() {
+void bittorrent::Tracker::MakeRequester() {
     auto str_tolower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(),
                        [](unsigned char c){ return std::tolower(c); }

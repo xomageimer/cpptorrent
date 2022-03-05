@@ -11,6 +11,7 @@ std::string GetSHA1(const std::string& p_arg);
 std::string UrlEncode(std::string const & url_to_encode);
 int IpToInt(std::string const & ip_address);
 
+// TODO мб неудачное название!
 template <typename T>
 struct as_big_endian {
     static_assert (CHAR_BIT == 8, "CHAR_BIT != 8");
@@ -54,6 +55,19 @@ public:
         return dest.full;
     }
 };
+
+template <typename T>
+T SwapEndian(T value) {
+    return as_big_endian(value).AsValue();
+}
+template <typename T>
+void ValueToArray(T value, uint8_t * arr) {
+    while (value) {
+        *arr = value % 10;
+        arr++;
+        value /= 10;
+    }
+}
 
 template <typename T, typename Enable = void>
 struct is_optional : std::false_type {};

@@ -37,17 +37,17 @@ namespace network {
     struct TrackerRequester;
 }
 
-namespace tracker {
+namespace bittorrent {
     enum class Event : int32_t {
         Empty = 0,
         Completed = 1,
         Started = 2,
         Stopped = 3
     };
-    static std::map<tracker::Event, std::string> events_str {
-            {tracker::Event::Completed, "completed"},
-            {tracker::Event::Started, "started"},
-            {tracker::Event::Stopped, "stopped"}
+    static std::map<bittorrent::Event, std::string> events_str {
+            {bittorrent::Event::Completed, "completed"},
+            {bittorrent::Event::Started, "started"},
+            {bittorrent::Event::Stopped, "stopped"}
     };
     struct Query {
          Event event;
@@ -90,16 +90,17 @@ namespace tracker {
     struct Tracker : std::enable_shared_from_this<Tracker> {
     public:
         Tracker(std::string tracker_url_arg, bittorrent::Torrent & torrent_arg);
-        boost::future<Response> Request(const tracker::Query &query);
-        void MakeRequester();
+        boost::future<Response> Request(const bittorrent::Query &query);
 
         auto Get() { return shared_from_this(); }
 
         Url const & GetUrl() const { return tracker_url; }
         size_t GetPort() const;
         std::string const & GetInfoHash() const;
-        size_t GetMasterPeerId() const;
+        const uint8_t * GetMasterPeerId() const;
     private:
+        void MakeRequester();
+
         friend class bittorrent::Torrent;
         std::shared_ptr<network::TrackerRequester> request;
 

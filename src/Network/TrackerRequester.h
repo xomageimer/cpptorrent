@@ -16,29 +16,31 @@
 #include "Tracker.h"
 #include "logger.h"
 
+// TODO сделать чтобы буффер респоунс был динамическим и не ограниченным в 1500 байт
+
 namespace ba = boost::asio;
 
 namespace network {
     struct TrackerRequester {
     public:
-        explicit TrackerRequester(const std::shared_ptr<tracker::Tracker>& tracker)
+        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker>& tracker)
                 : tracker_(*tracker) {}
         TrackerRequester(TrackerRequester const &) = delete;
         TrackerRequester(TrackerRequester &&) = delete;
 
-        virtual void Connect(const tracker::Query &query) = 0;
+        virtual void Connect(const bittorrent::Query &query) = 0;
         virtual void Disconnect() {
             is_set = true;
         }
-        [[nodiscard]] virtual boost::future<tracker::Response> GetResponse() { return promise_of_resp.get_future(); };
+        [[nodiscard]] virtual boost::future<bittorrent::Response> GetResponse() { return promise_of_resp.get_future(); };
         virtual ~TrackerRequester() {
             LOG ("Destruction");
         }
     protected:
         bool is_set = false;
 
-        boost::promise<tracker::Response> promise_of_resp;
-        tracker::Tracker & tracker_;
+        boost::promise<bittorrent::Response> promise_of_resp;
+        bittorrent::Tracker & tracker_;
 
         virtual void SetResponse() = 0;
         virtual void SetException(const std::string &exc) {
@@ -54,16 +56,16 @@ namespace network {
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(const std::shared_ptr<tracker::Tracker>& tracker,  boost::asio::strand<typename boost::asio::io_service::executor_type> executor)
+        explicit httpRequester(const std::shared_ptr<bittorrent::Tracker>& tracker,  const boost::asio::strand<typename boost::asio::io_service::executor_type>& executor)
                 : resolver_(executor), socket_(executor), timeout_(executor), TrackerRequester(tracker) {}
 
-        void Connect(const tracker::Query &query) override;
+        void Connect(const bittorrent::Query &query) override;
         void Disconnect() override {
             timeout_.cancel();
-            socket_->close();
+            socket_.close();
 
             TrackerRequester::Disconnect();
-        };
+        }
     private:
         void do_resolve();
         void do_connect(ba::ip::tcp::resolver::iterator endpoints);
@@ -80,7 +82,7 @@ namespace network {
         ba::streambuf response_;
 
         ba::ip::tcp::resolver resolver_;
-        std::optional<ba::ip::tcp::socket> socket_;
+        ba::ip::tcp::socket socket_;
 
         ba::deadline_timer timeout_;
 
@@ -90,14 +92,14 @@ namespace network {
 
     struct udpRequester : public TrackerRequester {
     public:
-        explicit udpRequester(const std::shared_ptr<tracker::Tracker>& tracker, boost::asio::strand<typename boost::asio::io_service::executor_type> executor)
+        explicit udpRequester(const std::shared_ptr<bittorrent::Tracker>& tracker, const boost::asio::strand<typename boost::asio::io_service::executor_type>& executor)
                 : resolver_(executor), socket_(executor), connect_timeout_(executor), announce_timeout_(executor), TrackerRequester(tracker) {}
 
-        void Connect(const tracker::Query &query) override;
+        void Connect(const bittorrent::Query &query) override;
         void Disconnect() override {
             announce_timeout_.cancel();
             connect_timeout_.cancel();
-            socket_->close();
+            socket_.close();
 
             TrackerRequester::Disconnect();
         };
@@ -127,7 +129,7 @@ namespace network {
         uint8_t response[MTU];
 
         ba::ip::udp::resolver resolver_;
-        std::optional<ba::ip::udp::socket> socket_;
+        ba::ip::udp::socket socket_;
         ba::ip::udp::resolver::iterator endpoints_it_;
 
         static const inline int MAX_CONNECT_ATTEMPTS = 4;
@@ -141,7 +143,7 @@ namespace network {
         ba::deadline_timer connect_timeout_;
         ba::deadline_timer announce_timeout_;
 
-        tracker::Query query_;
+        bittorrent::Query query_;
 
         struct connect_request {
             uint64_t protocol_id;

@@ -12,14 +12,14 @@
 // TODO лучше всю работу с распарсиванием ответа убрать в класс Tracker, а промис будет от строки или бенкода
 // TODO все логи отметить их url'ми чтобы удобнее читать вывод логера
 
+// TODO проверить работу http в санитайзерах!
+
 // HTTP
 void network::httpRequester::SetResponse() {
     if (is_set)
         return;
 
-   
     LOG (tracker_.GetUrl().Host, " : ", "Set response!");
-   
 
     std::string resp_str{(std::istreambuf_iterator<char>(&response_)), std::istreambuf_iterator<char>()} ;
     std::vector<std::string> bencode_response;
@@ -36,7 +36,7 @@ void network::httpRequester::SetResponse() {
     auto bencoder = bencode::Deserialize::Load(ss);
     const auto& bencode_resp = bencoder.GetRoot().AsDict();
 
-    tracker::Response resp;
+    bittorrent::Response resp;
 
     if (bencode_resp.count("tracker_id"))
         resp.tracker_id = bencode_resp.at("tracker_id").AsString();
@@ -55,26 +55,33 @@ void network::httpRequester::SetResponse() {
         resp.warning_message = it->second.AsString();
 
     auto peers = bencode_resp.at("peers").AsArray();
-    for (auto id = 0; id != peers.size(); id += 6) {
-        uint8_t peer_as_array[6];
-        for (size_t i = 0; i < 6; i++){
-            peer_as_array[i] = static_cast<uint8_t>(peers[id + i].AsNumber());
-        }
-        uint32_t ip = *(uint32_t *)&peer_as_array[0];
-        uint16_t port = *(uint16_t *)&peer_as_array[4];
+    for (auto & p : peers) {
+        bittorrent::Peer peer;
 
-        resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
+        char peer_as_array[26];
+        ValueToArray(p["ip"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[0]));
+        ValueToArray(p["port"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[4]));
+
+        /* port and peer id as little endian */
+        uint32_t ip = SwapEndian(p["ip"].AsNumber());
+        uint16_t port = SwapEndian(p["port"].AsNumber());
+
+        if (p.TryAt("peer id")) {
+            const char * key = p["peer id"].AsString().data();
+            std::memcpy(&peer_as_array[6], key, 20);
+            peer = bittorrent::Peer(ip, port, reinterpret_cast<const uint8_t *>(key));
+        } else peer = bittorrent::Peer(ip, port);
+
+        resp.peers.push_back({peer, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
     }
 
-   
     LOG (tracker_.GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
-   
 
     promise_of_resp.set_value(std::move(resp));
     Disconnect();
 }
 
-void network::httpRequester::Connect(const tracker::Query &query) {
+void network::httpRequester::Connect(const bittorrent::Query &query) {
     LOG(tracker_.GetUrl().Host, " : ","Make http request ");
 
     std::ostream request_stream(&request_);
@@ -83,18 +90,15 @@ void network::httpRequester::Connect(const tracker::Query &query) {
     request_stream << "GET /" << tracker_.GetUrl().Path.value_or("") << "?"
 
                    << "info_hash=" << UrlEncode(tracker_.GetInfoHash())
-                   << "&peer_id=" << UrlEncode(GetSHA1(std::to_string(tracker_.GetMasterPeerId())))
+                   << "&peer_id=" << UrlEncode(std::string(reinterpret_cast<const char *>(tracker_.GetMasterPeerId()), 20))
                    << "&port=" << tracker_.GetPort() << "&uploaded=" << query.uploaded << "&downloaded="
-                   << query.downloaded << "&left=" << query.left << "&compact=1"
-                   << ((query.event != tracker::Event::Empty) ? tracker::events_str.at(query.event) : "")
+                   << query.downloaded << "&left=" << query.left << "&compact=" << query.compact
+                   << ((query.event != bittorrent::Event::Empty) ? std::string("&event=") + bittorrent::events_str.at(query.event) : "")
 
                    << " HTTP/1.0\r\n"
                    << "Host: " << tracker_.GetUrl().Host << "\r\n"
                    << "Accept: */*\r\n"
                    << "Connection: close\r\n\r\n";
-
-    if (!socket_)
-        socket_.emplace(resolver_.get_executor());
 
     post(resolver_.get_executor(), [this] { do_resolve(); });
 }
@@ -122,7 +126,7 @@ void network::httpRequester::do_resolve() {
 void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoints) {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    ba::async_connect(*socket_, std::move(endpoints), [this](boost::system::error_code ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&){
+    ba::async_connect(socket_, std::move(endpoints), [this](boost::system::error_code ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&){
                                     if (!ec) {
                                         do_request();
                                     } else {
@@ -135,7 +139,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
 void network::httpRequester::do_request() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    ba::async_write(*socket_, request_, [this](boost::system::error_code ec, std::size_t /*length*/){
+    ba::async_write(socket_, request_, [this](boost::system::error_code ec, std::size_t /*length*/){
         if (!ec) {
             do_read_response_status();
         } else {
@@ -147,48 +151,47 @@ void network::httpRequester::do_request() {
 void network::httpRequester::do_read_response_status() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    ba::async_read_until(*socket_,
-                                  response_,
-                                  "\r\n",
-                          [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
+    ba::async_read_until(socket_, response_,
+                     "\r\n",
+                     [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
+                              {
+                                  if (!ec)
                                   {
-                                      if (!ec)
-                                      {
-                                          std::istream response_stream(&response_);
-                                          std::string http_version;
-                                          response_stream >> http_version;
-    
-                                         
-                                          LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
-                                           
-                                          
-                                          unsigned int status_code;
-                                          response_stream >> status_code;
-                                          std::string status_message;
-                                          std::getline(response_stream, status_message);
+                                      std::istream response_stream(&response_);
+                                      std::string http_version;
+                                      response_stream >> http_version;
 
-                                          if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
-                                              SetException("Invalid response\n");
-                                          } else if (status_code != 200) {
-                                              SetException("Response returned with status code " + std::to_string(status_code) + "\n");
-                                          } else {
-                                             
-                                              LOG(tracker_.GetUrl().Host, " : ", " correct http status");
-                                              do_read_response_header();
-                                             
-                                          }
+
+                                      LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
+
+
+                                      unsigned int status_code;
+                                      response_stream >> status_code;
+                                      std::string status_message;
+                                      std::getline(response_stream, status_message);
+
+                                      if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
+                                          SetException("Invalid response\n");
+                                      } else if (status_code != 200) {
+                                          SetException("Response returned with status code " + std::to_string(status_code) + "\n");
+                                      } else {
+
+                                          LOG(tracker_.GetUrl().Host, " : ", " correct http status");
+                                          do_read_response_header();
+
                                       }
-                                      else
-                                      {
-                                          SetException(ec.message());
-                                      }
-                                  });
+                                  }
+                                  else
+                                  {
+                                      SetException(ec.message());
+                                  }
+                              });
 }
 
 void network::httpRequester::do_read_response_header() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    ba::async_read_until(*socket_, response_,
+    ba::async_read_until(socket_, response_,
                          "\r\n\r\n",
                          [this](boost::system::error_code ec, std::size_t /*length*/)
                                   {
@@ -210,14 +213,13 @@ void network::httpRequester::do_read_response_header() {
 void network::httpRequester::do_read_response_body() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    ba::async_read(*socket_, response_,
+    ba::async_read(socket_, response_,
                    [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/)
                             {
                                 if (!ec)
                                 {
                                    
                                     LOG(tracker_.GetUrl().Host, " : ", " read response body");
-                                   
 
                                     do_read_response_body();
                                 }
@@ -242,7 +244,6 @@ void network::httpRequester::deadline() {
             }
         });
     }
-   
 }
 
 // TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
@@ -252,19 +253,24 @@ void network::udpRequester::SetResponse() {
 
     if (is_set) return;
 
-    tracker::Response resp;
+    bittorrent::Response resp;
 
     resp.interval = std::chrono::seconds(as_big_endian<uint32_t>(&response[8]).AsValue());
 
     for (size_t i = 20; response[i] != (uint8_t)'\0'; i+=6){
         uint8_t peer[6];
-        for (size_t j = 0; j != 6; j++){
+        for (size_t j = 0; j != std::size(peer); j++){
             peer[j] = response[i + j];
         }
-        uint32_t ip = *(uint32_t *)&peer[0];
-        uint16_t port = *(uint16_t *)&peer[4];
+        std::string bin = std::string(std::begin(peer), std::end(peer)); // raw data from tracker
 
-        resp.peers.push_back({bittorrent::Peer{ip, port}, std::string(std::begin(peer), std::end(peer))});
+        /* ip as little endian */
+        uint32_t ip = SwapEndian(*(uint32_t *)&peer[0]);
+        /* port as little endian */
+        uint16_t port = SwapEndian(*(uint16_t *)&peer[4]);
+
+        bittorrent::PeerImage pi {bittorrent::Peer{ip, port}, bin};
+        resp.peers.push_back(std::move(pi));
     }
 
     LOG (tracker_.GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
@@ -273,11 +279,8 @@ void network::udpRequester::SetResponse() {
     Disconnect();
 }
 
-void network::udpRequester::Connect(const tracker::Query &query) {
+void network::udpRequester::Connect(const bittorrent::Query &query) {
     LOG(tracker_.GetUrl().Host, " : ","Make udp request");
-
-    if (!socket_)
-        socket_.emplace(resolver_.get_executor());
 
     query_ = query;
     post(resolver_.get_executor(), [this] { do_resolve(); });
@@ -292,7 +295,7 @@ void network::udpRequester::do_resolve() {
                                 if (!ec) {
                                     endpoints_it_ = std::move(endpoints);
                                     ba::ip::udp::endpoint endpoint = *endpoints_it_;
-                                    socket_->open(endpoint.protocol());
+                                    socket_.open(endpoint.protocol());
 
                                     make_connect_request();
                                     make_announce_request();
@@ -336,7 +339,7 @@ void network::udpRequester::do_connect() {
 
     std::memcpy(&buff, &c_req, sizeof(connect_request));
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
-    socket_->async_send_to(
+    socket_.async_send_to(
                ba::buffer(buff, sizeof(buff)), endpoint,
                [this] (boost::system::error_code ec, size_t bytes_transferred){
                    LOG(tracker_.GetUrl().Host, " : ","send successfull completly");
@@ -357,7 +360,7 @@ void network::udpRequester::do_connect_response() {
         return;
 
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
-    socket_->async_receive_from(
+    socket_.async_receive_from(
             ba::buffer(buff, sizeof(buff)), endpoint,
             [this] (boost::system::error_code ec, size_t bytes_transferred) {
                 if (ec) {
@@ -411,7 +414,7 @@ void network::udpRequester::do_announce() {
     std::memcpy(&request[12], &c_resp.transaction_id, sizeof(c_resp.transaction_id));
 
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
-    socket_->async_send_to(
+    socket_.async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
             [this] (boost::system::error_code ec, size_t bytes_transferred){
                 LOG(tracker_.GetUrl().Host, " : ","announce send successfull completly");
@@ -435,7 +438,7 @@ void network::udpRequester::do_announce_response() {
         return;
 
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
-    socket_->async_receive_from(
+    socket_.async_receive_from(
             ba::buffer(response, MTU), endpoint,
             [this] (boost::system::error_code ec, size_t bytes_transferred) {
                 if (ec){
@@ -475,7 +478,7 @@ void network::udpRequester::connect_deadline() {
 
     if (connect_timeout_.expires_at() <= ba::deadline_timer::traits_type::now())
     {
-        socket_->cancel();
+        socket_.cancel();
         do_try_connect();
     } else {
         connect_timeout_.async_wait([this](boost::system::error_code ec) {
@@ -494,7 +497,7 @@ void network::udpRequester::announce_deadline() {
 
     if (announce_timeout_.expires_at() <=  ba::deadline_timer::traits_type::now())
     {
-        socket_->cancel();
+        socket_.cancel();
         do_try_announce();
     } else {
         announce_timeout_.async_wait([this](boost::system::error_code ec) {
@@ -511,7 +514,7 @@ void network::udpRequester::UpdateEndpoint() {
     attempts_ = 0;
     endpoints_it_++;
 
-    socket_->cancel();
+    socket_.cancel();
     if (endpoints_it_ == ba::ip::udp::resolver::iterator()) {
         SetException("all endpoints were polled but without success");
     }
@@ -528,7 +531,7 @@ void network::udpRequester::make_announce_request() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     std::memcpy(&request[16], tracker_.GetInfoHash().c_str(), 20);
-    std::memcpy(&request[36], GetSHA1(std::to_string(tracker_.GetMasterPeerId())).c_str(), 20);
+    std::memcpy(&request[36], tracker_.GetMasterPeerId(), 20);
 
     as_big_endian((uint32_t)1).AsArray(&request[8]);
     as_big_endian(query_.downloaded).AsArray(&request[56]);

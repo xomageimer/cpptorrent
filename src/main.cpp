@@ -1,9 +1,3 @@
-#define TORRENT_RELEASE
-#define TORRENT_DEBUG
-#ifdef TORRENT_RELEASE
-#undef TORRENT_DEBUG
-#endif
-
 #include "Tracker.h"
 #include "Torrent.h"
 
@@ -16,9 +10,9 @@ int main() {
     LOG ("Start");
     auto start = std::chrono::steady_clock::now();
     try {
-        bittorrent::Torrent torrent(std::filesystem::current_path() / "total-war-warhammer-2.torrent"); // TODO config from console
-        if (!torrent.TryConnect(bittorrent::launch::any,
-                                tracker::Event::Empty))    // TODO сначала вызывается any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать best, чтобы подменить на наиболее лучший
+        bittorrent::Torrent torrent(std::filesystem::current_path() / "Warhammer40000Regicide.torrent", std::filesystem::current_path()); // TODO config from console
+        if (!torrent.TryConnect(bittorrent::launch::best,
+                                bittorrent::Event::Empty))    // TODO сначала вызывается any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;
         std::cout << "make connect" << std::endl;
         torrent.StartCommunicatingPeers();

@@ -27,16 +27,17 @@ namespace bittorrent {
     };
     struct Torrent {
     public:
-        explicit Torrent(std::filesystem::path const & torrent_file_path);
-        bool TryConnect(bittorrent::launch policy = bittorrent::launch::best, tracker::Event event = tracker::Event::Empty);
+        explicit Torrent(std::filesystem::path const & torrent_file_path, std::filesystem::path const & path_to_download);
+        bool TryConnect(bittorrent::launch policy = bittorrent::launch::best, bittorrent::Event event = bittorrent::Event::Empty);
         void StartCommunicatingPeers();
 
+        [[nodiscard]] size_t GetPeersSize() const { return data_from_tracker ? data_from_tracker.value().peers.size() : 0; }
         [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash; }
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
-        [[nodiscard]] size_t GetMasterPeerKey() const { return master_peer->GetKey(); }
+        [[nodiscard]] const uint8_t * GetMasterPeerKey() const { return master_peer->GetID(); }
         [[nodiscard]] size_t GetPort() const { return port; }
-        [[nodiscard]] tracker::Query GetDefaultTrackerQuery() const;
-        [[nodiscard]] const tracker::Response & GetResponse() const;
+        [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
+        [[nodiscard]] const bittorrent::Response & GetResponse() const;
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
     private:
@@ -46,13 +47,15 @@ namespace bittorrent {
         size_t t_downloaded {};
         size_t t_left {};
 
-        friend class tracker::Tracker;
-        std::list<std::shared_ptr<tracker::Tracker>> active_trackers;
-        std::optional<tracker::Response> data_from_tracker;
+        friend class bittorrent::Tracker;
+        std::list<std::shared_ptr<bittorrent::Tracker>> active_trackers;
+        std::optional<bittorrent::Response> data_from_tracker;
 
         size_t port = 6881; // TODO config from console!
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::MasterPeer> master_peer;
+
+        const std::filesystem::path path_to_download;
     private:
         bool FillTrackers();
         [[nodiscard]] boost::asio::io_service & GetService() const;
