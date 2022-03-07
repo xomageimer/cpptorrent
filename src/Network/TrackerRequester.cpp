@@ -1,5 +1,4 @@
 //#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
-
 #include "TrackerRequester.h"
 
 #include <iostream>

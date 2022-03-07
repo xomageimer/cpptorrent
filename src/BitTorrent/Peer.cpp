@@ -55,6 +55,6 @@ void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient
 void bittorrent::MasterPeer::Unsubscribe(const std::shared_ptr<network::PeerClient>& unsub) {
     LOG(unsub->GetStrIP(), " was unsubscribed!");
 
-    std::lock_guard lock(mut_);
-    peers_subscribers_.erase(unsub);
+//    std::lock_guard lock(mut_);
+//    peers_subscribers_.erase(unsub);
 }

@@ -1,9 +1,11 @@
+//#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 #include "PeerClient.h"
 
 #include "auxiliary.h"
 
 #include <utility>
 
+// TODO попробовать без subscribe
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
                                 const boost::asio::strand<typename boost::asio::io_service::executor_type> & executor) : master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), socket_(executor), resolver_(executor), timeout_(executor) {
     do_resolve();
@@ -37,7 +39,6 @@ void network::PeerClient::do_resolve() {
                 }
             });
         } else {
-            std::cerr << "Error from resolve" << std::endl;
             Disconnect();
         }
     });
@@ -51,7 +52,6 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
         if (!ec) {
             do_handshake();
         } else {
-            std::cerr << "Error from connect" << std::endl;
             Disconnect();
         }
     });
@@ -87,17 +87,23 @@ void network::PeerClient::do_verify() {
             timeout_.cancel();
             bool wrong_answer = true;
             if ((!ec || ec == ba::error::eof)
-                    && bytes_transferred == 68 && buff[1] == 0x13
+                    && bytes_transferred >= 68 && buff[0] == 0x13
                     && memcmp(&buff[1], "BitTorrent protocol", 19) == 0
-                    && memcmp(&buff[28], &handshake_message[28], 20) == 0
-                    && memcmp(&buff[48], slave_peer_.GetID(), 20) == 0)
+                    && memcmp(&buff[28], &handshake_message[28], 20) == 0)
             {
                 wrong_answer = false;
-                std::cerr << std::string(reinterpret_cast<const char*>(&buff[48]), 20) << " was connected!" << std::endl;
+                std::cerr << GetStrIP() << " was connected!" << std::endl;
                 do_send_message();
                 do_read_message();
-            }
-            if (wrong_answer) {
+            } else {
+                std::cerr << "_____________________________________________" << std::endl;
+                std::cerr << GetStrIP() << std::endl;
+                std::cerr << ec.message() << std::endl;
+                std::cerr << (bytes_transferred >= 68) << std::endl << (buff[0] == 0x13)
+                << std::endl << (memcmp(&buff[1], "BitTorrent protocol", 19) == 0)
+                << std::endl << (memcmp(&buff[28], &handshake_message[28], 20) == 0) << std::endl;
+                std::cerr << "_____________________________________________" << std::endl;
+            } if (wrong_answer) {
                 if (--connect_attempts)
                     do_handshake();
                 else Disconnect();
