@@ -16,6 +16,8 @@ int main() {
             return EXIT_SUCCESS;
         std::cout << "make connect" << std::endl;
         torrent.StartCommunicatingPeers();
+        std::cout << "gonna die" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     } catch (std::exception & e) {
         std::cerr << "ERROR: " << e.what() << std::endl;
         return EXIT_FAILURE;

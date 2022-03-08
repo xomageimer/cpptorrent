@@ -42,6 +42,7 @@ namespace network {
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const & master_peer, bittorrent::Peer slave_peer, const boost::asio::strand<typename boost::asio::io_service::executor_type>& executor);
         ~PeerClient();
 
+        void start_connection();
         std::string GetStrIP() const;
 
         auto Get() { return shared_from_this(); }
@@ -66,7 +67,7 @@ namespace network {
         static const inline int MTU = 1500;
         uint8_t buff[MTU] {};
 
-        size_t connect_attempts = 1;
+        size_t connect_attempts = 3;
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
         ba::ip::tcp::socket socket_;
@@ -75,6 +76,7 @@ namespace network {
         ba::deadline_timer timeout_;
         static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
         static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(2000)};
+        bool is_disconnected = false;
     };
 }
 

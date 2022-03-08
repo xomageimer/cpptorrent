@@ -28,9 +28,12 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
 
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
     for (auto & peer : peers) {
-        auto p = std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service));
-        Subscribe(p);
+        auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service));
+        Subscribe(ptr_peer);
+        ptr_peer->start_connection();
     }
+//    auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peers.begin()->BE_struct, ba::make_strand(service));
+//    Subscribe(ptr_peer);
 }
 
 bencode::Node const & bittorrent::MasterPeer::GetChunkHashes() const {
@@ -55,6 +58,6 @@ void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient
 void bittorrent::MasterPeer::Unsubscribe(const std::shared_ptr<network::PeerClient>& unsub) {
     LOG(unsub->GetStrIP(), " was unsubscribed!");
 
-//    std::lock_guard lock(mut_);
-//    peers_subscribers_.erase(unsub);
+    std::lock_guard lock(mut_);
+    peers_subscribers_.erase(unsub);
 }

@@ -5,36 +5,42 @@
 
 #include <utility>
 
-// TODO попробовать без subscribe
+// TODO сделать так чтобы захватывался self указатель!
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
-                                const boost::asio::strand<typename boost::asio::io_service::executor_type> & executor) : master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), socket_(executor), resolver_(executor), timeout_(executor) {
-    do_resolve();
-}
+                                const boost::asio::strand<typename boost::asio::io_service::executor_type> & executor) : master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), socket_(executor), resolver_(executor), timeout_(executor){}
 
 network::PeerClient::~PeerClient() {
+    LOG (GetStrIP(), " : ", "destruction");
+
     socket_.close();
-    timeout_.cancel();
 }
 
 // TODO реализовать полный дисконнект
 void network::PeerClient::Disconnect() {
-    LOG (GetStrIP(), " : ", "disconnect");
+    if (is_disconnected)
+        return;
 
-    socket_.close();
+    LOG (GetStrIP(), " : ", __FUNCTION__);
+
     timeout_.cancel();
+    socket_.cancel();
     master_peer_.Unsubscribe(Get());
+    is_disconnected = true;
 }
 
 void network::PeerClient::do_resolve() {
     LOG (GetStrIP(), " : ", __FUNCTION__);
 
+    auto self(Get());
     resolver_.async_resolve(GetStrIP(), std::to_string(slave_peer_.GetPort()),
-                                         [this](boost::system::error_code ec,
+                                         [this, self](boost::system::error_code ec,
                                                 ba::ip::tcp::resolver::iterator endpoint) {
         if (!ec) {
             do_connect(std::move(endpoint));
-            timeout_.async_wait([this](boost::system::error_code const & ec) {
+            LOG (GetStrIP(), " : ", "start timer!");
+            timeout_.async_wait([this, self](boost::system::error_code const & ec) {
                 if (!ec) {
+                    LOG (GetStrIP(), " : ", "deadline timer from do_resolve");
                     deadline();
                 }
             });
@@ -47,12 +53,12 @@ void network::PeerClient::do_resolve() {
 void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
     LOG (GetStrIP(), " : ", __FUNCTION__);
 
-    ba::async_connect(socket_, std::move(endpoint), [this](boost::system::error_code ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&) {
-        timeout_.cancel();
+    auto self(Get());
+    ba::async_connect(socket_, std::move(endpoint), [this, self](boost::system::error_code ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator&) {
         if (!ec) {
+            timeout_.cancel();
+            MakeHandshake();
             do_handshake();
-        } else {
-            Disconnect();
         }
     });
     timeout_.expires_from_now(connection_waiting_time + epsilon);
@@ -61,18 +67,21 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
 void network::PeerClient::do_handshake() {
     LOG (GetStrIP(), " : ", __FUNCTION__);
 
-    MakeHandshake();
+    auto self(Get());
     ba::async_write(socket_, ba::buffer(handshake_message,
         std::size(handshake_message)),
-        [this](boost::system::error_code ec, std::size_t /*length*/) {
+        [this, self](boost::system::error_code ec, std::size_t /*length*/) {
             if (!ec) {
                 do_verify();
-                timeout_.async_wait([this](boost::system::error_code const & ec) {
+                LOG (GetStrIP(), " : ", "start timer!");
+                timeout_.async_wait([this, self](boost::system::error_code const & ec) {
                     if (!ec) {
+                        LOG (GetStrIP(), " : ", "deadline timer from do_handshake");
                         deadline();
                     }
                 });
             } else {
+                LOG (GetStrIP(), " : ", ec.message());
                 Disconnect();
             }
         });
@@ -81,10 +90,14 @@ void network::PeerClient::do_handshake() {
 void network::PeerClient::do_verify() {
     LOG (GetStrIP(), " : ", __FUNCTION__);
 
+    auto self(Get());
     ba::async_read(socket_,
-        ba::buffer(buff, MTU),
-        [this](boost::system::error_code ec, std::size_t bytes_transferred/*length*/) {
+        ba::buffer(buff, 68),
+        [this, self](boost::system::error_code ec, std::size_t bytes_transferred/*length*/) {
             timeout_.cancel();
+            if (ec == boost::asio::error::operation_aborted)
+                return;
+
             bool wrong_answer = true;
             if ((!ec || ec == ba::error::eof)
                     && bytes_transferred >= 68 && buff[0] == 0x13
@@ -95,17 +108,12 @@ void network::PeerClient::do_verify() {
                 std::cerr << GetStrIP() << " was connected!" << std::endl;
                 do_send_message();
                 do_read_message();
-            } else {
-                std::cerr << "_____________________________________________" << std::endl;
-                std::cerr << GetStrIP() << std::endl;
-                std::cerr << ec.message() << std::endl;
-                std::cerr << (bytes_transferred >= 68) << std::endl << (buff[0] == 0x13)
-                << std::endl << (memcmp(&buff[1], "BitTorrent protocol", 19) == 0)
-                << std::endl << (memcmp(&buff[28], &handshake_message[28], 20) == 0) << std::endl;
-                std::cerr << "_____________________________________________" << std::endl;
-            } if (wrong_answer) {
-                if (--connect_attempts)
+            }
+            if (wrong_answer) {
+                if (--connect_attempts) {
+                    LOG (GetStrIP(), " : attempts ", connect_attempts);
                     do_handshake();
+                }
                 else Disconnect();
             }
         }
@@ -122,13 +130,16 @@ void network::PeerClient::do_read_message() {
 }
 
 void network::PeerClient::deadline() {
-    LOG(GetStrIP(), " : ", "deadline was called");
+    LOG(GetStrIP(), " : ", __FUNCTION__);
 
-    if (timeout_.expires_at() <=  ba::deadline_timer::traits_type::now()) {
+    if (timeout_.expires_at() <= ba::deadline_timer::traits_type::now()) {
         Disconnect();
     } else {
-        timeout_.async_wait([this](boost::system::error_code ec) {
+        LOG (GetStrIP(), " : ", "start timer!");
+        auto self(Get());
+        timeout_.async_wait([this, self](boost::system::error_code ec) {
             if (!ec) {
+                LOG (GetStrIP(), " : ", "deadline timer from deadline!");
                 deadline();
             }
         });
@@ -167,4 +178,8 @@ std::string network::PeerClient::GetStrIP() const {
 
     cash_ip_ = ip_address_str;
     return cash_ip_;
+}
+
+void network::PeerClient::start_connection() {
+    do_resolve();
 }

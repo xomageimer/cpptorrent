@@ -224,6 +224,7 @@ void network::httpRequester::do_read_response_body() {
                                 }
                                 else if (ec == ba::error::eof)
                                 {
+                                    timeout_.cancel();
                                     SetResponse();
                                 } else {
                                    SetException(ec.message());
