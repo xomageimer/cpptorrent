@@ -28,6 +28,30 @@ void network::PeerClient::Disconnect() {
     is_disconnected = true;
 }
 
+void network::PeerClient::start_connection() {
+    do_resolve();
+}
+
+void network::PeerClient::try_again() {
+    if (is_disconnected)
+        return;
+
+    auto self = Get();
+    post(resolver_.get_executor(), [this, self] {
+        timeout_.cancel();
+        if (--connect_attempts) {
+            LOG (GetStrIP(), " : attempts ", connect_attempts);
+            timeout_.expires_from_now(connection_waiting_time + epsilon);
+            timeout_.async_wait([this, self](boost::system::error_code const & ec) {
+                if (!ec) {
+                    LOG (GetStrIP(), " : ", "deadline timer from do_resolve");
+                    do_resolve();
+                }
+            });
+        } else Disconnect();
+    });
+}
+
 void network::PeerClient::do_resolve() {
     LOG (GetStrIP(), " : ", __FUNCTION__);
 
@@ -45,7 +69,7 @@ void network::PeerClient::do_resolve() {
                 }
             });
         } else {
-            Disconnect();
+            try_again();
         }
     });
 }
@@ -59,7 +83,7 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
             timeout_.cancel();
             MakeHandshake();
             do_handshake();
-        }
+        } else try_again();
     });
     timeout_.expires_from_now(connection_waiting_time + epsilon);
 }
@@ -82,7 +106,7 @@ void network::PeerClient::do_handshake() {
                 });
             } else {
                 LOG (GetStrIP(), " : ", ec.message());
-                Disconnect();
+                try_again();
             }
         });
 }
@@ -98,23 +122,16 @@ void network::PeerClient::do_verify() {
             if (ec == boost::asio::error::operation_aborted)
                 return;
 
-            bool wrong_answer = true;
             if ((!ec || ec == ba::error::eof)
                     && bytes_transferred >= 68 && buff[0] == 0x13
                     && memcmp(&buff[1], "BitTorrent protocol", 19) == 0
                     && memcmp(&buff[28], &handshake_message[28], 20) == 0)
             {
-                wrong_answer = false;
                 std::cerr << GetStrIP() << " was connected!" << std::endl;
                 do_send_message();
                 do_read_message();
-            }
-            if (wrong_answer) {
-                if (--connect_attempts) {
-                    LOG (GetStrIP(), " : attempts ", connect_attempts);
-                    do_handshake();
-                }
-                else Disconnect();
+            } else {
+                try_again();
             }
         }
     );
@@ -133,7 +150,7 @@ void network::PeerClient::deadline() {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
     if (timeout_.expires_at() <= ba::deadline_timer::traits_type::now()) {
-        Disconnect();
+        try_again();
     } else {
         LOG (GetStrIP(), " : ", "start timer!");
         auto self(Get());
@@ -178,8 +195,4 @@ std::string network::PeerClient::GetStrIP() const {
 
     cash_ip_ = ip_address_str;
     return cash_ip_;
-}
-
-void network::PeerClient::start_connection() {
-    do_resolve();
 }

@@ -60,6 +60,8 @@ namespace network {
         void MakeHandshake();
         void Disconnect();
 
+        void try_again();
+
         bittorrent::MasterPeer & master_peer_;
         bittorrent::Peer slave_peer_;
         mutable std::string cash_ip_;
