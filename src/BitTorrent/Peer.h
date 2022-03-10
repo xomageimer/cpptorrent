@@ -19,9 +19,9 @@ namespace bittorrent {
 
 namespace network {
     struct PeerClient;
+    struct PeerListener;
 }
 
-// TODO change key to id in 20 bytes
 namespace bittorrent {
     struct Peer {
     public:
@@ -62,6 +62,7 @@ namespace bittorrent {
 
         std::mutex mut_;
         std::set<std::shared_ptr<network::PeerClient>> peers_subscribers_;
+        std::shared_ptr<network::PeerListener> peer_listener;
     };
 }
 

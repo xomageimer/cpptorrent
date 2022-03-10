@@ -22,7 +22,7 @@ add_library(helpers SHARED src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/logger.cpp src/utils/logger.h)
 add_library(bittorrent STATIC
         src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
-        src/Network/PeerClient.h src/Network/PeerClient.cpp
+        src/Network/PeerClient.h src/Network/PeerClient.cpp src/Network/PeerListener.h src/Network/PeerListener.cpp
 
         src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp)
 
