@@ -15,7 +15,8 @@
 
 #include "auxiliary.h"
 
-bittorrent::Torrent::Torrent(std::filesystem::path const & torrent_file_path, std::filesystem::path const & download_path) : path_to_download(download_path) {
+bittorrent::Torrent::Torrent(boost::asio::io_service & service, std::filesystem::path const & torrent_file_path, std::filesystem::path const & download_path, size_t listener_port)
+    : service(service), path_to_download(download_path), port(listener_port) {
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");
@@ -186,3 +187,5 @@ const bittorrent::Response & bittorrent::Torrent::GetResponse() const {
     }
     return *data_from_tracker;
 }
+
+size_t bittorrent::Torrent::GetPort() const { return port; }

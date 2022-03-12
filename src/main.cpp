@@ -1,6 +1,6 @@
 #include "Tracker.h"
 #include "Torrent.h"
-
+#include "Listener.h"
 #include "logger.h"
 
 using namespace std;
@@ -9,8 +9,11 @@ using namespace std;
 int main() {
     LOG ("Start");
     auto start = std::chrono::steady_clock::now();
+    boost::asio::io_service service;
     try {
-        bittorrent::Torrent torrent(std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent", std::filesystem::current_path()); // TODO config from console
+        auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
+        bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent", std::filesystem::current_path(), listener->GetPort()); // TODO config from console
+
         if (!torrent.TryConnect(bittorrent::launch::best,
                                 bittorrent::Event::Empty))    // TODO сначала вызывается any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;

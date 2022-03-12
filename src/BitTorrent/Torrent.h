@@ -20,14 +20,13 @@ namespace bittorrent {
         std::string info_hash;
         bencode::Node dict;
     };
-
     enum class launch {
         any,
         best
     };
     struct Torrent {
     public:
-        explicit Torrent(std::filesystem::path const & torrent_file_path, std::filesystem::path const & path_to_download);
+        explicit Torrent(boost::asio::io_service & service, std::filesystem::path const & torrent_file_path, std::filesystem::path const & path_to_download, size_t listener_port);
         bool TryConnect(bittorrent::launch policy = bittorrent::launch::best, bittorrent::Event event = bittorrent::Event::Empty);
         void StartCommunicatingPeers();
 
@@ -35,13 +34,14 @@ namespace bittorrent {
         [[nodiscard]] std::string const & GetInfoHash() const { return meta_info.info_hash; }
         [[nodiscard]] bencode::Node const & GetMeta() const { return meta_info.dict;}
         [[nodiscard]] const uint8_t * GetMasterPeerKey() const { return master_peer->GetID(); }
-        [[nodiscard]] size_t GetPort() const { return port; }
+        [[nodiscard]] std::shared_ptr<bittorrent::MasterPeer> GetRootPeer() { return master_peer; }
+        [[nodiscard]] size_t GetPort() const;
         [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
         [[nodiscard]] const bittorrent::Response & GetResponse() const;
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
     private:
-        mutable boost::asio::io_service service; // обязательно в самом верху
+        mutable boost::asio::io_service & service; // обязательно в самом верху
 
         size_t t_uploaded {};
         size_t t_downloaded {};
@@ -51,7 +51,7 @@ namespace bittorrent {
         std::list<std::shared_ptr<bittorrent::Tracker>> active_trackers;
         std::optional<bittorrent::Response> data_from_tracker;
 
-        size_t port = 6881; // TODO config from console!
+        size_t port;
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::MasterPeer> master_peer;
 

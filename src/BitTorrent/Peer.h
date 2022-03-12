@@ -19,7 +19,7 @@ namespace bittorrent {
 
 namespace network {
     struct PeerClient;
-    struct PeerListener;
+    struct Listener;
 }
 
 namespace bittorrent {
@@ -62,7 +62,6 @@ namespace bittorrent {
 
         std::mutex mut_;
         std::set<std::shared_ptr<network::PeerClient>> peers_subscribers_;
-        std::shared_ptr<network::PeerListener> peer_listener;
     };
 }
 
