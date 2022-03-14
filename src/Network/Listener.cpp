@@ -8,7 +8,7 @@ network::Listener::Listener(const boost::asio::strand<boost::asio::io_service::e
 void network::Listener::get_port() {
     boost::system::error_code ec;
     do {
-        if (port == max_port)
+        if (port == bittorrent_constants::last_port)
             throw BadConnect("can't get free ports, try again later!");
 
         port++;

@@ -12,6 +12,7 @@
 
 #include <utility>
 
+#include "Constants.h"
 #include "NetExceptions.h"
 #include "Tracker.h"
 #include "logger.h"
@@ -123,10 +124,9 @@ namespace network {
         void make_announce_request();
         void make_connect_request();
 
-        uint8_t buff[32];
-        static const inline int MTU = 1500;
-        uint8_t request[98];
-        uint8_t response[MTU];
+        uint8_t buff[bittorrent_constants::short_buff_size];
+        uint8_t request[bittorrent_constants::middle_buff_size];
+        uint8_t response[bittorrent_constants::MTU];
 
         ba::ip::udp::resolver resolver_;
         ba::ip::udp::socket socket_;

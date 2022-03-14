@@ -13,6 +13,8 @@
 #include <utility>
 #include <string>
 
+#include "Constants.h"
+
 #include "Torrent.h"
 #include "NetExceptions.h"
 #include "Peer.h"
@@ -33,13 +35,10 @@ namespace network {
 
         std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents;
 
-        static const inline size_t max_port = 6889;
-        size_t port = 6880; // TODO config from console!
+        size_t port = bittorrent_constants::begin_port;
 
         ba::ip::tcp::acceptor acceptor_;
         ba::ip::tcp::socket socket_;
-
-
     };
 }
 

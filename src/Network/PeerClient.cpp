@@ -7,11 +7,12 @@
 
 // TODO сделать так чтобы захватывался self указатель!
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
-                                const boost::asio::strand<typename boost::asio::io_service::executor_type> & executor) : master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), socket_(executor), resolver_(executor), timeout_(executor){}
+                                const boost::asio::strand<typename boost::asio::io_service::executor_type> & executor) : master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), socket_(executor), resolver_(executor), timeout_(executor) {}
 
 network::PeerClient::~PeerClient() {
     LOG (GetStrIP(), " : ", "destruction");
 
+    Disconnect();
     socket_.close();
 }
 
@@ -96,7 +97,7 @@ void network::PeerClient::do_handshake() {
         std::size(handshake_message)),
         [this, self](boost::system::error_code ec, std::size_t /*length*/) {
             if (!ec) {
-                do_verify();
+                do_check_handshake();
                 LOG (GetStrIP(), " : ", "start timer!");
                 timeout_.async_wait([this, self](boost::system::error_code const & ec) {
                     if (!ec) {
@@ -111,7 +112,7 @@ void network::PeerClient::do_handshake() {
         });
 }
 
-void network::PeerClient::do_verify() {
+void network::PeerClient::do_check_handshake() {
     LOG (GetStrIP(), " : ", __FUNCTION__);
 
     auto self(Get());
@@ -128,7 +129,6 @@ void network::PeerClient::do_verify() {
                     && memcmp(&buff[28], &handshake_message[28], 20) == 0)
             {
                 std::cerr << GetStrIP() << " was connected!" << std::endl;
-                do_send_message();
                 do_read_message();
             } else {
                 try_again();
@@ -138,12 +138,29 @@ void network::PeerClient::do_verify() {
     timeout_.expires_from_now(connection_waiting_time + epsilon);
 }
 
-void network::PeerClient::do_send_message() {
+void network::PeerClient::do_verify() {
+    LOG (GetStrIP(), " : ", __FUNCTION__);
 
-}
+    auto self(Get());
+    ba::async_read(socket_,
+                   ba::buffer(buff, 68),
+                   [this, self](boost::system::error_code ec, std::size_t bytes_transferred/*length*/) {
+                       timeout_.cancel();
+                       if (ec == boost::asio::error::operation_aborted)
+                           return;
 
-void network::PeerClient::do_read_message() {
+                       if ((!ec || ec == ba::error::eof)
+                           && bytes_transferred >= 68 && buff[0] == 0x13
+                           && memcmp(&buff[1], "BitTorrent protocol", 19) == 0
+                           && memcmp(&buff[28], &handshake_message[28], 20) == 0)
+                       {
 
+                       } else {
+                           try_again();
+                       }
+                   }
+    );
+    timeout_.expires_from_now(connection_waiting_time + epsilon);
 }
 
 void network::PeerClient::deadline() {

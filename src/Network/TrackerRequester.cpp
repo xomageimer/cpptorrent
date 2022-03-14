@@ -439,7 +439,7 @@ void network::udpRequester::do_announce_response() {
 
     ba::ip::udp::endpoint endpoint = *endpoints_it_;
     socket_.async_receive_from(
-            ba::buffer(response, MTU), endpoint,
+            ba::buffer(response, bittorrent_constants::MTU), endpoint,
             [this] (boost::system::error_code ec, size_t bytes_transferred) {
                 if (ec){
                     LOG(tracker_.GetUrl().Host, " : ",ec.message());

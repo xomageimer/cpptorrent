@@ -12,9 +12,12 @@
 #include <utility>
 #include <string>
 
+#include "Constants.h"
 #include "NetExceptions.h"
-#include "Peer.h"
 #include "logger.h"
+
+#include "Peer.h"
+#include "Message.h"
 
 namespace ba = boost::asio;
 
@@ -24,18 +27,6 @@ namespace network {
         am_interested = 0b0010,      // this client is interested in the peer
         peer_choking = 0b0100,       // peer is choking this client
         peer_interested = 0b1000     // peer is interested in this client
-    };
-    enum class MESSAGE_TYPE : uint8_t {
-        choke = 0,
-        unchoke = 1,
-        interested = 2,
-        not_interested = 3,
-        have = 4,
-        bitfield = 5,
-        request = 6,
-        piece_block = 7,
-        cancel = 8,
-        port = 9
     };
     struct PeerClient : public std::enable_shared_from_this<PeerClient> {
     public:
@@ -49,11 +40,11 @@ namespace network {
     private:
         void do_resolve();
         void do_connect(ba::ip::tcp::resolver::iterator endpoint);
-        void do_handshake();
-        void do_verify();
 
-        void do_send_message();
-        void do_read_message();
+        void do_handshake();
+        void do_check_handshake();
+
+        void do_verify();
 
         void deadline();
 
@@ -65,8 +56,8 @@ namespace network {
         bittorrent::MasterPeer & master_peer_;
         bittorrent::Peer slave_peer_;
         mutable std::string cash_ip_;
-        uint8_t handshake_message[68] {};
-        static const inline int MTU = 1500;
+        uint8_t handshake_message[bittorrent_constants::handshake_length] {};
+        static const inline int MTU = bittorrent_constants::MTU;
         uint8_t buff[MTU] {};
 
         size_t connect_attempts = 3;
@@ -79,6 +70,20 @@ namespace network {
         static const inline boost::posix_time::milliseconds epsilon {boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
         static const inline boost::posix_time::milliseconds connection_waiting_time {boost::posix_time::milliseconds(2000)};
         bool is_disconnected = false;
+    public:
+        template <typename Function>
+        void do_send_message(std::string const & msg, Function && callback){
+            auto self = Get();
+
+        }
+
+        void do_read_message() {
+
+        }
+        template <typename Function>
+        void do_read_message(Function && callback) {
+
+        }
     };
 }
 

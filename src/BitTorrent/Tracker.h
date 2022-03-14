@@ -25,6 +25,7 @@
 #include <boost/hana/at_key.hpp>
 #include <boost/hana/keys.hpp>
 
+#include "Constants.h"
 #include "bencode_lib.h"
 #include "Peer.h"
 
@@ -73,7 +74,7 @@ namespace bittorrent {
         std::optional<std::string> warning_message;
         std::optional<std::chrono::seconds> min_interval;
 
-        Response() : interval(std::chrono::seconds(900)) {}
+        Response() : interval(std::chrono::seconds(bittorrent_constants::tracker_again_request_time_secs)) {}
     };
     struct Url {
         BOOST_HANA_DEFINE_STRUCT(Url,
