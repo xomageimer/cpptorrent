@@ -5,4 +5,4 @@ random_generator &random_generator::Random() {
     return rg;
 }
 
-random_generator::random_generator(): std::mt19937_64(std::random_device{}()) {}
+random_generator::random_generator() : std::mt19937_64(std::random_device{}()) {}

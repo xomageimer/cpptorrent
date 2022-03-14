@@ -1,15 +1,14 @@
 #include "Tracker.h"
 
+#include "Torrent.h"
 #include "TrackerRequester.h"
 #include "auxiliary.h"
-#include "Torrent.h"
 
 namespace ba = boost::asio;
 
 bittorrent::Tracker::Tracker(std::string tracker_url_arg,
-                          bittorrent::Torrent & torrent_arg)
-    : torrent(torrent_arg)
-{
+                             bittorrent::Torrent &torrent_arg)
+    : torrent(torrent_arg) {
     std::vector<std::string> urls_parts;
     boost::regex expression(
             // proto
@@ -19,20 +18,18 @@ bittorrent::Tracker::Tracker(std::string tracker_url_arg,
             // port
             "(\?::(\\d+))\?"
             // path
-            "\\/?([^?#]*)"
-    );
-    if (!boost::regex_split(std::back_inserter(urls_parts), tracker_url_arg, expression))
-    {
+            "\\/?([^?#]*)");
+    if (!boost::regex_split(std::back_inserter(urls_parts), tracker_url_arg, expression)) {
         throw std::logic_error("Bad url, can't take it apart");
     }
 
-    auto deserialize = [&](auto & object) {
+    auto deserialize = [&](auto &object) {
         size_t i = 0;
         boost::hana::for_each(bh::keys(object), [&](auto key) {
             if (i == urls_parts.size())
                 return;
             else {
-                auto& member = bh::at_key(object, key);
+                auto &member = bh::at_key(object, key);
                 member = urls_parts[i++];
             }
         });
@@ -44,7 +41,7 @@ std::string const &bittorrent::Tracker::GetInfoHash() const {
     return torrent.GetInfoHash();
 }
 
-const uint8_t * bittorrent::Tracker::GetMasterPeerId() const {
+const uint8_t *bittorrent::Tracker::GetMasterPeerId() const {
     return torrent.GetMasterPeerKey();
 }
 
@@ -61,8 +58,7 @@ boost::future<bittorrent::Response> bittorrent::Tracker::Request(const bittorren
 void bittorrent::Tracker::MakeRequester() {
     auto str_tolower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(),
-                       [](unsigned char c){ return std::tolower(c); }
-        );
+                       [](unsigned char c) { return std::tolower(c); });
         return s;
     };
     if (str_tolower(tracker_url.Protocol) == "udp")

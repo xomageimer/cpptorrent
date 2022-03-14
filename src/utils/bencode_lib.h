@@ -1,12 +1,12 @@
 #ifndef QTORRENT_BENCODE_LIB_H
 #define QTORRENT_BENCODE_LIB_H
 
-#include <iostream>
-#include <vector>
-#include <map>
 #include <functional>
+#include <iostream>
+#include <map>
 #include <optional>
 #include <variant>
+#include <vector>
 
 namespace bencode {
     struct Node;
@@ -36,17 +36,17 @@ namespace bencode {
             return std::get<std::map<std::string, Node>>(*this);
         }
 
-        [[nodiscard]] const Node & operator[](std::string const & key) const {
+        [[nodiscard]] const Node &operator[](std::string const &key) const {
             return AsDict().at(key);
         }
 
-        [[nodiscard]] std::optional<std::reference_wrapper<const Node>> TryAt(std::string const & key) const {
+        [[nodiscard]] std::optional<std::reference_wrapper<const Node>> TryAt(std::string const &key) const {
             if (AsDict().count(key))
                 return std::ref(AsDict().at(key));
             return std::nullopt;
         }
 
-        [[nodiscard]] const Node & operator[](size_t i) const {
+        [[nodiscard]] const Node &operator[](size_t i) const {
             return AsArray().at(i);
         }
     };
@@ -54,8 +54,9 @@ namespace bencode {
     struct Document {
     private:
         Node root;
+
     public:
-        explicit Document(Node new_root) : root(std::move(new_root)) {};
+        explicit Document(Node new_root) : root(std::move(new_root)){};
 
         [[nodiscard]] inline Node const &GetRoot() const {
             return root;
@@ -73,32 +74,33 @@ namespace bencode {
 
         Node LoadNumber(std::istream &input);
 
-        inline Document Load(std::istream & input) {
+        inline Document Load(std::istream &input) {
             return std::move(Document{Deserialize::LoadNode(input)});
         }
-    }
+    }// namespace Deserialize
 
     namespace Serialize {
-        template <typename T>
-        void MakeSerialize(const T & bencode_node, std::ostream &out = std::cout) {
-            std::visit([&out](auto const & arg){
+        template<typename T>
+        void MakeSerialize(const T &bencode_node, std::ostream &out = std::cout) {
+            std::visit([&out](auto const &arg) {
                 bencode::Serialize::MakeSerialize<std::decay_t<decltype(arg)>>(arg, out);
-            }, bencode_node.GetOrigin());
+            },
+                       bencode_node.GetOrigin());
         }
 
-        template <>
+        template<>
         void MakeSerialize<long long>(const long long &bencode_int, std::ostream &out);
 
-        template <>
-        void MakeSerialize<std::string>(const std::string & bencode_str, std::ostream &out);
+        template<>
+        void MakeSerialize<std::string>(const std::string &bencode_str, std::ostream &out);
 
-        template <>
-        void MakeSerialize<std::vector<Node>>(const std::vector<Node> & bencode_arr, std::ostream &out);
+        template<>
+        void MakeSerialize<std::vector<Node>>(const std::vector<Node> &bencode_arr, std::ostream &out);
 
-        template <>
-        void MakeSerialize<std::map<std::string, Node>>(const std::map<std::string, Node> & bencode_dict, std::ostream &out);
-    }
-}
+        template<>
+        void MakeSerialize<std::map<std::string, Node>>(const std::map<std::string, Node> &bencode_dict, std::ostream &out);
+    }// namespace Serialize
+}// namespace bencode
 
 
-#endif //QTORRENT_BENCODE_LIB_H
+#endif//QTORRENT_BENCODE_LIB_H

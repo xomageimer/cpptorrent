@@ -1,9 +1,9 @@
 #ifndef CPPTORRENT_PEER_H
 #define CPPTORRENT_PEER_H
 
-#include <string>
 #include <cctype>
 #include <set>
+#include <string>
 
 #include <boost/asio.hpp>
 #define BOOST_THREAD_PROVIDES_FUTURE
@@ -20,19 +20,20 @@ namespace bittorrent {
 namespace network {
     struct PeerClient;
     struct Listener;
-}
+}// namespace network
 
 namespace bittorrent {
     struct Peer {
     public:
         Peer();
         Peer(uint32_t ip_address, uint16_t port_number);
-        Peer(uint32_t ip_address, uint16_t port_number, const uint8_t * key);
-        [[maybe_unused]] explicit Peer(const uint8_t * key_arg);
+        Peer(uint32_t ip_address, uint16_t port_number, const uint8_t *key);
+        [[maybe_unused]] explicit Peer(const uint8_t *key_arg);
 
-        [[nodiscard]] const uint8_t * GetID() const { return id; }
+        [[nodiscard]] const uint8_t *GetID() const { return id; }
         [[nodiscard]] virtual uint16_t GetPort() const { return port; }
         [[nodiscard]] size_t GetIP() const { return ip; }
+
     protected:
         uint8_t id[20];
         uint32_t ip{};
@@ -40,29 +41,30 @@ namespace bittorrent {
     };
 
     struct PeerImage {
-        bittorrent::Peer BE_struct; // PEERS with keys: peer_id, ip, port
-        std::string BE_bin; // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
+        bittorrent::Peer BE_struct;// PEERS with keys: peer_id, ip, port
+        std::string BE_bin;        // string consisting of multiples of 6 bytes. First 4 bytes are the IP address and last 2 bytes are the port number. All in network (big endian) notation.
     };
 
     struct MasterPeer : public Peer, std::enable_shared_from_this<MasterPeer> {
     public:
-        explicit MasterPeer(bittorrent::Torrent & tor) : torrent(tor) {}
+        explicit MasterPeer(bittorrent::Torrent &tor) : torrent(tor) {}
 
-        void InitiateJob(boost::asio::io_service & service, std::vector<PeerImage> const & peers);
+        void InitiateJob(boost::asio::io_service &service, std::vector<PeerImage> const &peers);
         auto Get() { return shared_from_this(); }
         size_t GetApplicationPort() const;
-        bencode::Node const & GetChunkHashes() const;
+        bencode::Node const &GetChunkHashes() const;
         std::string GetInfoHash() const;
 
-        void Subscribe(const std::shared_ptr<network::PeerClient>& new_sub);
-        void Unsubscribe(const std::shared_ptr<network::PeerClient>& unsub);
+        void Subscribe(const std::shared_ptr<network::PeerClient> &new_sub);
+        void Unsubscribe(const std::shared_ptr<network::PeerClient> &unsub);
+
     private:
         friend class bittorrent::Torrent;
-        bittorrent::Torrent & torrent;
+        bittorrent::Torrent &torrent;
 
         std::mutex mut_;
         std::set<std::shared_ptr<network::PeerClient>> peers_subscribers_;
     };
-}
+}// namespace bittorrent
 
-#endif //CPPTORRENT_PEER_H
+#endif//CPPTORRENT_PEER_H

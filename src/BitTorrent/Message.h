@@ -1,11 +1,11 @@
 #ifndef CPPTORRENT_MESSAGE_H
 #define CPPTORRENT_MESSAGE_H
 
-#include <utility>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 #include "Constants.h"
 
@@ -26,11 +26,12 @@ namespace bittorrent {
     public:
         static const inline int max_body_length = bittorrent_constants::MTU;
         static const inline int header_length = 4;
+
     private:
         uint8_t data_[max_body_length];
         MESSAGE_TYPE m_type_;
     };
-}
+}// namespace bittorrent
 
 
-#endif //CPPTORRENT_MESSAGE_H
+#endif//CPPTORRENT_MESSAGE_H

@@ -5,19 +5,19 @@
 #define BOOST_THREAD_PROVIDES_FUTURE
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
-#include <boost/thread.hpp>
 #include <boost/regex.hpp>
+#include <boost/thread.hpp>
 
-#include <unordered_map>
 #include <memory>
-#include <utility>
 #include <string>
+#include <unordered_map>
+#include <utility>
 
 #include "Constants.h"
 
-#include "Torrent.h"
 #include "NetExceptions.h"
 #include "Peer.h"
+#include "Torrent.h"
 #include "logger.h"
 
 namespace ba = boost::asio;
@@ -29,6 +29,7 @@ namespace network {
         ~Listener();
 
         [[nodiscard]] size_t GetPort() const { return port; }
+
     private:
         void get_port();
         void do_accept();
@@ -40,7 +41,7 @@ namespace network {
         ba::ip::tcp::acceptor acceptor_;
         ba::ip::tcp::socket socket_;
     };
-}
+}// namespace network
 
 
-#endif //CPPTORRENT_LISTENER_H
+#endif//CPPTORRENT_LISTENER_H

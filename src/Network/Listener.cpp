@@ -13,7 +13,7 @@ void network::Listener::get_port() {
 
         port++;
         acceptor_.open(ba::ip::tcp::v4(), ec) ||
-        acceptor_.bind({ba::ip::tcp::v4(), static_cast<unsigned short>(port)}, ec);
+                acceptor_.bind({ba::ip::tcp::v4(), static_cast<unsigned short>(port)}, ec);
     } while (ec == ba::error::address_in_use);
     acceptor_.listen();
 }
@@ -26,10 +26,9 @@ network::Listener::~Listener() {
 
 void network::Listener::do_accept() {
     acceptor_.async_accept(socket_,
-                           [this](boost::system::error_code ec){
-       if (!ec) {
-
-       }
-       do_accept();
-    });
+                           [this](boost::system::error_code ec) {
+                               if (!ec) {
+                               }
+                               do_accept();
+                           });
 }

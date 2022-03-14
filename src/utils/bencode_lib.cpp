@@ -38,7 +38,7 @@ bencode::Node bencode::Deserialize::LoadArray(std::istream &input) {
     std::vector<Node> arr;
 
     input.get();
-    for (;;){
+    for (;;) {
         if (input.peek() == 'e')
             break;
         arr.emplace_back(LoadNode(input));
@@ -71,35 +71,37 @@ bencode::Node bencode::Deserialize::LoadNumber(std::istream &input) {
     return number;
 }
 
-template <>
-void bencode::Serialize::MakeSerialize<std::string>(const std::string & bencode_str, std::ostream &out) {
+template<>
+void bencode::Serialize::MakeSerialize<std::string>(const std::string &bencode_str, std::ostream &out) {
     out << bencode_str.size() << ':' << bencode_str;
 }
 
-template <>
+template<>
 void bencode::Serialize::MakeSerialize<long long>(const long long &bencode_int, std::ostream &out) {
     out << 'i' << bencode_int << 'e';
 }
 
-template <>
-void bencode::Serialize::MakeSerialize<std::vector<bencode::Node>>(const std::vector<Node> & bencode_arr, std::ostream &out) {
+template<>
+void bencode::Serialize::MakeSerialize<std::vector<bencode::Node>>(const std::vector<Node> &bencode_arr, std::ostream &out) {
     out << 'l';
-    for (auto & node_el : bencode_arr){
-        std::visit([&out](auto const & arg){
+    for (auto &node_el: bencode_arr) {
+        std::visit([&out](auto const &arg) {
             bencode::Serialize::MakeSerialize<std::decay_t<decltype(arg)>>(arg, out);
-        }, node_el.GetOrigin());
+        },
+                   node_el.GetOrigin());
     }
     out << 'e';
 }
 
-template <>
-void bencode::Serialize::MakeSerialize<std::map<std::string, bencode::Node>>(const std::map<std::string, Node> & bencode_dict, std::ostream &out) {
+template<>
+void bencode::Serialize::MakeSerialize<std::map<std::string, bencode::Node>>(const std::map<std::string, Node> &bencode_dict, std::ostream &out) {
     out << 'd';
-    for (auto & [key, node_el] : bencode_dict){
+    for (auto &[key, node_el]: bencode_dict) {
         bencode::Serialize::MakeSerialize(key, out);
-        std::visit([&out](auto const & arg){
+        std::visit([&out](auto const &arg) {
             bencode::Serialize::MakeSerialize<std::decay_t<decltype(arg)>>(arg, out);
-        }, node_el.GetOrigin());
+        },
+                   node_el.GetOrigin());
     }
     out << 'e';
 }

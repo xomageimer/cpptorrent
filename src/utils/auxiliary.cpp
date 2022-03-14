@@ -3,31 +3,29 @@
 #include <algorithm>
 #include <cstring>
 
-#include <boost/function_output_iterator.hpp>
 #include <boost/compute/detail/sha1.hpp>
+#include <boost/function_output_iterator.hpp>
 
-bool is_little_endian()
-{
+bool is_little_endian() {
     int num = 1;
     return (*reinterpret_cast<char *>(&num) == 1);
 }
 
-std::string GetSHA1(const std::string &p_arg){
+std::string GetSHA1(const std::string &p_arg) {
     boost::uuids::detail::sha1 sha1;
     sha1.process_bytes(p_arg.data(), p_arg.size());
     unsigned hash[5] = {0};
     sha1.get_digest(hash);
 
-    union value_type
-    {
+    union value_type {
         unsigned full;
         unsigned char u8[sizeof(unsigned)];
-    } dest {};
+    } dest{};
     for (auto &el: hash) {
         value_type source{};
         source.full = el;
 
-        for (size_t k = 0; k < sizeof(unsigned); k++){
+        for (size_t k = 0; k < sizeof(unsigned); k++) {
             dest.u8[k] = source.u8[sizeof(unsigned) - k - 1];
         }
         el = dest.full;
@@ -35,7 +33,7 @@ std::string GetSHA1(const std::string &p_arg){
 
     char str_hash[sizeof(unsigned) * 5];
 
-    memcpy(str_hash, (char *)&hash, sizeof(unsigned) * 5);
+    memcpy(str_hash, (char *) &hash, sizeof(unsigned) * 5);
     return {str_hash, std::size(str_hash)};
 }
 
@@ -49,10 +47,10 @@ static std::string encode_impl(std::string::value_type symb) {
     return std::move(enc_ss.str());
 }
 
-std::string UrlEncode(const std::string &url_to_encode){
+std::string UrlEncode(const std::string &url_to_encode) {
     std::string qstr;
     std::transform(url_to_encode.begin(), url_to_encode.end(),
-                   boost::make_function_output_iterator([&](const std::string& byte) -> void {
+                   boost::make_function_output_iterator([&](const std::string &byte) -> void {
                        qstr.append(byte);
                    }),
                    encode_impl);
@@ -62,4 +60,3 @@ std::string UrlEncode(const std::string &url_to_encode){
 int IpToInt(const std::string &ip_address) {
     return 0;
 }
-
