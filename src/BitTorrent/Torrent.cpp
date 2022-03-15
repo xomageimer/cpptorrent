@@ -133,9 +133,9 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
 
 void bittorrent::Torrent::StartCommunicatingPeers() {
     std::cout << GetResponse().peers.size() << std::endl;
-//    service.restart();
-//    master_peer->InitiateJob(GetService(), GetResponse().peers);
-//    service.run();
+    service.restart();
+    master_peer->InitiateJob(GetService(), GetResponse().peers);
+    service.run();
 }
 
 bool bittorrent::Torrent::FillTrackers() {

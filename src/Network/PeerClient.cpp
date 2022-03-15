@@ -12,7 +12,7 @@ network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &m
 network::PeerClient::~PeerClient() {
     LOG(GetStrIP(), " : ", "destruction");
 
-    Disconnect();
+    timeout_.cancel();
     socket_.close();
 }
 

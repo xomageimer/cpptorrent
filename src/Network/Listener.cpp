@@ -25,10 +25,12 @@ network::Listener::~Listener() {
 }
 
 void network::Listener::do_accept() {
-    acceptor_.async_accept(socket_,
-                           [this](boost::system::error_code ec) {
-                               if (!ec) {
-                               }
-                               do_accept();
-                           });
+    LOG ("Listener" " : ", __FUNCTION__);
+
+//    acceptor_.async_accept(socket_,
+//                           [this](boost::system::error_code ec) {
+//                               if (!ec) {
+//                               }
+//                               do_accept();
+//                           });
 }

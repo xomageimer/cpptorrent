@@ -32,6 +32,9 @@ void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const
         Subscribe(ptr_peer);
         ptr_peer->start_connection();
     }
+//      auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peers.begin()->BE_struct, ba::make_strand(service));
+//      Subscribe(ptr_peer);
+//      ptr_peer->start_connection();
 }
 
 bencode::Node const &bittorrent::MasterPeer::GetChunkHashes() const {

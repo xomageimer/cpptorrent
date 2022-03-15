@@ -60,6 +60,7 @@ namespace network {
         uint8_t handshake_message[bittorrent_constants::handshake_length]{};
         static const inline int MTU = bittorrent_constants::MTU;
         uint8_t buff[MTU]{};
+        std::deque<bittorrent::Message> message_queue;
 
         size_t connect_attempts = 3;
 
@@ -76,6 +77,8 @@ namespace network {
         template<typename Function>
         void do_send_message(std::string const &msg, Function &&callback) {
             auto self = Get();
+
+//            boost::async::async_write(socket_, )
         }
 
         void do_read_message() {
