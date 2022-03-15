@@ -8,7 +8,7 @@
 #include <memory>
 
 bittorrent::Peer::Peer() {
-    std::memcpy(&id[0], "-CP2060-", 8);
+    std::memcpy(&id[0], "-CP2060-", 8); // cpptorrent
     for (size_t i = 0; i < 12; i++) {
         id[8 + i] = random_generator::Random().GetNumber<uint8_t>();
     }

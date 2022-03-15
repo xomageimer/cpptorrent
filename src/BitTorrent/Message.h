@@ -26,9 +26,10 @@ namespace bittorrent {
     public:
         static const inline int max_body_length = bittorrent_constants::MTU;
         static const inline int header_length = 4;
+        static const inline int id_length = 1;
 
     private:
-        uint8_t data_[max_body_length];
+        uint8_t data_[header_length + id_length + max_body_length];
         MESSAGE_TYPE m_type_;
     };
 }// namespace bittorrent
