@@ -60,7 +60,7 @@ namespace network {
         uint8_t handshake_message[bittorrent_constants::handshake_length]{};
         static const inline int MTU = bittorrent_constants::MTU;
         uint8_t buff[MTU]{};
-        std::deque<bittorrent::Message> message_queue;
+        std::deque<bittorrent::Message> message_queue_;
 
         size_t connect_attempts = 3;
 
@@ -75,16 +75,50 @@ namespace network {
 
     public:
         template<typename Function>
-        void do_send_message(std::string const &msg, Function &&callback) {
+        void send_message(std::string const &msg, Function &&callback) {
             auto self = Get();
 
-//            boost::async::async_write(socket_, )
+            post(socket_.get_executor(), [this, self, msg, callback]() {
+                bool write_in_progress = !message_queue_.empty();
+                auto new_msgs = bittorrent::GetMessagesQueue(msg);
+                message_queue_.insert(message_queue_.end(), new_msgs.begin(), new_msgs.end());
+                if (!write_in_progress) {
+                    do_write(callback);
+                }
+            });
         }
 
-        void do_read_message() {
+        void read_message() {
+            
         }
         template<typename Function>
-        void do_read_message(Function &&callback) {
+        void read_message(Function &&callback) {
+
+        }
+
+    private:
+        template<typename Function>
+        void do_write(Function &&callback) {
+            ba::async_write(socket_,
+                            ba::buffer(message_queue_.front().data(),
+                                       message_queue_.front().length()),
+                            [this, callback](boost::system::error_code ec, std::size_t /*length*/) {
+                                if (!ec) {
+                                    message_queue_.pop_front();
+                                    if (!message_queue_.empty()) {
+                                        do_write(callback);
+                                    } else {
+                                        callback();
+                                    }
+                                } else {
+                                    socket_.close();
+                                }
+                            });
+        }
+
+        template<typename Function>
+        void do_read(Function &&callback) {
+
         }
     };
 }// namespace network

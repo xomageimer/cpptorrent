@@ -31,6 +31,14 @@ void network::PeerClient::Disconnect() {
 
 void network::PeerClient::start_connection() {
     do_resolve();
+
+    auto self = Get();
+    timeout_.async_wait([this, self](boost::system::error_code const &ec) {
+        if (!ec) {
+            LOG(GetStrIP(), " : ", "deadline timer from do_resolve");
+            deadline();
+        }
+    });
 }
 
 void network::PeerClient::try_again() {
@@ -39,7 +47,6 @@ void network::PeerClient::try_again() {
 
     auto self = Get();
     post(resolver_.get_executor(), [this, self] {
-        timeout_.cancel();
         if (--connect_attempts) {
             LOG(GetStrIP(), " : attempts ", connect_attempts);
             timeout_.expires_from_now(connection_waiting_time + epsilon);
@@ -74,6 +81,7 @@ void network::PeerClient::do_resolve() {
                                     try_again();
                                 }
                             });
+    timeout_.expires_from_now(connection_waiting_time + epsilon);
 }
 
 void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
@@ -81,8 +89,8 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
 
     auto self(Get());
     ba::async_connect(socket_, std::move(endpoint), [this, self](boost::system::error_code ec, [[maybe_unused]] const ba::ip::tcp::resolver::iterator &) {
+        timeout_.cancel();
         if (!ec) {
-            timeout_.cancel();
             MakeHandshake();
             do_handshake();
         } else
@@ -126,7 +134,7 @@ void network::PeerClient::do_check_handshake() {
 
                        if ((!ec || ec == ba::error::eof) && bytes_transferred >= 68 && buff[0] == 0x13 && memcmp(&buff[1], "BitTorrent protocol", 19) == 0 && memcmp(&buff[28], &handshake_message[28], 20) == 0) {
                            std::cerr << GetStrIP() << " was connected!" << std::endl;
-                           do_read_message();
+                           read_message();
                        } else {
                            try_again();
                        }

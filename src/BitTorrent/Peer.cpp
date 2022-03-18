@@ -26,6 +26,7 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
     port = port_number;
 }
 
+// TODO мб сделать map для пиров subscriber'ов, где ключом будет его IP
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
     for (auto &peer: peers) {
         auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service));
