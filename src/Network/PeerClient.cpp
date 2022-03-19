@@ -35,7 +35,7 @@ void network::PeerClient::start_connection() {
     auto self = Get();
     timeout_.async_wait([this, self](boost::system::error_code const &ec) {
         if (!ec) {
-            LOG(GetStrIP(), " : ", "deadline timer from do_resolve");
+            LOG(GetStrIP(), " : ", "deadline timer to make resolve");
             deadline();
         }
     });
@@ -49,13 +49,7 @@ void network::PeerClient::try_again() {
     post(resolver_.get_executor(), [this, self] {
         if (--connect_attempts) {
             LOG(GetStrIP(), " : attempts ", connect_attempts);
-            timeout_.expires_from_now(connection_waiting_time + epsilon);
-            timeout_.async_wait([this, self](boost::system::error_code const &ec) {
-                if (!ec) {
-                    LOG(GetStrIP(), " : ", "deadline timer from do_resolve");
-                    do_resolve();
-                }
-            });
+            start_connection();
         } else
             Disconnect();
     });
