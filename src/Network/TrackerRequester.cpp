@@ -1,6 +1,7 @@
 //#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 #include "TrackerRequester.h"
 
+#include <variant>
 #include <iostream>
 #include <utility>
 
@@ -49,26 +50,46 @@ void network::httpRequester::SetResponse() {
     if (auto it = bencode_resp.begin(); (it = bencode_resp.find("warning_message"), it != bencode_resp.end()) || (it = bencode_resp.find("warning message"), it != bencode_resp.end()))
         resp.warning_message = it->second.AsString();
 
-    auto peers = bencode_resp.at("peers").AsArray();
-    for (auto &p: peers) {
-        bittorrent::Peer peer;
+    auto bencode_peers = bencode_resp.at("peers");
+    if (bencode_peers.IsString()) {
+        for (size_t i = 0; bencode_peers.AsString()[i] != (uint8_t) '\0'; i += 6) {
+            uint8_t peer[6];
+            for (size_t j = 0; j != std::size(peer); j++) {
+                peer[j] = bencode_peers.AsString()[i + j];
+            }
+            std::string bin = std::string(std::begin(peer), std::end(peer));// raw data from tracker
 
-        char peer_as_array[26];
-        ValueToArray(p["ip"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[0]));
-        ValueToArray(p["port"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[4]));
+            /* ip as little endian */
+            uint32_t ip = SwapEndian(*(uint32_t *) &peer[0]);
+            /* port as little endian */
+            uint16_t port = SwapEndian(*(uint16_t *) &peer[4]);
 
-        /* port and peer id as little endian */
-        uint32_t ip = SwapEndian(p["ip"].AsNumber());
-        uint16_t port = SwapEndian(p["port"].AsNumber());
+            bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
+            resp.peers.push_back(std::move(pi));
+        }
+    } else if (bencode_peers.IsArray()) {
+        for (auto & p: bencode_peers.AsArray()) {
+            bittorrent::Peer peer;
 
-        if (p.TryAt("peer id")) {
-            const char *key = p["peer id"].AsString().data();
-            std::memcpy(&peer_as_array[6], key, 20);
-            peer = bittorrent::Peer(ip, port, reinterpret_cast<const uint8_t *>(key));
-        } else
-            peer = bittorrent::Peer(ip, port);
+            char peer_as_array[26];
+            ValueToArray(p["ip"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[0]));
+            ValueToArray(p["port"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[4]));
 
-        resp.peers.push_back({peer, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
+            /* port and peer id as little endian */
+            uint32_t ip = SwapEndian(p["ip"].AsNumber());
+            uint16_t port = SwapEndian(p["port"].AsNumber());
+
+            if (p.TryAt("peer id")) {
+                const char *key = p["peer id"].AsString().data();
+                std::memcpy(&peer_as_array[6], key, 20);
+                peer = bittorrent::Peer(ip, port, reinterpret_cast<const uint8_t *>(key));
+            } else
+                peer = bittorrent::Peer(ip, port);
+
+            resp.peers.push_back({peer, std::string(std::begin(peer_as_array), std::end(peer_as_array))});
+        }
+    } else {
+        SetException("Invalid peers");
     }
 
     LOG(tracker_.GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());

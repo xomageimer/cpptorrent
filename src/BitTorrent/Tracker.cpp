@@ -24,7 +24,7 @@ bittorrent::Tracker::Tracker(std::string tracker_url_arg,
     }
 
     auto deserialize = [&](auto &object) {
-        size_t i = 0;
+        volatile size_t i = 0;
         boost::hana::for_each(bh::keys(object), [&](auto key) {
             if (i == urls_parts.size())
                 return;

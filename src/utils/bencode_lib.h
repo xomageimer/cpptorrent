@@ -24,16 +24,32 @@ namespace bencode {
             return std::get<long long>(*this);
         }
 
+        [[nodiscard]] bool IsNumber() const {
+            return std::holds_alternative<long long>(*this);
+        }
+
         [[nodiscard]] std::string const &AsString() const {
             return std::get<std::string>(*this);
+        }
+
+        [[nodiscard]] bool IsString() const {
+            return std::holds_alternative<std::string>(*this);
         }
 
         [[nodiscard]] std::vector<Node> const &AsArray() const {
             return std::get<std::vector<Node>>(*this);
         }
 
+        [[nodiscard]] bool IsArray() const {
+            return std::holds_alternative<std::vector<Node>>(*this);
+        }
+
         [[nodiscard]] std::map<std::string, Node> const &AsDict() const {
             return std::get<std::map<std::string, Node>>(*this);
+        }
+
+        [[nodiscard]] bool IsDict() const {
+            return std::holds_alternative<std::map<std::string, Node>>(*this);
         }
 
         [[nodiscard]] const Node &operator[](std::string const &key) const {

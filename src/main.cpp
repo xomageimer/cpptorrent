@@ -12,7 +12,7 @@ int main() {
     boost::asio::io_service service;
     try {
         auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
-        bittorrent::Torrent torrent(service, std::filesystem::current_path() / "No Country for Old Men.torrent", std::filesystem::current_path(), listener->GetPort());// TODO config from console
+        bittorrent::Torrent torrent(service, std::filesystem::current_path() / "No Country for Old Men2.torrent", std::filesystem::current_path(), listener->GetPort());// TODO config from console
 
         if (!torrent.TryConnect(bittorrent::Launch::Best,
                                 bittorrent::Event::Empty))// TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и параллельно вызвать Best, чтобы подменить на наиболее лучший

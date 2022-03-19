@@ -173,7 +173,7 @@ bool bittorrent::Torrent::FillTrackers() {
 }
 
 bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
-    return bittorrent::Query{.event = bittorrent::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left};
+    return bittorrent::Query{.event = bittorrent::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left, .compact = true};
 }
 
 boost::asio::io_service &bittorrent::Torrent::GetService() const {
