@@ -1,9 +1,9 @@
 //#define BOOST_ASIO_ENABLE_HANDLER_TRACKING
 #include "TrackerRequester.h"
 
-#include <variant>
 #include <iostream>
 #include <utility>
+#include <variant>
 
 #include "Tracker.h"
 #include "auxiliary.h"
@@ -11,8 +11,6 @@
 
 // TODO лучше всю работу с распарсиванием ответа убрать в класс Tracker, а промис будет от строки или бенкода
 // TODO все логи отметить их url'ми чтобы удобнее читать вывод логера
-
-// TODO проверить работу http в санитайзерах!
 
 // HTTP
 void network::httpRequester::SetResponse() {
@@ -28,7 +26,6 @@ void network::httpRequester::SetResponse() {
     if (!boost::regex_split(std::back_inserter(bencode_response), resp_str, expression)) {
         SetException("Bad response, can't split to bencode format");
     }
-    std::cout << bencode_response.back() << std::endl;
 
     std::stringstream ss(bencode_response.back());
     auto bencoder = bencode::Deserialize::Load(ss);
@@ -68,7 +65,7 @@ void network::httpRequester::SetResponse() {
             resp.peers.push_back(std::move(pi));
         }
     } else if (bencode_peers.IsArray()) {
-        for (auto & p: bencode_peers.AsArray()) {
+        for (auto &p: bencode_peers.AsArray()) {
             bittorrent::Peer peer;
 
             char peer_as_array[26];

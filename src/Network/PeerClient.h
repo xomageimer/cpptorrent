@@ -44,25 +44,20 @@ namespace network {
 
         void do_handshake();
         void do_check_handshake();
-
         void do_verify();
 
         void deadline();
-
-        void MakeHandshake();
         void Disconnect();
-
         void try_again();
 
         bittorrent::MasterPeer &master_peer_;
         bittorrent::Peer slave_peer_;
         mutable std::string cash_ip_;
-        uint8_t handshake_message[bittorrent_constants::handshake_length]{};
         static const inline int MTU = bittorrent_constants::MTU;
         uint8_t buff[MTU]{};
         std::deque<bittorrent::Message> message_queue_;
 
-        size_t connect_attempts = 3;
+        size_t connect_attempts = 10;
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
         ba::ip::tcp::socket socket_;
@@ -74,6 +69,21 @@ namespace network {
         bool is_disconnected = false;
 
     public:
+        template<typename Function>
+        void send_binstring(std::string const &msg, Function &&callback) {
+            auto self = Get();
+
+            ba::async_write(socket_,
+                            ba::buffer(msg.c_str(),
+                                       msg.size()),
+                            [this, callback](boost::system::error_code ec, std::size_t /*length*/) {
+                                if (!ec) {
+                                    callback();
+                                } else {
+                                    socket_.close();
+                                }
+                            });
+        }
         template<typename Function>
         void send_message(std::string const &msg, Function &&callback) {
             auto self = Get();
@@ -89,11 +99,9 @@ namespace network {
         }
 
         void read_message() {
-            
         }
         template<typename Function>
         void read_message(Function &&callback) {
-
         }
 
     private:
@@ -118,7 +126,6 @@ namespace network {
 
         template<typename Function>
         void do_read(Function &&callback) {
-
         }
     };
 }// namespace network

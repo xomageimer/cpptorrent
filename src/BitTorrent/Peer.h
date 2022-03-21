@@ -10,6 +10,7 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 
+#include "Constants.h"
 #include "bencode_lib.h"
 #include "logger.h"
 
@@ -54,11 +55,15 @@ namespace bittorrent {
         size_t GetApplicationPort() const;
         bencode::Node const &GetChunkHashes() const;
         std::string GetInfoHash() const;
+        const uint8_t * GetHandshake() const;
 
         void Subscribe(const std::shared_ptr<network::PeerClient> &new_sub);
         void Unsubscribe(const std::shared_ptr<network::PeerClient> &unsub);
 
     private:
+        void MakeHandshake();
+        uint8_t handshake_message[bittorrent_constants::handshake_length]{};
+
         friend class bittorrent::Torrent;
         bittorrent::Torrent &torrent;
 

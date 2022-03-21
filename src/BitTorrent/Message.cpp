@@ -28,9 +28,14 @@ std::deque<bittorrent::Message> bittorrent::GetMessagesQueue(const std::string &
 }
 
 void bittorrent::Message::encode_header() {
-
+    char header[header_length + 1] {};
+    std::sprintf(header, "4%d", static_cast<int>(body_length_));
+    std::memcpy(data_, header, header_length);
 }
 
 void bittorrent::Message::decode_header() {
+    char header[header_length + 1] {};
+    std::strncat(header, reinterpret_cast<const char*>(data_), header_length);
+    body_length_ = std::atoi(header);
 
 }

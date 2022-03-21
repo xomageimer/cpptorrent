@@ -28,6 +28,7 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
 
 // TODO мб сделать map для пиров subscriber'ов, где ключом будет его IP
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
+    MakeHandshake();
     for (auto &peer: peers) {
         auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service));
         Subscribe(ptr_peer);
@@ -62,4 +63,15 @@ void bittorrent::MasterPeer::Unsubscribe(const std::shared_ptr<network::PeerClie
 
     std::lock_guard lock(mut_);
     peers_subscribers_.erase(unsub);
+}
+
+void bittorrent::MasterPeer::MakeHandshake() {
+    handshake_message[0] = 0x13;
+    std::memcpy(&handshake_message[1], "BitTorrent protocol", 19);
+    std::memset(&handshake_message[20], 0x00, 8);// reserved bytes (last |= 0x01 for DHT or last |= 0x04 for FPE)
+    std::memcpy(&handshake_message[28], GetInfoHash().data(), 20);
+    std::memcpy(&handshake_message[48], GetID(), 20);
+}
+const uint8_t * bittorrent::MasterPeer::GetHandshake() const {
+    return handshake_message;
 }
