@@ -48,7 +48,9 @@ namespace bittorrent {
 
     struct MasterPeer : public Peer, std::enable_shared_from_this<MasterPeer> {
     public:
-        explicit MasterPeer(bittorrent::Torrent &tor) : torrent(tor) {}
+        explicit MasterPeer(bittorrent::Torrent &tor) : torrent(tor) {
+            MakeHandshake();
+        }
 
         void InitiateJob(boost::asio::io_service &service, std::vector<PeerImage> const &peers);
         auto Get() { return shared_from_this(); }

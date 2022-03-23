@@ -31,24 +31,23 @@ namespace network {
     struct PeerClient : public std::enable_shared_from_this<PeerClient> {
     public:
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
+        explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, ba::ip::tcp::socket socket, uint8_t * handshake_ptr);
         ~PeerClient();
 
-        void start_connection();
+        void StartConnection();
         std::string GetStrIP() const;
 
         auto Get() { return shared_from_this(); }
+        void Disconnect();
 
     private:
         void do_resolve();
         void do_connect(ba::ip::tcp::resolver::iterator endpoint);
-
-        void do_handshake();
-        void do_check_handshake();
         void do_verify();
 
+        void try_again_connect();
+
         void deadline();
-        void Disconnect();
-        void try_again();
 
         bittorrent::MasterPeer &master_peer_;
         bittorrent::Peer slave_peer_;
@@ -57,33 +56,17 @@ namespace network {
         uint8_t buff[MTU]{};
         std::deque<bittorrent::Message> message_queue_;
 
-        size_t connect_attempts = 10;
-
+        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
+
+        ba::ip::tcp::resolver::iterator endpoint_it_;
         ba::ip::tcp::socket socket_;
         ba::ip::tcp::resolver resolver_;
 
         ba::deadline_timer timeout_;
-        static const inline boost::posix_time::milliseconds epsilon{boost::posix_time::milliseconds(15)};// чтобы сразу не закончить таймер!
-        static const inline boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};
         bool is_disconnected = false;
 
     public:
-        template<typename Function>
-        void send_binstring(std::string const &msg, Function &&callback) {
-            auto self = Get();
-
-            ba::async_write(socket_,
-                            ba::buffer(msg.c_str(),
-                                       msg.size()),
-                            [this, callback](boost::system::error_code ec, std::size_t /*length*/) {
-                                if (!ec) {
-                                    callback();
-                                } else {
-                                    socket_.close();
-                                }
-                            });
-        }
         template<typename Function>
         void send_message(std::string const &msg, Function &&callback) {
             auto self = Get();
@@ -93,39 +76,56 @@ namespace network {
                 auto new_msgs = bittorrent::GetMessagesQueue(msg);
                 message_queue_.insert(message_queue_.end(), new_msgs.begin(), new_msgs.end());
                 if (!write_in_progress) {
-                    do_write(callback);
+                    do_write(std::string(reinterpret_cast<const char*>(message_queue_.front().data()),
+                                         message_queue_.front().length()),
+                             [this, self, callback](){
+                                 message_queue_.pop_front();
+                                 if (!message_queue_.empty()) {
+                                     do_write(callback);
+                                 } else {
+                                     callback();
+                                 }
+                             });
                 }
             });
         }
 
-        void read_message() {
-        }
+        // TODO проверять что callback обязательно принимает строку
         template<typename Function>
         void read_message(Function &&callback) {
+            auto self = Get();
+
+            post(socket_.get_executor(), [this, self, callback]() {
+
+            });
         }
 
     private:
         template<typename Function>
-        void do_write(Function &&callback) {
+        void do_write(std::string binstring, Function &&callback) {
+            auto self = Get();
+
+            timeout_.async_wait([this, self](boost::system::error_code const &ec) {
+                if (!ec) {
+                    LOG(GetStrIP(), " : ", "deadline timer from send bin string");
+                    deadline(); // TODO что-то другое мб
+                }
+            });
             ba::async_write(socket_,
-                            ba::buffer(message_queue_.front().data(),
-                                       message_queue_.front().length()),
-                            [this, callback](boost::system::error_code ec, std::size_t /*length*/) {
+                            ba::buffer(binstring),
+                            [this, self, callback](boost::system::error_code ec, std::size_t /*length*/) {
                                 if (!ec) {
-                                    message_queue_.pop_front();
-                                    if (!message_queue_.empty()) {
-                                        do_write(callback);
-                                    } else {
-                                        callback();
-                                    }
+                                    callback();
                                 } else {
                                     socket_.close();
                                 }
                             });
+            timeout_.expires_from_now(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
         }
 
         template<typename Function>
         void do_read(Function &&callback) {
+
         }
     };
 }// namespace network

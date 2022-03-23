@@ -16,32 +16,54 @@
 #include "Constants.h"
 
 #include "NetExceptions.h"
-#include "Peer.h"
+#include "PeerClient.h"
+
 #include "Torrent.h"
 #include "logger.h"
 
 namespace ba = boost::asio;
 
-namespace network {
-    struct Listener {
-    public:
-        explicit Listener(const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
-        ~Listener();
+namespace network
+{
+struct Listener
+{
+public:
+    explicit Listener(const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
+    ~Listener();
 
-        [[nodiscard]] size_t GetPort() const { return port; }
+    [[nodiscard]] size_t GetPort() const { return port_; }
+
+private:
+    void get_port();
+    void do_accept();
+
+    struct participant : public std::enable_shared_from_this<participant>
+    {
+    public:
+        explicit participant(Listener &listener, ba::ip::tcp::socket socket)
+            : listener_(listener), socket_(std::move(socket)), timeout_(socket_.get_executor())
+        {
+        }
+        auto Get() { return shared_from_this(); }
+        void Verify();
 
     private:
-        void get_port();
-        void do_accept();
-
-        std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents;
-
-        size_t port = bittorrent_constants::begin_port;
-
-        ba::ip::tcp::acceptor acceptor_;
         ba::ip::tcp::socket socket_;
+        Listener &listener_;
+
+        uint8_t buff[bittorrent_constants::handshake_length];
+
+        ba::deadline_timer timeout_;
     };
-}// namespace network
+    friend struct participant;
 
+    std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents;
 
-#endif//CPPTORRENT_LISTENER_H
+    size_t port_ = bittorrent_constants::begin_port;
+
+    ba::ip::tcp::acceptor acceptor_;
+    ba::ip::tcp::socket socket_;
+};
+} // namespace network
+
+#endif // CPPTORRENT_LISTENER_H

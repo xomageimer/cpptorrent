@@ -146,7 +146,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
             SetException(ec.message());
         }
     });
-    timeout_.expires_from_now(connection_waiting_time + epsilon);
+    timeout_.expires_from_now(bittorrent_constants::connection_waiting_time + epsilon);
 }
 
 void network::httpRequester::do_request() {
@@ -315,7 +315,7 @@ void network::udpRequester::do_try_connect() {
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
-    if (attempts_ >= MAX_CONNECT_ATTEMPTS) {
+    if (attempts_ >= bittorrent_constants::MAX_CONNECT_ATTEMPTS) {
         UpdateEndpoint();
     }
     if (endpoints_it_ != ba::ip::udp::resolver::iterator()) {
@@ -346,12 +346,12 @@ void network::udpRequester::do_connect() {
                 LOG(tracker_.GetUrl().Host, " : ", "send successfull completly");
 
                 if (ec || bytes_transferred < 16) {
-                    attempts_ = MAX_CONNECT_ATTEMPTS;
+                    attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
                 } else {
                     do_connect_response();
                 }
             });
-    connect_timeout_.expires_from_now(connection_waiting_time + epsilon);
+    connect_timeout_.expires_from_now(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
 }
 
 void network::udpRequester::do_connect_response() {
@@ -364,7 +364,7 @@ void network::udpRequester::do_connect_response() {
     socket_.async_receive_from(
             ba::buffer(buff, sizeof(buff)), endpoint,
             [this](boost::system::error_code ec, size_t bytes_transferred) {
-                if (ec) {
+                if (ec || bytes_transferred < 16) {
                     LOG(tracker_.GetUrl().Host, " : ", ec.message());
 
                     return;
@@ -374,7 +374,7 @@ void network::udpRequester::do_connect_response() {
 
                 LOG(tracker_.GetUrl().Host, " : ", "\nreceive successfull completly ", bytes_transferred, '\n', value, " == ", c_req.transaction_id, " -> ", (value == c_req.transaction_id));
 
-                if (!ec && bytes_transferred >= 16 && value == c_req.transaction_id && buff[0] == 0) {
+                if (!ec && value == c_req.transaction_id && buff[0] == 0) {
                     connect_timeout_.cancel();
 
                     std::memcpy(&c_resp, buff, sizeof(c_resp));
@@ -390,7 +390,7 @@ void network::udpRequester::do_try_announce() {
     if (endpoints_it_ == ba::ip::udp::resolver::iterator())
         return;
 
-    if (announce_attempts_ >= MAX_ANNOUNCE_ATTEMPTS) {
+    if (announce_attempts_ >= bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS) {
         announce_attempts_ = 0;
 
         do_try_connect();
@@ -421,15 +421,15 @@ void network::udpRequester::do_announce() {
                 LOG(tracker_.GetUrl().Host, " : ", "announce send successfull completly");
 
                 if (ec || bytes_transferred != sizeof(request)) {
-                    announce_attempts_ = MAX_ANNOUNCE_ATTEMPTS;
-                    attempts_ = MAX_CONNECT_ATTEMPTS;
+                    announce_attempts_ = bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS;
+                    attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
                     LOG(tracker_.GetUrl().Host, " : ", "caught errors from announce");
                 } else {
                     do_announce_response();
                 }
             });
-    announce_timeout_.expires_from_now(announce_waiting_time + epsilon);
+    announce_timeout_.expires_from_now(bittorrent_constants::announce_waiting_time + bittorrent_constants::epsilon);
 }
 
 void network::udpRequester::do_announce_response() {

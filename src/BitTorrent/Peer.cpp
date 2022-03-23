@@ -28,15 +28,10 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
 
 // TODO мб сделать map для пиров subscriber'ов, где ключом будет его IP
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
-    MakeHandshake();
     for (auto &peer: peers) {
-        auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service));
-        Subscribe(ptr_peer);
-        ptr_peer->start_connection();
+        Subscribe(std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service)));
     }
-//      auto ptr_peer = std::make_shared<network::PeerClient>(Get(), peers.begin()->BE_struct, ba::make_strand(service));
-//      Subscribe(ptr_peer);
-//      ptr_peer->start_connection();
+//      Subscribe(std::make_shared<network::PeerClient>(Get(), peers.begin()->BE_struct, ba::make_strand(service)));
 }
 
 bencode::Node const &bittorrent::MasterPeer::GetChunkHashes() const {
@@ -55,7 +50,9 @@ void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient
     LOG(new_sub->GetStrIP(), " was subscribed!");
 
     std::lock_guard lock(mut_);
-    peers_subscribers_.insert(new_sub);
+    auto it = peers_subscribers_.insert(new_sub);
+    if (it.second)
+        (*it.first)->StartConnection();
 }
 
 void bittorrent::MasterPeer::Unsubscribe(const std::shared_ptr<network::PeerClient> &unsub) {
