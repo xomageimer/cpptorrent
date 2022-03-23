@@ -343,11 +343,11 @@ void network::udpRequester::do_connect() {
     socket_.async_send_to(
             ba::buffer(buff, sizeof(buff)), endpoint,
             [this](boost::system::error_code ec, size_t bytes_transferred) {
-                LOG(tracker_.GetUrl().Host, " : ", "send successfull completly");
-
                 if (ec || bytes_transferred < 16) {
                     attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
                 } else {
+                    LOG(tracker_.GetUrl().Host, " : ", "send successfull completly");
+
                     do_connect_response();
                 }
             });
@@ -418,14 +418,14 @@ void network::udpRequester::do_announce() {
     socket_.async_send_to(
             ba::buffer(request, sizeof(request)), endpoint,
             [this](boost::system::error_code ec, size_t bytes_transferred) {
-                LOG(tracker_.GetUrl().Host, " : ", "announce send successfull completly");
-
                 if (ec || bytes_transferred != sizeof(request)) {
+                    LOG(tracker_.GetUrl().Host, " : ", "caught errors from announce");
+
                     announce_attempts_ = bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS;
                     attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
-
-                    LOG(tracker_.GetUrl().Host, " : ", "caught errors from announce");
                 } else {
+                    LOG(tracker_.GetUrl().Host, " : ", "announce send successfull completly");
+
                     do_announce_response();
                 }
             });
@@ -442,7 +442,7 @@ void network::udpRequester::do_announce_response() {
     socket_.async_receive_from(
             ba::buffer(response, bittorrent_constants::MTU), endpoint,
             [this](boost::system::error_code ec, size_t bytes_transferred) {
-                if (ec) {
+                if (ec || bytes_transferred < 8) {
                     LOG(tracker_.GetUrl().Host, " : ", ec.message());
                     return;
                 }
