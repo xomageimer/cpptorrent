@@ -2,6 +2,9 @@
 
 void network::Listener::participant::Verify()
 {
+    LOG("Listener"
+        " : ",
+        __FUNCTION__);
     auto self = Get();
 
     ba::async_read(socket_, ba::buffer(buff, bittorrent_constants::handshake_length),
