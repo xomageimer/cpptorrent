@@ -13,7 +13,7 @@ struct Logger {
 public:
     static Logger &log();
     template<typename... Args>
-    void out(Args &&...args) {
+    void out(Args ...args) {
         std::lock_guard lock(m);
 
         outtime();
@@ -23,7 +23,7 @@ public:
         ss.clear();
         (ss << ... << args);
 
-        std::string line;
+        std::string line {};
         for (; std::getline(ss, line);) {
             (*os_ptr) << '\t' << line << std::endl;
         }
