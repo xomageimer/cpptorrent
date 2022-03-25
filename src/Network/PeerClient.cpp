@@ -17,8 +17,38 @@ network::PeerClient::PeerClient(
 {
     for (size_t i = 0; i < bittorrent_constants::handshake_length; i++)
     {
-        buff[i] = handshake_ptr[i];
+        buff.data()[i] = handshake_ptr[i];
     }
+}
+
+std::string network::PeerClient::GetStrIP() const
+{
+    if (!cash_ip_.empty())
+        return cash_ip_;
+
+    size_t ip = slave_peer_.GetIP();
+    std::vector<uint8_t> ip_address;
+    while (ip)
+    {
+        ip_address.push_back(ip & 255);
+        ip >>= 8;
+    }
+    std::reverse(ip_address.begin(), ip_address.end());
+
+    std::string ip_address_str;
+    bool is_first = true;
+    for (auto &el : ip_address)
+    {
+        if (!is_first)
+        {
+            ip_address_str += '.';
+        }
+        is_first = false;
+        ip_address_str += std::to_string(el);
+    }
+
+    cash_ip_ = ip_address_str;
+    return cash_ip_;
 }
 
 network::PeerClient::~PeerClient()
@@ -39,7 +69,7 @@ void network::PeerClient::Disconnect()
 
     timeout_.cancel();
     socket_.cancel();
-    master_peer_.Unsubscribe(Get());
+    master_peer_.Unsubscribe(GetPeerData().GetIP());
     is_disconnected = true;
 }
 
@@ -114,7 +144,9 @@ void network::PeerClient::do_resolve()
                             deadline();
                         }
                     });
-            } else {
+            }
+            else
+            {
                 Disconnect();
             }
         });
@@ -133,19 +165,20 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint)
             if (!ec)
             {
                 // do handshake
-                do_write(std::string(reinterpret_cast<const char *>(master_peer_.GetHandshake()), bittorrent_constants::handshake_length),
+                send(std::string(reinterpret_cast<const char *>(master_peer_.GetHandshake()), bittorrent_constants::handshake_length),
                     [this, self]()
                     {
-                        ba::async_read(socket_, ba::buffer(buff, 68),
+                        ba::async_read(socket_, ba::buffer(buff.data(), bittorrent_constants::handshake_length),
                             [this, self](boost::system::error_code ec, std::size_t bytes_transferred /*length*/)
                             {
                                 timeout_.cancel();
-                                if ((!ec || ec == ba::error::eof) && bytes_transferred >= 68 && buff[0] == 0x13 &&
-                                    memcmp(&buff[1], "BitTorrent protocol", 19) == 0 &&
-                                    memcmp(&buff[28], &master_peer_.GetHandshake()[28], 20) == 0)
+                                if ((!ec || ec == ba::error::eof) && bytes_transferred >= 68 && buff.data()[0] == 0x13 &&
+                                    memcmp(&buff.data()[1], "BitTorrent protocol", 19) == 0 &&
+                                    memcmp(&buff.data()[28], &master_peer_.GetHandshake()[28], 20) == 0)
                                 {
                                     std::cerr << GetStrIP() << " was connected!" << std::endl;
-                                    read_message([] {});
+                                    drop_timeout();
+                                    do_read_header();
                                 }
                                 else
                                 {
@@ -168,13 +201,14 @@ void network::PeerClient::do_verify()
 {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
-    if (buff[0] == 0x13 && memcmp(&buff[1], "BitTorrent protocol", 19) == 0 &&
-        memcmp(&buff[28], &master_peer_.GetHandshake()[28], 20) == 0)
+    if (buff.data()[0] == 0x13 && memcmp(&buff.data()[1], "BitTorrent protocol", 19) == 0)
     {
         auto self(Get());
-        do_write(std::string(reinterpret_cast<const char*>(buff), bittorrent_constants::handshake_length),
-            [this, self](){
-
+        send(std::string(reinterpret_cast<const char *>(buff.data()), bittorrent_constants::handshake_length),
+            [this, self]()
+            {
+                drop_timeout();
+                do_read_header();
             });
     }
     else
@@ -208,32 +242,142 @@ void network::PeerClient::deadline()
     }
 }
 
-std::string network::PeerClient::GetStrIP() const
+void network::PeerClient::drop_timeout()
 {
-    if (!cash_ip_.empty())
-        return cash_ip_;
+    timeout_.cancel();
+    timeout_.expires_from_now(bittorrent_constants::waiting_time + bittorrent_constants::epsilon);
 
-    size_t ip = slave_peer_.GetIP();
-    std::vector<uint8_t> ip_address;
-    while (ip)
-    {
-        ip_address.push_back(ip & 255);
-        ip >>= 8;
-    }
-    std::reverse(ip_address.begin(), ip_address.end());
-
-    std::string ip_address_str;
-    bool is_first = true;
-    for (auto &el : ip_address)
-    {
-        if (!is_first)
+    auto self(Get());
+    timeout_.async_wait(
+        [this, self](boost::system::error_code ec)
         {
-            ip_address_str += '.';
-        }
-        is_first = false;
-        ip_address_str += std::to_string(el);
-    }
+            if (!ec)
+            {
+                Disconnect();
+            }
+        });
+}
 
-    cash_ip_ = ip_address_str;
-    return cash_ip_;
+void network::PeerClient::do_read_header()  {
+    LOG ("trying to read message");
+    auto self = Get();
+
+    ba::async_read(socket_, ba::buffer(buff.data(), bittorrent::Message::header_length),
+        [this, self](boost::system::error_code ec, std::size_t length)
+        {
+            if (!ec || length < bittorrent::Message::header_length)
+            {
+                buff.decode_header();
+                if (!buff.body_length())
+                {
+                    LOG ("Keep-alive message");
+                    return drop_timeout();
+                }
+                else
+                {
+                    return do_read_body();
+                }
+            }
+            else
+            {
+                Disconnect();
+            }
+        });
+}
+void network::PeerClient::do_read_body() {
+    LOG ("trying to read payload of message");
+
+    auto self = Get();
+    ba::async_read(socket_, ba::buffer(buff.body(), bittorrent::Message::id_length + buff.body_length()),
+        [this, self](boost::system::error_code ec, std::size_t /*length*/)
+        {
+            if (!ec)
+            {
+                auto message_type = buff.GetMessageType();
+                size_t payload_size = buff.body_length() - 1;
+                auto payload = buff.body() + 1;
+
+                switch (message_type)
+                {
+                case bittorrent::MESSAGE_TYPE::choke:
+                    LOG ("choke message");
+                    if (payload_size != 0)
+                    {
+                        LOG ("invalid choke-message size");
+                        Disconnect();
+                    }
+
+                    status_ |= peer_choking;
+                    break;
+                case bittorrent::MESSAGE_TYPE::unchoke:
+                    LOG ("unchoke message");
+                    if (payload_size != 0) {
+                        LOG ("invalid unchoke-message size");
+                        Disconnect();
+                    }
+                    status_ &= ~peer_choking;
+                    // TODO запросить необходимые куски!
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::interested:
+                    LOG ("interested message");
+                    if (payload_size != 0) {
+                        LOG ("invalid interested-message size");
+                        Disconnect();
+                    }
+                    status_ |= peer_interested;
+
+                    if (IsClientChoked())
+                        sendUnchoke();
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::not_interested:
+                    LOG ("not interested message");
+                    if (payload_size != 0) {
+                        LOG ("invalid not_interested-message size");
+                        Disconnect();
+                    }
+                    status_ &= ~peer_interested;
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::have:
+                {
+                    LOG("have message");
+                    if (payload_size != 4)
+                    {
+                        LOG("invalid have-message size");
+                        Disconnect();
+                    }
+                    uint32_t i = SwapEndian(ArrayToValue<uint32_t>(payload));
+
+                    // пометить бит как уже отданный!
+
+                    break;
+                }
+                case bittorrent::MESSAGE_TYPE::bitfield:
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::request:
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::piece_block:
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::cancel:
+
+                    break;
+                case bittorrent::MESSAGE_TYPE::port:
+
+                    break;
+                }
+            }
+            else
+            {
+                Disconnect();
+            }
+        });
+}
+
+void network::PeerClient::sendUnchoke() {
+
 }

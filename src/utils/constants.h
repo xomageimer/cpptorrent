@@ -20,6 +20,7 @@ namespace bittorrent_constants {
     const boost::posix_time::milliseconds epsilon{boost::posix_time::milliseconds(15)};
     const boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};
     const boost::posix_time::milliseconds announce_waiting_time{boost::posix_time::milliseconds(1000)};
+    const boost::posix_time::minutes waiting_time{boost::posix_time::minutes(2)};
     const int MAX_CONNECT_ATTEMPTS = 4;
     const int MAX_ANNOUNCE_ATTEMPTS = 3;
 }

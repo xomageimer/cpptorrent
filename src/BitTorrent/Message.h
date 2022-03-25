@@ -9,10 +9,10 @@
 #include <string>
 #include <utility>
 
-#include "Constants.h"
+#include "constants.h"
 
 namespace bittorrent {
-    enum class MESSAGE_TYPE : uint8_t {
+    enum MESSAGE_TYPE : uint8_t {
         choke = 0,
         unchoke = 1,
         interested = 2,
@@ -42,7 +42,7 @@ namespace bittorrent {
         }
 
         [[nodiscard]] inline std::size_t length() const {
-            return header_length + id_length + body_length_;
+            return header_length +  body_length_;
         }
 
         [[nodiscard]] const uint8_t *body() const {
@@ -63,13 +63,16 @@ namespace bittorrent {
                 body_length_ = max_body_length;
         }
 
+        [[nodiscard]] MESSAGE_TYPE GetMessageType() const {
+            return MESSAGE_TYPE{body()[0]};
+        }
+
         void encode_header();
         void decode_header();
 
     private:
         uint8_t data_[header_length + id_length + max_body_length]{};
         size_t body_length_{};
-        MESSAGE_TYPE m_type_ = MESSAGE_TYPE::choke;
     };
     std::deque<Message> GetMessagesQueue(const std::string &msg);
 }// namespace bittorrent

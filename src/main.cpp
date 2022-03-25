@@ -9,6 +9,9 @@ using namespace std;
 // раздачи (сидироваения) и какие мы докачиваем!
 int main()
 {
+#ifdef OS_WIN
+    SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+#endif
     LOG("Start");
     auto start = std::chrono::steady_clock::now();
     boost::asio::io_service service;

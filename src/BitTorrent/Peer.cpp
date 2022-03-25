@@ -50,16 +50,16 @@ void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient
     LOG(new_sub->GetStrIP(), " was subscribed!");
 
     std::lock_guard lock(mut_);
-    auto it = peers_subscribers_.insert(new_sub);
+    auto it = peers_subscribers_.emplace(new_sub->GetPeerData().GetIP(), new_sub);
     if (it.second)
-        (*it.first)->StartConnection();
+        it.first->second->StartConnection();
 }
 
-void bittorrent::MasterPeer::Unsubscribe(const std::shared_ptr<network::PeerClient> &unsub) {
+void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
     LOG(unsub->GetStrIP(), " was unsubscribed!");
 
     std::lock_guard lock(mut_);
-    peers_subscribers_.erase(unsub);
+    peers_subscribers_.erase(unsub_ip);
 }
 
 void bittorrent::MasterPeer::MakeHandshake() {

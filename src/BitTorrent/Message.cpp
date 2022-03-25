@@ -1,5 +1,7 @@
 #include "Message.h"
 
+#include "auxiliary.h"
+
 std::deque<bittorrent::Message> bittorrent::GetMessagesQueue(const std::string &msg) {
     size_t count = msg.size() > bittorrent::Message::max_body_length
                            ? msg.size() / bittorrent::Message::max_body_length
@@ -36,6 +38,6 @@ void bittorrent::Message::encode_header() {
 void bittorrent::Message::decode_header() {
     char header[header_length + 1] {};
     std::strncat(header, reinterpret_cast<const char*>(data_), header_length);
-    body_length_ = std::atoi(header);
-
+    auto header_int = SwapEndian(ArrayToValue<int>(reinterpret_cast<uint8_t *>(header)));
+    body_length_ = header_int;
 }

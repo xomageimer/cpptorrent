@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-#include "Constants.h"
+#include "constants.h"
 
 bool is_little_endian();
 
@@ -72,6 +72,17 @@ void ValueToArray(T value, uint8_t *arr) {
         arr++;
         value /= 10;
     }
+}
+template <typename T>
+T ArrayToValue(uint8_t * arr){
+    union value_type {
+        T full;
+        unsigned char u8[sizeof(T)];
+    } smart_value;
+    for (size_t i = 0; i < sizeof(T); i++) {
+        smart_value.u8[i] = arr[i];
+    }
+    return smart_value.full;
 }
 
 template<typename T, typename Enable = void>
