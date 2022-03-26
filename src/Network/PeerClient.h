@@ -11,9 +11,13 @@
 #include <string>
 #include <utility>
 
-#include "Message.h"
 #include "NetExceptions.h"
+
 #include "Peer.h"
+
+#include "bt/Message.h"
+#include "bt/Bitfield.h"
+
 #include "auxiliary.h"
 #include "constants.h"
 #include "logger.h"
@@ -93,24 +97,31 @@ public:
                 message_queue_.insert(message_queue_.end(), new_msgs.begin(), new_msgs.end());
                 if (!write_in_progress)
                 {
-                    send(std::string(reinterpret_cast<const char *>(message_queue_.front().data()), message_queue_.front().length()),
-                        [this, self, callback]()
-                        {
-                            message_queue_.pop_front();
-                            if (!message_queue_.empty())
-                            {
-                                send(callback);
-                            }
-                            else
-                            {
-                                callback();
-                            }
-                        });
+                    do_send_message(callback);
                 }
             });
     }
 
 private:
+    template <typename Function>
+    void do_send_message(Function &&callback) {
+        auto self = Get();
+
+        send(std::string(reinterpret_cast<const char *>(message_queue_.front().data()), message_queue_.front().length()),
+            [this, self, callback]()
+            {
+                message_queue_.pop_front();
+                if (!message_queue_.empty())
+                {
+                    do_send_message(callback);
+                }
+                else
+                {
+                    callback();
+                }
+            });
+    }
+
     template <typename Function>
     void send(std::string binstring, Function &&callback)
     {

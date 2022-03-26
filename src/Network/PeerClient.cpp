@@ -68,7 +68,8 @@ void network::PeerClient::Disconnect()
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
     timeout_.cancel();
-    socket_.cancel();
+    if (socket_.is_open())
+        socket_.cancel();
     master_peer_.Unsubscribe(GetPeerData().GetIP());
     is_disconnected = true;
 }
