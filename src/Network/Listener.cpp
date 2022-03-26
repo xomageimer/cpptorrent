@@ -44,6 +44,9 @@ network::Listener::Listener(const boost::asio::strand<boost::asio::io_service::e
 
 void network::Listener::get_port()
 {
+
+    SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+
     boost::system::error_code ec;
     do
     {
@@ -51,6 +54,7 @@ void network::Listener::get_port()
             throw BadConnect("can't get free ports, try again later!");
 
         port_++;
+        acceptor_.close();
         acceptor_.open(ba::ip::tcp::v4(), ec) || acceptor_.bind({ba::ip::tcp::v4(), static_cast<unsigned short>(port_)}, ec);
     } while (ec == ba::error::address_in_use);
     acceptor_.listen();

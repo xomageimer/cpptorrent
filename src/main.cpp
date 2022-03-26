@@ -21,7 +21,7 @@ int main()
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
     try
     {
-        if (!torrent.TryConnect(bittorrent::Launch::Any,
+        if (!torrent.TryConnect(bittorrent::Launch::Best,
                 bittorrent::Event::Empty)) // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                            // параллельно вызвать Best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;
