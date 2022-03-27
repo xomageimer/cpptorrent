@@ -296,7 +296,7 @@ void network::PeerClient::do_read_body() {
             {
                 auto message_type = buff.GetMessageType();
                 size_t payload_size = buff.body_length() - 1;
-                auto payload = buff.body() + 1;
+                auto payload = buff.body();
 
                 switch (message_type)
                 {
@@ -350,7 +350,10 @@ void network::PeerClient::do_read_body() {
                         Disconnect();
                     }
                     uint32_t i = SwapEndian(ArrayToValue<uint32_t>(payload));
+                    if (i < bitfield_.Size())
+                        Disconnect();
 
+                    bitfield_.Set(i);
                     // пометить бит как уже отданный!
 
                     break;

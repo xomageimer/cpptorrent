@@ -82,9 +82,11 @@ private:
     ba::deadline_timer timeout_;
     bool is_disconnected = false;
 
+    Bitfield bitfield_;
+
 public:
     template <typename Function>
-    void send_message(std::string const &msg, Function &&callback)
+    void SendMessage(std::string const &msg, Function &&callback)
     {
         drop_timeout();
         auto self = Get();

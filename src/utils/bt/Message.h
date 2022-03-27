@@ -46,11 +46,11 @@ namespace bittorrent {
         }
 
         [[nodiscard]] const uint8_t *body() const {
-            return data_ + header_length;
+            return data_ + header_length + id_length;
         }
 
         uint8_t *body() {
-            return data_ + header_length;
+            return data_ + header_length + id_length;
         }
 
         [[nodiscard]] std::size_t body_length() const {
@@ -64,7 +64,7 @@ namespace bittorrent {
         }
 
         [[nodiscard]] MESSAGE_TYPE GetMessageType() const {
-            return MESSAGE_TYPE{body()[0]};
+            return MESSAGE_TYPE{data()[header_length + 1]};
         }
 
         void encode_header();

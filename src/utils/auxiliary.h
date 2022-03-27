@@ -13,7 +13,7 @@ std::string GetSHA1(const std::string &p_arg);
 std::string UrlEncode(std::string const &url_to_encode);
 int IpToInt(std::string const &ip_address);
 
-// TODO мб неудачное название!
+// TODO мб неудачное название! + переделать по виду функций типа ReadBE(...) / WriteLE(...) и тп.
 template<typename T>
 struct as_big_endian {
     static_assert(CHAR_BIT == bittorrent_constants::byte_size, "CHAR_BIT != 8");
