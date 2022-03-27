@@ -82,7 +82,7 @@ private:
     ba::deadline_timer timeout_;
     bool is_disconnected = false;
 
-    Bitfield bitfield_;
+    Bitfield bitfield_ {0};
 
 public:
     template <typename Function>
