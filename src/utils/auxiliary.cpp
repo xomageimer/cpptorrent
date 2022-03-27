@@ -21,7 +21,7 @@ std::string GetSHA1(const std::string &p_arg) {
         unsigned full;
         unsigned char u8[sizeof(unsigned)];
     } dest{};
-    for (auto &el: hash) {
+    for (auto &el : hash) {
         value_type source{};
         source.full = el;
 
@@ -33,13 +33,12 @@ std::string GetSHA1(const std::string &p_arg) {
 
     char str_hash[sizeof(unsigned) * 5];
 
-    memcpy(str_hash, (char *) &hash, sizeof(unsigned) * 5);
+    memcpy(str_hash, (char *)&hash, sizeof(unsigned) * 5);
     return {str_hash, std::size(str_hash)};
 }
 
 static std::string encode_impl(std::string::value_type symb) {
-    if (isalnum(symb) || symb == '-' || symb == '_' || symb == '.' || symb == '~')
-        return {symb};
+    if (isalnum(symb) || symb == '-' || symb == '_' || symb == '.' || symb == '~') return {symb};
 
     std::stringstream enc_ss;
     enc_ss << '%' << std::setw(2) << std::setfill('0') << std::hex << std::uppercase
@@ -50,10 +49,7 @@ static std::string encode_impl(std::string::value_type symb) {
 std::string UrlEncode(const std::string &url_to_encode) {
     std::string qstr;
     std::transform(url_to_encode.begin(), url_to_encode.end(),
-                   boost::make_function_output_iterator([&](const std::string &byte) -> void {
-                       qstr.append(byte);
-                   }),
-                   encode_impl);
+        boost::make_function_output_iterator([&](const std::string &byte) -> void { qstr.append(byte); }), encode_impl);
     return std::move(qstr);
 }
 

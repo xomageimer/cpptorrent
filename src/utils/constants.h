@@ -23,6 +23,6 @@ namespace bittorrent_constants {
     const boost::posix_time::minutes waiting_time{boost::posix_time::minutes(2)};
     const int MAX_CONNECT_ATTEMPTS = 4;
     const int MAX_ANNOUNCE_ATTEMPTS = 3;
-}
+} // namespace bittorrent_constants
 
-#endif //CPPTORRENT_CONSTANTS_H
+#endif // CPPTORRENT_CONSTANTS_H

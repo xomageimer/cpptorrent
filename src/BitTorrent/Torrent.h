@@ -35,7 +35,7 @@ namespace bittorrent {
         [[nodiscard]] bencode::Node const &GetMeta() const { return meta_info.dict; }
         [[nodiscard]] const uint8_t *GetMasterPeerKey() const { return master_peer->GetID(); }
         [[nodiscard]] std::shared_ptr<bittorrent::MasterPeer> GetRootPeer() { return master_peer; }
-        [[nodiscard]] size_t GetPort() const;
+        [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
         [[nodiscard]] const bittorrent::Response &GetResponse() const;
 

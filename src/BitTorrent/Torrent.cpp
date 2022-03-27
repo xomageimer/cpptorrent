@@ -188,5 +188,3 @@ const bittorrent::Response &bittorrent::Torrent::GetResponse() const {
     }
     return *data_from_tracker;
 }
-
-size_t bittorrent::Torrent::GetPort() const { return port; }

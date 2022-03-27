@@ -3,9 +3,7 @@
 #include "auxiliary.h"
 
 std::deque<bittorrent::Message> bittorrent::GetMessagesQueue(const std::string &msg) {
-    size_t count = msg.size() > bittorrent::Message::max_body_length
-                           ? msg.size() / bittorrent::Message::max_body_length
-                           : 1;
+    size_t count = msg.size() > bittorrent::Message::max_body_length ? msg.size() / bittorrent::Message::max_body_length : 1;
     auto block_size = msg.size() / count;
     std::deque<bittorrent::Message> queue_new_msgs;
     auto msg_cur_pos = msg.data();
@@ -30,14 +28,14 @@ std::deque<bittorrent::Message> bittorrent::GetMessagesQueue(const std::string &
 }
 
 void bittorrent::Message::encode_header() {
-    char header[header_length + 1] {};
+    char header[header_length + 1]{};
     std::sprintf(header, "4%d", static_cast<int>(body_length_));
     std::memcpy(data_, header, header_length);
 }
 
 void bittorrent::Message::decode_header() {
-    char header[header_length + 1] {};
-    std::strncat(header, reinterpret_cast<const char*>(data_), header_length);
+    char header[header_length + 1]{};
+    std::strncat(header, reinterpret_cast<const char *>(data_), header_length);
     auto header_int = SwapEndian(ArrayToValue<int>(reinterpret_cast<uint8_t *>(header)));
     body_length_ = header_int;
 }

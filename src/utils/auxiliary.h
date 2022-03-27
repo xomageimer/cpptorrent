@@ -14,8 +14,7 @@ std::string UrlEncode(std::string const &url_to_encode);
 int IpToInt(std::string const &ip_address);
 
 // TODO мб неудачное название! + переделать по виду функций типа ReadBE(...) / WriteLE(...) и тп.
-template<typename T>
-struct as_big_endian {
+template <typename T> struct as_big_endian {
     static_assert(CHAR_BIT == bittorrent_constants::byte_size, "CHAR_BIT != 8");
 
 private:
@@ -56,25 +55,20 @@ public:
             arr[k] = dest.u8[k];
         }
     }
-    [[nodiscard]] T AsValue() const {
-        return dest.full;
-    }
+    [[nodiscard]] T AsValue() const { return dest.full; }
 };
 
-template<typename T>
-T SwapEndian(T value) {
+template <typename T> T SwapEndian(T value) {
     return as_big_endian(value).AsValue();
 }
-template<typename T>
-void ValueToArray(T value, uint8_t *arr) {
+template <typename T> void ValueToArray(T value, uint8_t *arr) {
     while (value) {
         *arr = value % 10;
         arr++;
         value /= 10;
     }
 }
-template <typename T>
-T ArrayToValue(uint8_t * arr){
+template <typename T> T ArrayToValue(uint8_t *arr) {
     union value_type {
         T full;
         unsigned char u8[sizeof(T)];
@@ -85,10 +79,8 @@ T ArrayToValue(uint8_t * arr){
     return smart_value.full;
 }
 
-template<typename T, typename Enable = void>
-struct is_optional : std::false_type {};
+template <typename T, typename Enable = void> struct is_optional : std::false_type {};
 
-template<typename T>
-struct is_optional<std::optional<T>> : std::true_type {};
+template <typename T> struct is_optional<std::optional<T>> : std::true_type {};
 
-#endif//CPPTORRENT_AUXILIARY_H
+#endif // CPPTORRENT_AUXILIARY_H

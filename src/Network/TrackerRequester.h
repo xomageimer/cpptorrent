@@ -24,19 +24,14 @@ namespace ba = boost::asio;
 namespace network {
     struct TrackerRequester {
     public:
-        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker)
-            : tracker_(*tracker) {}
+        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker) : tracker_(*tracker) {}
         TrackerRequester(TrackerRequester const &) = delete;
         TrackerRequester(TrackerRequester &&) = delete;
 
         virtual void Connect(const bittorrent::Query &query) = 0;
-        virtual void Disconnect() {
-            is_set = true;
-        }
+        virtual void Disconnect() { is_set = true; }
         [[nodiscard]] virtual boost::future<bittorrent::Response> GetResponse() { return promise_of_resp.get_future(); };
-        virtual ~TrackerRequester() {
-            LOG("Destruction");
-        }
+        virtual ~TrackerRequester() { LOG("Destruction"); }
 
     protected:
         bool is_set = false;
@@ -46,8 +41,7 @@ namespace network {
 
         virtual void SetResponse() = 0;
         virtual void SetException(const std::string &exc) {
-            if (is_set)
-                return;
+            if (is_set) return;
 
             LOG(tracker_.GetUrl().Host, " : ", " get exception");
 
@@ -58,7 +52,8 @@ namespace network {
 
     struct httpRequester : public TrackerRequester {
     public:
-        explicit httpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
+        explicit httpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
+            const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
             : resolver_(executor), socket_(executor), timeout_(executor), TrackerRequester(tracker) {}
 
         void Connect(const bittorrent::Query &query) override;
@@ -89,13 +84,15 @@ namespace network {
 
         ba::deadline_timer timeout_;
 
-        static const inline boost::posix_time::milliseconds epsilon{boost::posix_time::milliseconds(15)};// чтобы сразу не закончить таймер!
+        static const inline boost::posix_time::milliseconds epsilon{
+            boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
         static const inline boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};
     };
 
     struct udpRequester : public TrackerRequester {
     public:
-        explicit udpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
+        explicit udpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
+            const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
             : resolver_(executor), socket_(executor), connect_timeout_(executor), announce_timeout_(executor), TrackerRequester(tracker) {}
 
         void Connect(const bittorrent::Query &query) override;
@@ -155,6 +152,6 @@ namespace network {
         } c_resp;
         // TODO add scrape
     };
-}// namespace network
+} // namespace network
 
-#endif//CPPTORRENT_TRACKERREQUESTER_H
+#endif // CPPTORRENT_TRACKERREQUESTER_H

@@ -46,9 +46,7 @@ namespace bittorrent {
         Stopped = 3
     };
     static std::map<bittorrent::Event, std::string> events_str{
-            {bittorrent::Event::Completed, "completed"},
-            {bittorrent::Event::Started, "started"},
-            {bittorrent::Event::Stopped, "stopped"}};
+        {bittorrent::Event::Completed, "completed"}, {bittorrent::Event::Started, "started"}, {bittorrent::Event::Stopped, "stopped"}};
     struct Query {
         Event event;
         size_t port{};
@@ -76,14 +74,8 @@ namespace bittorrent {
         Response() : interval(std::chrono::seconds(bittorrent_constants::tracker_again_request_time_secs)) {}
     };
     struct Url {
-        BOOST_HANA_DEFINE_STRUCT(Url,
-                                 (std::string, Protocol),
-                                 (std::string, Host),
-                                 (std::string, Port),
-
-                                 (std::optional<std::string>, Path),
-                                 (std::optional<std::string>, File),
-                                 (std::optional<std::string>, Parameters));
+        BOOST_HANA_DEFINE_STRUCT(Url, (std::string, Protocol), (std::string, Host), (std::string, Port), (std::optional<std::string>, Path),
+            (std::optional<std::string>, File), (std::optional<std::string>, Parameters));
     };
 
     struct Tracker : std::enable_shared_from_this<Tracker> {
@@ -107,6 +99,6 @@ namespace bittorrent {
         Url tracker_url;
         bittorrent::Torrent &torrent;
     };
-}// namespace bittorrent
+} // namespace bittorrent
 
-#endif//QTORRENT_TRACKER_H
+#endif // QTORRENT_TRACKER_H

@@ -17,6 +17,6 @@ namespace network {
         explicit BadConnect(std::string arg) : exception(std::move(arg)){};
         [[nodiscard]] const char *what() const noexcept override { return exception.data(); }
     };
-}// namespace network
+} // namespace network
 
-#endif//CPPTORRENT_NETEXCEPTIONS_H
+#endif // CPPTORRENT_NETEXCEPTIONS_H
