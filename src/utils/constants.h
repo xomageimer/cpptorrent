@@ -16,6 +16,7 @@ namespace bittorrent_constants {
     const size_t tracker_again_request_time_secs = 900;
 
     const size_t byte_size = 8;
+    [[maybe_unused]] const size_t max_request_size = std::pow(2, 14);
 
     const boost::posix_time::milliseconds epsilon{boost::posix_time::milliseconds(15)};
     const boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};

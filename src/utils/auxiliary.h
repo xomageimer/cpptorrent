@@ -12,6 +12,8 @@ bool is_little_endian();
 std::string GetSHA1(const std::string &p_arg);
 std::string UrlEncode(std::string const &url_to_encode);
 int IpToInt(std::string const &ip_address);
+std::string BytesToHumanReadable(uint32_t bytes);
+double long BytesToGiga(uint32_t bytes);
 
 // TODO мб неудачное название! + переделать по виду функций типа ReadBE(...) / WriteLE(...) и тп.
 template <typename T> struct as_big_endian {

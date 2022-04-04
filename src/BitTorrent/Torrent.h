@@ -8,12 +8,16 @@
 #include <thread>
 #include <utility>
 
+#include "TorrentFilesManager.h"
 #include "Peer.h"
 #include "Tracker.h"
+
+#include "bt/Piece.h"
 #include "bencode_lib.h"
 #include "random_generator.h"
 
 // Объект с которым работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
+// TODO изменить стиль названий, поля должны кончаться на _, а название приватных методов быть name_name_name... ()
 
 namespace bittorrent {
     struct meta_info_file {
@@ -26,7 +30,8 @@ namespace bittorrent {
     };
     struct Torrent {
     public:
-        explicit Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path, std::filesystem::path const &path_to_download, size_t listener_port);
+        explicit Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path,
+            std::filesystem::path const &path_to_download, size_t listener_port);
         bool TryConnect(bittorrent::Launch policy = bittorrent::Launch::Best, bittorrent::Event event = bittorrent::Event::Empty);
         void StartCommunicatingPeers();
 
@@ -42,7 +47,7 @@ namespace bittorrent {
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
 
     private:
-        boost::asio::io_service &service;// обязательно в самом верху
+        boost::asio::io_service &service; // обязательно в самом верху
 
         size_t t_uploaded{};
         size_t t_downloaded{};
@@ -56,13 +61,13 @@ namespace bittorrent {
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::MasterPeer> master_peer;
 
-        const std::filesystem::path path_to_download;
+        std::shared_ptr<TorrentFilesManager> file_manager;
+//        std::vector<Piece> pieces;
 
     private:
         bool FillTrackers();
         [[nodiscard]] boost::asio::io_service &GetService() const;
     };
-}// namespace bittorrent
+} // namespace bittorrent
 
-
-#endif//QTORRENT_TORRENT_H
+#endif // QTORRENT_TORRENT_H

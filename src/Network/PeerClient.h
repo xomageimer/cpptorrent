@@ -17,6 +17,7 @@
 
 #include "bt/Message.h"
 #include "bt/Bitfield.h"
+#include "bt/Piece.h"
 
 #include "auxiliary.h"
 #include "constants.h"
@@ -43,6 +44,7 @@ namespace network {
         std::string GetStrIP() const;
         auto Get() { return shared_from_this(); }
         const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
+        bittorrent::Bitfield &GetOwnerBitfield() { return slave_peer_.bitfield_; }
 
         size_t TotalPiecesCount() { return master_peer_.GetTotalPiecesCount(); }
 
@@ -65,6 +67,9 @@ namespace network {
 
         void send_unchoke();
 
+        void request_piece(size_t piece_index);
+        void cancel_piece(size_t piece_index);
+
         bittorrent::MasterPeer &master_peer_;
         bittorrent::Peer slave_peer_;
         mutable std::string cash_ip_;
@@ -82,7 +87,6 @@ namespace network {
         bool is_disconnected = false;
 
         // TODO задать битовое поле из торрент структуры
-        bittorrent::Bitfield bitfield_{0};
 
     public:
         template <typename Function> void SendPeerMessage(std::string const &msg, Function &&callback) {

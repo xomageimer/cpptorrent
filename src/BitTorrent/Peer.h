@@ -41,6 +41,9 @@ namespace bittorrent {
         uint8_t id[20];
         uint32_t ip{};
         uint16_t port{};
+
+    public:
+        bittorrent::Bitfield bitfield_{0};
     };
 
     struct PeerImage {
@@ -59,6 +62,7 @@ namespace bittorrent {
         auto Get() { return shared_from_this(); }
         size_t GetApplicationPort() const;
         bencode::Node const &GetChunkHashes() const;
+        bittorrent::Bitfield &GetOwnerBitfield() { return bitfield_; }
         std::string GetInfoHash() const;
         size_t GetTotalPiecesCount() const;
         const uint8_t *GetHandshake() const;

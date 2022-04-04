@@ -21,12 +21,16 @@ add_library(helpers SHARED src/utils/constants.h
         src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/random_generator.cpp src/utils/random_generator.h
         src/utils/logger.cpp src/utils/logger.h
-        src/utils/bt/Message.h src/utils/bt/Message.cpp src/utils/bt/Bitfield.h src/utils/bt/Bitfield.cpp)
+
+        src/utils/bt/Message.h src/utils/bt/Message.cpp
+        src/utils/bt/Bitfield.h src/utils/bt/Bitfield.cpp
+        src/utils/bt/Piece.h src/utils/bt/Piece.cpp)
 add_library(bittorrent STATIC
         src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
         src/Network/PeerClient.h src/Network/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
 
-        src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp)
+        src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp
+        src/BitTorrent/TorrentFilesManager.cpp)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} helpers bencode)

@@ -11,12 +11,14 @@
 #include <sstream>
 
 #include "Torrent.h"
-#include "logger.h"
+#include "TorrentFilesManager.h"
 
 #include "auxiliary.h"
 
+#include "logger.h"
+
 bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path, std::filesystem::path const &download_path, size_t listener_port)
-    : service(service), path_to_download(download_path), port(listener_port) {
+    : service(service), port(listener_port) {
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");
@@ -31,6 +33,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     meta_info.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
 
     master_peer = std::make_shared<MasterPeer>(*this);
+    file_manager = std::make_shared<TorrentFilesManager>(*this, download_path);
 
     FillTrackers();
 }
@@ -132,7 +135,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
 }
 
 void bittorrent::Torrent::StartCommunicatingPeers() {
-    if (GetPeersSize())
+    if (!GetPeersSize())
         return;
     std::cout << GetResponse().peers.size() << std::endl;
     service.restart();

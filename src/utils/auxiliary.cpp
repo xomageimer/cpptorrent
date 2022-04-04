@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 
 #include <boost/compute/detail/sha1.hpp>
 #include <boost/function_output_iterator.hpp>
@@ -54,5 +55,27 @@ std::string UrlEncode(const std::string &url_to_encode) {
 }
 
 int IpToInt(const std::string &ip_address) {
+//    int iip = 0;
+//    for (auto const & el : ip_address) {
+//        iip <<= 8;
+//
+//    }
     return 0;
+}
+
+std::string BytesToHumanReadable(uint32_t bytes) {
+    if (bytes < 1024 )
+        return std::to_string(bytes) + " B";
+
+    auto exp = static_cast<size_t>(std::log(bytes) / std::log(1024));
+    const char * ci = "kMGTPE";
+
+    std::ostringstream os;
+    os << static_cast<double>(bytes / std::pow(1024, exp)) << " ";
+    os << ci[exp - 1] << "B";
+
+    return os.str();
+}
+double long BytesToGiga(uint32_t bytes) {
+    return static_cast<double>(bytes) / powf(1024.f, 3);
 }

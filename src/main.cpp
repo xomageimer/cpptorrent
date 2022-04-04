@@ -22,9 +22,10 @@ int main()
     try
     {
         if (!torrent.TryConnect(bittorrent::Launch::Any,
-                bittorrent::Event::Empty)) // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
-                                           // параллельно вызвать Best, чтобы подменить на наиболее лучший
+                bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
+                                             // параллельно вызвать Best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;
+        }
         std::cout << "make connect: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count() << "sec " << std::endl;
         torrent.StartCommunicatingPeers();
         std::cout << "gonna die" << std::endl;
