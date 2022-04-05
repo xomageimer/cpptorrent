@@ -19,8 +19,10 @@ int main()
     auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
     bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
+    return 0;
     try
     {
+        std::cerr << "Total piece count " << torrent.GetTotalCount() << std::endl;
         if (!torrent.TryConnect(bittorrent::Launch::Any,
                 bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                              // параллельно вызвать Best, чтобы подменить на наиболее лучший

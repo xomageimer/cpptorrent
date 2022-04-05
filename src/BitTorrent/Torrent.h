@@ -35,6 +35,8 @@ namespace bittorrent {
         bool TryConnect(bittorrent::Launch policy = bittorrent::Launch::Best, bittorrent::Event event = bittorrent::Event::Empty);
         void StartCommunicatingPeers();
 
+        void RequestBlock(uint32_t index, uint32_t begin, uint32_t length);
+
         [[nodiscard]] size_t GetPeersSize() const { return data_from_tracker ? data_from_tracker.value().peers.size() : 0; }
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info.info_hash; }
         [[nodiscard]] bencode::Node const &GetMeta() const { return meta_info.dict; }
@@ -43,6 +45,7 @@ namespace bittorrent {
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
         [[nodiscard]] const bittorrent::Response &GetResponse() const;
+        [[nodiscard]] size_t GetTotalCount() const { return GetMeta()["info"]["pieces"].AsString().size() / 20; };
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
 
@@ -62,7 +65,6 @@ namespace bittorrent {
         std::shared_ptr<bittorrent::MasterPeer> master_peer;
 
         std::shared_ptr<TorrentFilesManager> file_manager;
-//        std::vector<Piece> pieces;
 
     private:
         bool FillTrackers();

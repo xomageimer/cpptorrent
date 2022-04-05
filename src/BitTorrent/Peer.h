@@ -66,6 +66,7 @@ namespace bittorrent {
         std::string GetInfoHash() const;
         size_t GetTotalPiecesCount() const;
         const uint8_t *GetHandshake() const;
+        void request_block(uint32_t index, uint32_t begin, uint32_t length);
 
         void Subscribe(const std::shared_ptr<network::PeerClient> &new_sub);
         void Unsubscribe(IP unsub_ip);

@@ -137,6 +137,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
 void bittorrent::Torrent::StartCommunicatingPeers() {
     if (!GetPeersSize())
         return;
+
     std::cout << GetResponse().peers.size() << std::endl;
     service.restart();
     master_peer->InitiateJob(GetService(), GetResponse().peers);
@@ -190,4 +191,8 @@ const bittorrent::Response &bittorrent::Torrent::GetResponse() const {
         throw std::logic_error("Trackers have not yet been polled");
     }
     return *data_from_tracker;
+}
+
+void bittorrent::Torrent::RequestBlock(uint32_t index, uint32_t begin, uint32_t length) {
+
 }

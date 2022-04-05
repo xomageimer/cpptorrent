@@ -73,3 +73,7 @@ const uint8_t *bittorrent::MasterPeer::GetHandshake() const {
 size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
     return 0;
 }
+
+void bittorrent::MasterPeer::request_block(uint32_t index, uint32_t begin, uint32_t length) {
+
+}
