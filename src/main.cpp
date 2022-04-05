@@ -19,7 +19,6 @@ int main()
     auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
     bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
-    return 0;
     try
     {
         std::cerr << "Total piece count " << torrent.GetTotalCount() << std::endl;

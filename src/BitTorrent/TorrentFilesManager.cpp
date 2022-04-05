@@ -11,10 +11,6 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
     pieces.resize(torrent_.GetTotalCount());
     LOG("Torrent pieces count: ", torrent_.GetTotalCount());
     LOG("Torrent total size: ", total_size_GB, " GB");
-
-    for (auto & file : files) {
-        std::cerr << *std::prev(file.path.end()) << " : index - " << file.piece_index << " pos - " << file.begin << std::endl;
-    }
 }
 
 void bittorrent::TorrentFilesManager::fill_files() {
