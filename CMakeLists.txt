@@ -41,5 +41,5 @@ endif()
 
 add_executable(cpptorrent src/main.cpp)
 
-include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils)
+include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils dependence/BigInteger-master/src/header)
 target_link_libraries(cpptorrent PUBLIC bittorrent bencode helpers)

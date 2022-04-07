@@ -12,7 +12,7 @@ std::string UrlEncode(std::string const &url_to_encode);
 int IpToInt(std::string const &ip_address);
 
 std::string BytesToHumanReadable(uint32_t bytes);
-double long BytesToGiga(uint32_t bytes);
+double long BytesToGiga(long long bytes);
 unsigned long long GigaToBytes(long double gigabytes);
 
 bool is_little_endian();

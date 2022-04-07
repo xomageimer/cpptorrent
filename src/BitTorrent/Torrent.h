@@ -37,15 +37,19 @@ namespace bittorrent {
 
         void RequestBlock(uint32_t index, uint32_t begin, uint32_t length);
 
-        [[nodiscard]] size_t GetPeersSize() const { return data_from_tracker ? data_from_tracker.value().peers.size() : 0; }
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info.info_hash; }
         [[nodiscard]] bencode::Node const &GetMeta() const { return meta_info.dict; }
+
+        [[nodiscard]] size_t GetPeersSize() const { return data_from_tracker ? data_from_tracker.value().peers.size() : 0; }
         [[nodiscard]] const uint8_t *GetMasterPeerKey() const { return master_peer->GetID(); }
         [[nodiscard]] std::shared_ptr<bittorrent::MasterPeer> GetRootPeer() { return master_peer; }
+
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
         [[nodiscard]] const bittorrent::Response &GetResponse() const;
         [[nodiscard]] size_t GetTotalCount() const { return GetMeta()["info"]["pieces"].AsString().size() / 20; };
+        [[nodiscard]] size_t GetPieceSize() const { return GetMeta()["info"]["piece length"].AsNumber(); };
+        [[nodiscard]] size_t GetLastPieceSize() const {  };
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
 
@@ -63,6 +67,7 @@ namespace bittorrent {
         size_t port;
         meta_info_file meta_info;
         std::shared_ptr<bittorrent::MasterPeer> master_peer;
+        size_t last_piece_size {};
 
         std::shared_ptr<TorrentFilesManager> file_manager;
 

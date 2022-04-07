@@ -76,8 +76,8 @@ std::string BytesToHumanReadable(uint32_t bytes) {
 
     return os.str();
 }
-double long BytesToGiga(uint32_t bytes) {
-    return static_cast<double>(bytes) / powf(1024.f, 3);
+long double BytesToGiga(long long bytes) {
+    return static_cast<long double>(bytes) / powf(1024.f, 3);
 }
 unsigned long long GigaToBytes(long double gigabytes) {
     return gigabytes * powf(1024.f, 3);

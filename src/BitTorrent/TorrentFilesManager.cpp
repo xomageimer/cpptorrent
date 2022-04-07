@@ -8,16 +8,20 @@
 bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::filesystem::path path)
     : torrent_(torrent), path_to_download(std::move(path)) {
     fill_files();
-    pieces.resize(torrent_.GetTotalCount());
+//    pieces.resize(torrent_.GetTotalCount());
     LOG("Torrent pieces count: ", torrent_.GetTotalCount());
     LOG("Torrent total size: ", total_size_GB, " GB");
+    LOG("Last peace size: ", last_piece_size, " bytes");
 }
 
 void bittorrent::TorrentFilesManager::fill_files() {
     auto file_info = torrent_.GetMeta()["info"];
     if (file_info.TryAt("length")) {
-        total_size_GB = BytesToGiga(file_info["length"].AsNumber());
-        files.emplace_back(FileInfo{file_info["name"].AsString(), 0, 0, file_info["length"].AsNumber()});
+        auto bytes_size = file_info["length"].AsNumber();
+        total_size_GB = BytesToGiga(bytes_size);
+        files.emplace_back(FileInfo{file_info["name"].AsString(), 0, 0, bytes_size});
+
+        last_piece_size = bytes_size % file_info["piece length"].AsNumber();
     } else {
         const long long piece_length = file_info["piece length"].AsNumber();
         total_size_GB = 0;
@@ -47,5 +51,6 @@ void bittorrent::TorrentFilesManager::fill_files() {
 
             total_size_GB += BytesToGiga(bytes_size);
         }
+        last_piece_size = cur_piece_begin;
     }
 }

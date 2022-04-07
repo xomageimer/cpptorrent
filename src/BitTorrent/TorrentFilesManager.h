@@ -3,6 +3,7 @@
 
 #include "bt/Piece.h"
 
+#include <queue>
 #include <unordered_map>
 #include <fstream>
 #include <filesystem>
@@ -23,7 +24,8 @@ namespace bittorrent {
     private:
         Torrent &torrent_;
 
-        std::vector<Piece> pieces;
+        std::queue<std::pair<size_t, Piece>> pieces; // TODO не должно хранить все pieces
+        long long last_piece_size {};
 
         const std::filesystem::path path_to_download;
         long double total_size_GB;

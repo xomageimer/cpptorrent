@@ -17,7 +17,7 @@ int main()
     boost::asio::io_service service;
 
     auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
-    bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Mount_and_Blade_II_Bannerlord_1.7.0.torrent",
+    bittorrent::Torrent torrent(service, std::filesystem::current_path() / "No Country for Old Men.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
     try
     {
