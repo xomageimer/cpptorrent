@@ -13,9 +13,12 @@
 namespace bittorrent {
     struct Bitfield {
     public:
+        explicit Bitfield() = default;
         explicit Bitfield(size_t size) : bits_(size, 0) {}
         explicit Bitfield(std::vector<uint8_t> const &from_cast);
         Bitfield(const Bitfield &) = default;
+
+        void Resize(size_t new_size);
 
         bool Test(size_t i) { return bits_[i]; }
         void Set(size_t i) { bits_.set(i); }

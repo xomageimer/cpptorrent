@@ -27,6 +27,7 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
 }
 
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
+    bitfield_.Resize(torrent.GetPieceCount());
     for (auto &peer : peers) {
         Subscribe(std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service)));
     }
@@ -58,6 +59,7 @@ void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
 
     std::lock_guard lock(mut_);
     peers_subscribers_.erase(unsub_ip);
+    LOG ("peers remain: ", peers_subscribers_.size());
 }
 
 void bittorrent::MasterPeer::MakeHandshake() {
@@ -67,13 +69,13 @@ void bittorrent::MasterPeer::MakeHandshake() {
     std::memcpy(&handshake_message[28], GetInfoHash().data(), 20);
     std::memcpy(&handshake_message[48], GetID(), 20);
 }
+
 const uint8_t *bittorrent::MasterPeer::GetHandshake() const {
     return handshake_message;
 }
+
 size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
-    return 0;
+    return torrent.GetPieceCount();
 }
 
-void bittorrent::MasterPeer::request_block(uint32_t index, uint32_t begin, uint32_t length) {
-
-}
+void bittorrent::MasterPeer::request_block(uint32_t index, uint32_t begin, uint32_t length) {}

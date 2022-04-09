@@ -44,7 +44,7 @@ namespace network {
         std::string GetStrIP() const;
         auto Get() { return shared_from_this(); }
         const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
-        bittorrent::Bitfield &GetOwnerBitfield() { return slave_peer_.bitfield_; }
+        bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
 
         size_t TotalPiecesCount() { return master_peer_.GetTotalPiecesCount(); }
 

@@ -47,9 +47,9 @@ namespace bittorrent {
         [[nodiscard]] size_t GetPort() const { return port; }
         [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
         [[nodiscard]] const bittorrent::Response &GetResponse() const;
-        [[nodiscard]] size_t GetTotalCount() const { return GetMeta()["info"]["pieces"].AsString().size() / 20; };
+        [[nodiscard]] size_t GetPieceCount() const { return GetMeta()["info"]["pieces"].AsString().size() / 20; };
         [[nodiscard]] size_t GetPieceSize() const { return GetMeta()["info"]["piece length"].AsNumber(); };
-        [[nodiscard]] size_t GetLastPieceSize() const {  };
+        [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size; }
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
 

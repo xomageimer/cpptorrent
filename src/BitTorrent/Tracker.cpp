@@ -63,3 +63,7 @@ void bittorrent::Tracker::MakeRequester() {
     else
         request = std::make_shared<network::httpRequester>(Get(), make_strand(torrent.GetService()));
 }
+
+void bittorrent::Tracker::Stop()  {
+    request->Disconnect();
+}

@@ -38,6 +38,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     FillTrackers();
 }
 
+// TODO убрать service.reset и service.stop - и сделать что-то другое, например strand
 bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Event event) {
     if (!HasTrackers())
         return false;
@@ -134,6 +135,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
     }
 }
 
+// TODO убрать всякие сервис restart и тп.
 void bittorrent::Torrent::StartCommunicatingPeers() {
     if (!GetPeersSize())
         return;

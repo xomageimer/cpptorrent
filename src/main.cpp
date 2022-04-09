@@ -5,8 +5,8 @@
 
 using namespace std;
 
-// TODO добавить менеджера кт будет взаимодействовать с данными из какого-нибудь файлика с информацией о том какие файлы есть у нас для
-// раздачи (сидироваения) и какие мы докачиваем!
+// TODO добавить менеджера кт будет взаимодействовать с данными из какого-нибудь файлика с информацией о том какие файлы есть у нас для \
+//  раздачи (сидироваения) и какие мы докачиваем!
 int main()
 {
 #ifdef OS_WIN
@@ -17,12 +17,12 @@ int main()
     boost::asio::io_service service;
 
     auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
-    bittorrent::Torrent torrent(service, std::filesystem::current_path() / "No Country for Old Men.torrent",
+    bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
     try
     {
-        std::cerr << "Total piece count " << torrent.GetTotalCount() << std::endl;
-        if (!torrent.TryConnect(bittorrent::Launch::Any,
+        std::cerr << "Total piece count " << torrent.GetPieceCount() << std::endl;
+        if (!torrent.TryConnect(bittorrent::Launch::Best,
                 bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                              // параллельно вызвать Best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;

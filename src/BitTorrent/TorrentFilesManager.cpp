@@ -8,8 +8,9 @@
 bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::filesystem::path path)
     : torrent_(torrent), path_to_download(std::move(path)) {
     fill_files();
-//    pieces.resize(torrent_.GetTotalCount());
-    LOG("Torrent pieces count: ", torrent_.GetTotalCount());
+    bitset_.Resize(torrent_.GetPieceCount());
+
+    LOG("Torrent pieces count: ", torrent_.GetPieceCount());
     LOG("Torrent total size: ", total_size_GB, " GB");
     LOG("Last peace size: ", last_piece_size, " bytes");
 }

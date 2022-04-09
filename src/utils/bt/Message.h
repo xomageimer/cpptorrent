@@ -24,6 +24,7 @@ namespace bittorrent {
         cancel = 8,
         port = 9
     };
+    // TODO сделать другой message, а этот унаследовать от него!
     struct Message {
     public:
         static const inline int max_body_length = bittorrent_constants::MTU;

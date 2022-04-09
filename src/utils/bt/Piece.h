@@ -15,6 +15,9 @@ namespace bittorrent {
     };
     struct Piece {
         std::vector<Block> blocks;
+
+        size_t current_block;
+        size_t blocks_count;
         size_t index;
     };
 } // namespace bittorrent

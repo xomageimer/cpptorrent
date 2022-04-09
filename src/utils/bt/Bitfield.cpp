@@ -12,3 +12,7 @@ std::vector<uint8_t> bittorrent::Bitfield::GetCast() const {
     boost::to_block_range(bits_, std::back_inserter(cast));
     return std::move(cast);
 }
+
+void bittorrent::Bitfield::Resize(size_t new_size) {
+    bits_.resize(new_size);
+}

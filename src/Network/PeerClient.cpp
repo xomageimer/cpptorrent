@@ -134,7 +134,10 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
                                 if ((!ec || ec == ba::error::eof) && bytes_transferred >= 68 && buff.data()[0] == 0x13 &&
                                     memcmp(&buff.data()[1], "BitTorrent protocol", 19) == 0 &&
                                     memcmp(&buff.data()[28], &master_peer_.GetHandshake()[28], 20) == 0) {
+
                                     std::cerr << GetStrIP() << " was connected!" << std::endl;
+
+                                    GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
                                     drop_timeout();
                                     do_read_header();
                                 } else {
@@ -226,129 +229,127 @@ void network::PeerClient::do_read_body() {
                 auto payload = buff.body();
 
                 switch (message_type) {
-                case bittorrent::MESSAGE_TYPE::choke:
-                    LOG("choke message");
-                    if (payload_size != 0) {
-                        LOG("invalid choke-message size");
-                        Disconnect();
-                    }
-                    status_ |= peer_choking;
+                    case bittorrent::MESSAGE_TYPE::choke:
+                        LOG("choke message");
+                        if (payload_size != 0) {
+                            LOG("invalid choke-message size");
+                            Disconnect();
+                        }
+                        status_ |= peer_choking;
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::unchoke:
-                    LOG("unchoke message");
-                    if (payload_size != 0) {
-                        LOG("invalid unchoke-message size");
-                        Disconnect();
-                    }
-                    status_ &= ~peer_choking;
-                    // TODO запросить необходимые куски!
+                        break;
+                    case bittorrent::MESSAGE_TYPE::unchoke:
+                        LOG("unchoke message");
+                        if (payload_size != 0) {
+                            LOG("invalid unchoke-message size");
+                            Disconnect();
+                        }
+                        status_ &= ~peer_choking;
+                        // TODO запросить необходимые куски!
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::interested:
-                    LOG("interested message");
-                    if (payload_size != 0) {
-                        LOG("invalid interested-message size");
-                        Disconnect();
-                    }
-                    status_ |= peer_interested;
+                        break;
+                    case bittorrent::MESSAGE_TYPE::interested:
+                        LOG("interested message");
+                        if (payload_size != 0) {
+                            LOG("invalid interested-message size");
+                            Disconnect();
+                        }
+                        status_ |= peer_interested;
 
-                    if (IsClientChoked()) send_unchoke();
+                        if (IsClientChoked()) send_unchoke();
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::not_interested:
-                    LOG("not interested message");
-                    if (payload_size != 0) {
-                        LOG("invalid not_interested-message size");
-                        Disconnect();
-                    }
-                    status_ &= ~peer_interested;
+                        break;
+                    case bittorrent::MESSAGE_TYPE::not_interested:
+                        LOG("not interested message");
+                        if (payload_size != 0) {
+                            LOG("invalid not_interested-message size");
+                            Disconnect();
+                        }
+                        status_ &= ~peer_interested;
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::have: {
-                    LOG("have message");
-                    if (payload_size != 4) {
-                        LOG("invalid have-message size");
-                        Disconnect();
-                    }
-                    uint32_t i = SwapEndian(ArrayToValue<uint32_t>(payload));
-                    if (i < GetOwnerBitfield().Size()) {
-                        Disconnect();
+                        break;
+                    case bittorrent::MESSAGE_TYPE::have: {
+                        LOG("have message");
+                        if (payload_size != 4) {
+                            LOG("invalid have-message size");
+                            Disconnect();
+                        }
+                        uint32_t i = SwapEndian(ArrayToValue<uint32_t>(payload));
+                        if (i < GetPeerBitfield().Size()) {
+                            Disconnect();
+                            break;
+                        }
+
+                        GetPeerBitfield().Set(i);
                         break;
                     }
-
-                    GetOwnerBitfield().Set(i);
-                    break;
-                }
-                case bittorrent::MESSAGE_TYPE::bitfield:
-                    LOG("bitfield message");
-                    if (payload_size == 0) {
-                        LOG("invalid bitfield-message size");
-                        Disconnect();
-                    }
-                    for (size_t i = 0; i < payload_size; i++) {
-                        for (size_t x = 0; x < 8; x++) {
-                            if (payload[i] & (1 << (7 - x))) {
-                                size_t idx = i * 8 + x;
-                                if (idx >= TotalPiecesCount()) {
-                                    Disconnect();
-                                    return;
+                    case bittorrent::MESSAGE_TYPE::bitfield:
+                        LOG("bitfield message");
+                        if (payload_size == 0) {
+                            LOG("invalid bitfield-message size");
+                            Disconnect();
+                        }
+                        for (size_t i = 0; i < payload_size; i++) {
+                            for (size_t x = 0; x < 8; x++) {
+                                if (payload[i] & (1 << (7 - x))) {
+                                    size_t idx = i * 8 + x;
+                                    if (idx >= TotalPiecesCount()) {
+                                        Disconnect();
+                                        return;
+                                    }
+                                    GetPeerBitfield().Set(idx);
                                 }
-                                GetOwnerBitfield().Set(idx);
                             }
                         }
-                    }
 
-                    if (GetOwnerBitfield().Popcount() != TotalPiecesCount()) {
-//                        req
-                        return;
-                    }  // TODO тогда запросить еще куски
+                        if (GetPeerBitfield().Popcount() != TotalPiecesCount()) {
+                            // TODO тогда запросить еще куски
+                        }
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::request:
-                    LOG("request message");
-                    if (payload_size != 12) {
-                        LOG("invalid request-message size");
-                        Disconnect();
-                    }
-                    if (!IsRemoteInterested()) {
-                        LOG("peer requested piece block without showing interest");
-                        Disconnect();
-                    }
-                    if (IsClientChoked()) {
-                        LOG("peer requested piece while choked");
-                        Disconnect();
-                    }
+                        break;
+                    case bittorrent::MESSAGE_TYPE::request:
+                        LOG("request message");
+                        if (payload_size != 12) {
+                            LOG("invalid request-message size");
+                            Disconnect();
+                        }
+                        if (!IsRemoteInterested()) {
+                            LOG("peer requested piece block without showing interest");
+                            Disconnect();
+                        }
+                        if (IsClientChoked()) {
+                            LOG("peer requested piece while choked");
+                            Disconnect();
+                        }
 
-                    uint32_t index, begin, length;
-                    index = *(reinterpret_cast<uint32_t *>(&payload[0]));
-                    begin = *(reinterpret_cast<uint32_t *>(&payload[4]));
-                    length = *(reinterpret_cast<uint32_t *>(&payload[8]));
+                        uint32_t index, begin, length;
+                        index = *(reinterpret_cast<uint32_t *>(&payload[0]));
+                        begin = *(reinterpret_cast<uint32_t *>(&payload[4]));
+                        length = *(reinterpret_cast<uint32_t *>(&payload[8]));
 
-                    LOG ("size of message:", BytesToHumanReadable(length));
-                    if (length > bittorrent_constants::max_request_size){
-                        LOG ("invalid size");
-                        Disconnect();
-                    }
+                        LOG("size of message:", BytesToHumanReadable(length));
+                        if (length > bittorrent_constants::max_request_size) {
+                            LOG("invalid size");
+                            Disconnect();
+                        }
 
+                        break;
+                    case bittorrent::MESSAGE_TYPE::piece_block:
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::piece_block:
+                        break;
+                    case bittorrent::MESSAGE_TYPE::cancel:
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::cancel:
+                        break;
+                    case bittorrent::MESSAGE_TYPE::port:
+                        // TODO хз че тут надо
+                        if (payload_size != 2) {
+                            LOG("invalid port-message size");
+                            Disconnect();
+                        }
+                        uint16_t port;
+                        port = *(reinterpret_cast<uint16_t *>(&payload[0]));
 
-                    break;
-                case bittorrent::MESSAGE_TYPE::port:
-                    // TODO хз че тут надо
-                    if (payload_size != 2) {
-                        LOG("invalid port-message size");
-                        Disconnect();
-                    }
-                    uint16_t port;
-                    port = *(reinterpret_cast<uint16_t *>(&payload[0]));
-
-                    break;
+                        break;
                 }
             } else {
                 Disconnect();

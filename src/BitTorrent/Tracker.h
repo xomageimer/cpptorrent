@@ -89,6 +89,7 @@ namespace bittorrent {
         size_t GetPort() const;
         std::string const &GetInfoHash() const;
         const uint8_t *GetMasterPeerId() const;
+        void Stop();
 
     private:
         void MakeRequester();

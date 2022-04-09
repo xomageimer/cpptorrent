@@ -36,6 +36,7 @@ namespace bittorrent {
         [[nodiscard]] const uint8_t *GetID() const { return id; }
         [[nodiscard]] virtual uint16_t GetPort() const { return port; }
         [[nodiscard]] size_t GetIP() const { return ip; }
+        [[nodiscard]] bittorrent::Bitfield & GetBitfield() { return bitfield_; }
 
     protected:
         uint8_t id[20];
@@ -43,7 +44,7 @@ namespace bittorrent {
         uint16_t port{};
 
     public:
-        bittorrent::Bitfield bitfield_{0};
+        bittorrent::Bitfield bitfield_;
     };
 
     struct PeerImage {
