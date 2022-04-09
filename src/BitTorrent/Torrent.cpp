@@ -42,7 +42,6 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
 bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Event event) {
     if (!HasTrackers())
         return false;
-    service.reset();
     bittorrent::Query query = GetDefaultTrackerQuery();
     query.event = event;
 
@@ -50,7 +49,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
     LOG("create requests");
-    std::thread t;
     try {
         std::vector<boost::future<bittorrent::Response>> results;
         for (auto &tracker: active_trackers) {
@@ -58,13 +56,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
         }
 
         LOG("requests were created");
-        t = std::thread([&] {
-#ifdef OS_WIN
-            SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-#endif
-            service.run();
-            std::cerr << "service stopped" << std::endl;
-        });
         switch (policy) {
             case Launch::Any: {
                 boost::promise<bittorrent::Response> total_res;
@@ -122,13 +113,15 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
             }
         }
         std::cerr << "got tracker" << std::endl;
-        service.stop();
-        t.join();
+        for (auto & tracker : active_trackers) {
+            tracker->Stop();
+        }
 
         return true;
     } catch (boost::exception &excp) {
-        service.stop();
-        t.join();
+        for (auto & tracker : active_trackers) {
+            tracker->Stop();
+        }
 
         std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;
@@ -141,9 +134,7 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
         return;
 
     std::cout << GetResponse().peers.size() << std::endl;
-    service.restart();
     master_peer->InitiateJob(GetService(), GetResponse().peers);
-    service.run();
 }
 
 bool bittorrent::Torrent::FillTrackers() {

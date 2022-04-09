@@ -15,6 +15,13 @@ int main()
     LOG("Start");
     auto start = std::chrono::steady_clock::now();
     boost::asio::io_service service;
+    boost::asio::io_service::work worker(service);
+
+    std::thread t1 ([&] {service.run();});
+    std::thread t2 ([&] {service.run();});
+    std::thread t3 ([&] {service.run();});
+    std::thread t4 ([&] {service.run();});
+
 
     auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
     bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Elden Ring.torrent",
@@ -29,7 +36,6 @@ int main()
         }
         std::cout << "make connect: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count() << "sec " << std::endl;
         torrent.StartCommunicatingPeers();
-        std::cout << "gonna die" << std::endl;
     }
     catch (std::exception &e)
     {
@@ -37,7 +43,18 @@ int main()
         return EXIT_FAILURE;
     }
 
+    std::cout << "PRESS KEY TO CANCEL!" << std::endl;
+    char c;
+    std::cin >> c;
     service.stop();
+
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+
+    std::cout << "gonna die" << std::endl;
+
     auto end = std::chrono::steady_clock::now();
 
     std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "sec " << std::endl;
