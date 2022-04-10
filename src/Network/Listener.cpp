@@ -35,9 +35,6 @@ network::Listener::Listener(const boost::asio::strand<boost::asio::io_service::e
 }
 
 void network::Listener::get_port() {
-
-    SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-
     boost::system::error_code ec;
     do {
         if (port_ == bittorrent_constants::last_port) throw BadConnect("can't get free ports, try again later!");

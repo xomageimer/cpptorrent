@@ -142,7 +142,7 @@ void network::httpRequester::do_connect(ba::ip::tcp::resolver::iterator endpoint
                 SetException(ec.message());
             }
         });
-    timeout_.expires_from_now(bittorrent_constants::connection_waiting_time + epsilon);
+    timeout_.expires_from_now(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
 }
 
 void network::httpRequester::do_request() {
@@ -283,6 +283,7 @@ void network::udpRequester::do_resolve() {
             if (!ec) {
                 endpoints_it_ = std::move(endpoints);
                 ba::ip::udp::endpoint endpoint = *endpoints_it_;
+
                 socket_.open(endpoint.protocol());
 
                 make_connect_request();

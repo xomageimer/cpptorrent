@@ -65,5 +65,5 @@ void bittorrent::Tracker::MakeRequester() {
 }
 
 void bittorrent::Tracker::Stop()  {
-    request->Disconnect();
+    torrent.GetService().post([this] { request->Disconnect(); });
 }

@@ -83,10 +83,6 @@ namespace network {
         ba::ip::tcp::socket socket_;
 
         ba::deadline_timer timeout_;
-
-        static const inline boost::posix_time::milliseconds epsilon{
-            boost::posix_time::milliseconds(15)}; // чтобы сразу не закончить таймер!
-        static const inline boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};
     };
 
     struct udpRequester : public TrackerRequester {

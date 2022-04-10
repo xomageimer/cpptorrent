@@ -81,17 +81,19 @@ void network::PeerClient::try_again_connect() {
 }
 
 void network::PeerClient::StartConnection() {
-    if (socket_.is_open()) {
-        do_verify();
-    } else {
-        do_resolve();
-    }
     auto self = Get();
-    timeout_.async_wait([this, self](boost::system::error_code const &ec) {
-        if (!ec) {
-            LOG(GetStrIP(), " : ", "deadline timer to make resolve");
-            Disconnect();
+    post (socket_.get_executor(), [this, self]{
+        if (socket_.is_open()) {
+            do_verify();
+        } else {
+            do_resolve();
         }
+        timeout_.async_wait([this, self](boost::system::error_code const &ec) {
+            if (!ec) {
+                LOG(GetStrIP(), " : ", "deadline timer to make resolve");
+                Disconnect();
+            }
+        });
     });
 }
 

@@ -7,6 +7,7 @@ using namespace std;
 
 // TODO добавить менеджера кт будет взаимодействовать с данными из какого-нибудь файлика с информацией о том какие файлы есть у нас для \
 //  раздачи (сидироваения) и какие мы докачиваем!
+
 int main()
 {
 #ifdef OS_WIN
@@ -17,13 +18,13 @@ int main()
     boost::asio::io_service service;
     boost::asio::io_service::work worker(service);
 
+    auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
+
     std::thread t1 ([&] {service.run();});
     std::thread t2 ([&] {service.run();});
     std::thread t3 ([&] {service.run();});
     std::thread t4 ([&] {service.run();});
 
-
-    auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
     bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
     try
