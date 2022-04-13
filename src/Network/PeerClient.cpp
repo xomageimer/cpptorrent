@@ -137,7 +137,7 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
                                     memcmp(&buff.data()[1], "BitTorrent protocol", 19) == 0 &&
                                     memcmp(&buff.data()[28], &master_peer_.GetHandshake()[28], 20) == 0) {
 
-                                    std::cerr << GetStrIP() << " was connected!" << std::endl;
+                                    LOG(GetStrIP(), " was connected!");
 
                                     GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
                                     drop_timeout();
@@ -210,15 +210,16 @@ void network::PeerClient::do_read_header() {
                 buff.decode_header();
                 if (!buff.body_length()) {
                     LOG("Keep-alive message");
-                    return drop_timeout();
+                    drop_timeout();
                 } else {
-                    return do_read_body();
+                    do_read_body();
                 }
             } else {
                 Disconnect();
             }
         });
 }
+
 void network::PeerClient::do_read_body() {
     LOG("trying to read payload of message");
 
@@ -247,6 +248,7 @@ void network::PeerClient::do_read_body() {
                             Disconnect();
                         }
                         status_ &= ~peer_choking;
+
                         // TODO запросить необходимые куски!
 
                         break;
@@ -360,5 +362,7 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::send_unchoke() {}
+
 void network::PeerClient::request_piece(size_t piece_index) {}
+
 void network::PeerClient::cancel_piece(size_t piece_index) {}

@@ -22,7 +22,7 @@ void network::Listener::participant::Verify() {
     timeout_.expires_from_now(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
     timeout_.async_wait([this, self](boost::system::error_code const &ec) {
         if (!ec) {
-            socket_.cancel();
+            socket_.close();
             timeout_.cancel();
         }
     });
@@ -32,6 +32,10 @@ network::Listener::Listener(const boost::asio::strand<boost::asio::io_service::e
     : socket_(executor), acceptor_(executor) {
     get_port();
     do_accept();
+}
+
+void network::Listener::AddTorrent(const std::shared_ptr<bittorrent::Torrent> &new_torrent) {
+    torrents.emplace(new_torrent->GetInfoHash(), new_torrent);
 }
 
 void network::Listener::get_port() {
@@ -46,16 +50,10 @@ void network::Listener::get_port() {
     acceptor_.listen();
 }
 
-network::Listener::~Listener() {
-    socket_.close();
-    acceptor_.close();
-}
-
 void network::Listener::do_accept() {
     LOG("Listener"
         " : ",
         __FUNCTION__);
-    return;
 
     acceptor_.async_accept(socket_, [this](boost::system::error_code ec) {
         if (!ec) {
@@ -63,4 +61,9 @@ void network::Listener::do_accept() {
         }
         do_accept();
     });
+}
+
+network::Listener::~Listener() {
+    socket_.close();
+    acceptor_.close();
 }

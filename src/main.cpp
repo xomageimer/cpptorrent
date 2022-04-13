@@ -25,25 +25,27 @@ int main()
     std::thread t3 ([&] {service.run();});
     std::thread t4 ([&] {service.run();});
 
-    bittorrent::Torrent torrent(service, std::filesystem::current_path() / "Elden Ring.torrent",
+    auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
+
+    listener->AddTorrent(torrent);
+
     try
     {
-        std::cerr << "Total piece count " << torrent.GetPieceCount() << std::endl;
-        if (!torrent.TryConnect(bittorrent::Launch::Best,
+        std::cerr << "Total piece count " << torrent->GetPieceCount() << std::endl;
+        if (!torrent->TryConnect(bittorrent::Launch::Best,
                 bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                              // параллельно вызвать Best, чтобы подменить на наиболее лучший
             return EXIT_SUCCESS;
         }
         std::cout << "make connect: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count() << "sec " << std::endl;
-        torrent.StartCommunicatingPeers();
+        torrent->StartCommunicatingPeers();
     }
     catch (std::exception &e)
     {
         std::cerr << "ERROR: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
-
     std::cout << "PRESS KEY TO CANCEL!" << std::endl;
     char c;
     std::cin >> c;

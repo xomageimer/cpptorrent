@@ -45,9 +45,7 @@ namespace network {
         auto Get() { return shared_from_this(); }
         const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
         bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
-
         size_t TotalPiecesCount() { return master_peer_.GetTotalPiecesCount(); }
-
         bool IsClientChoked() const { return status_ & am_choking; }
         bool IsRemoteChoked() const { return status_ & peer_choking; }
         bool IsClientInterested() const { return status_ & am_interested; }
@@ -55,84 +53,84 @@ namespace network {
 
         void Disconnect();
 
+        template <typename Function> void SendPeerMessage(std::string const &msg, Function &&callback);
+
     private:
         void do_resolve();
         void do_connect(ba::ip::tcp::resolver::iterator endpoint);
         void do_verify();
 
         void try_again_connect();
-
         void deadline();
         void drop_timeout();
 
-        void send_unchoke();
+        template <typename Function> void do_send_message(Function &&callback);
+        template <typename Function> void send(std::string binstring, Function &&callback);
+        void do_read_header();
+        void do_read_body();
 
-        void request_piece(size_t piece_index);
-        void cancel_piece(size_t piece_index);
-
-        bittorrent::MasterPeer &master_peer_;
-        bittorrent::Peer slave_peer_;
         mutable std::string cash_ip_;
-        bittorrent::Message buff{};
-        std::deque<bittorrent::Message> message_queue_;
 
-        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
-        uint8_t status_ = STATE::am_choking | STATE::peer_choking;
-
-        ba::ip::tcp::resolver::iterator endpoint_it_;
         ba::ip::tcp::socket socket_;
         ba::ip::tcp::resolver resolver_;
 
         ba::deadline_timer timeout_;
         bool is_disconnected = false;
 
+        void send_unchoke();
+        void request_piece(size_t piece_index);
+        void cancel_piece(size_t piece_index);
+
+        bittorrent::MasterPeer &master_peer_;
+        bittorrent::Peer slave_peer_;
+        bittorrent::Message buff{};
+        std::deque<bittorrent::Message> message_queue_;
+
+        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
+        uint8_t status_ = STATE::am_choking | STATE::peer_choking;
+
         // TODO задать битовое поле из торрент структуры
+    };
 
-    public:
-        template <typename Function> void SendPeerMessage(std::string const &msg, Function &&callback) {
-            drop_timeout();
-            auto self = Get();
+    template <typename Function> void PeerClient::SendPeerMessage(std::string const &msg, Function &&callback) {
+        drop_timeout();
+        auto self = Get();
 
-            post(socket_.get_executor(), [this, self, msg, callback]() {
-                bool write_in_progress = !message_queue_.empty();
-                auto new_msgs = bittorrent::GetMessagesQueue(msg);
-                message_queue_.insert(message_queue_.end(), new_msgs.begin(), new_msgs.end());
-                if (!write_in_progress) {
+        post(socket_.get_executor(), [this, self, msg, callback]() {
+            bool write_in_progress = !message_queue_.empty();
+            auto new_msgs = bittorrent::MakeMessage(msg);
+            message_queue_.push_back(new_msgs);
+            if (!write_in_progress) {
+                do_send_message(callback);
+            }
+        });
+    }
+
+    template <typename Function> void PeerClient::do_send_message(Function &&callback) {
+        auto self = Get();
+
+        send(std::string(reinterpret_cast<const char *>(message_queue_.front().data()), message_queue_.front().length()),
+            [this, self, callback]() {
+                message_queue_.pop_front();
+                if (!message_queue_.empty()) {
                     do_send_message(callback);
-                }
-            });
-        }
-
-    private:
-        template <typename Function> void do_send_message(Function &&callback) {
-            auto self = Get();
-
-            send(std::string(reinterpret_cast<const char *>(message_queue_.front().data()), message_queue_.front().length()),
-                [this, self, callback]() {
-                    message_queue_.pop_front();
-                    if (!message_queue_.empty()) {
-                        do_send_message(callback);
-                    } else {
-                        callback();
-                    }
-                });
-        }
-
-        template <typename Function> void send(std::string binstring, Function &&callback) {
-            drop_timeout();
-            auto self = Get();
-
-            // TODO попытки отправки при исчерпании которых соединение закрывается
-            ba::async_write(socket_, ba::buffer(binstring), [this, self, callback](boost::system::error_code ec, std::size_t /*length*/) {
-                if (!ec) {
+                } else {
                     callback();
                 }
             });
-        }
+    }
 
-        void do_read_header();
-        void do_read_body();
-    };
+    template <typename Function> void PeerClient::send(std::string binstring, Function &&callback) {
+        drop_timeout();
+        auto self = Get();
+
+        // TODO попытки отправки при исчерпании которых соединение закрывается
+        ba::async_write(socket_, ba::buffer(binstring), [this, self, callback](boost::system::error_code ec, std::size_t /*length*/) {
+            if (!ec) {
+                callback();
+            }
+        });
+    }
 } // namespace network
 
 #endif // CPPTORRENT_PEERCLIENT_H

@@ -60,7 +60,7 @@ namespace bittorrent {
         uint8_t data_[header_length + id_length + max_body_length]{};
         size_t body_length_{};
     };
-    std::deque<Message> GetMessagesQueue(const std::string &msg);
+    Message MakeMessage(const std::string & msg);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_MESSAGE_H
