@@ -12,30 +12,37 @@
 // TODO структура отвечает за правильную обработку файлов торрента
 namespace bittorrent {
     struct Torrent;
+
     struct FileInfo {
         std::filesystem::path path;
         size_t piece_index;
         long long begin;
         long long size;
     };
+
     struct TorrentFilesManager {
     public:
         explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path);
+
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB; }; // GigaBytes
+
     private:
+        void fill_files();
+
         Torrent &torrent_;
 
         // TODO мб queue не подойдет
         std::queue<std::pair<size_t, Piece>> pieces; // TODO не должно хранить все pieces
-        long long last_piece_size {};
+
+        long long last_piece_size{};
 
         const std::filesystem::path path_to_download;
+
         long double total_size_GB;
 
         std::vector<FileInfo> files;
-        bittorrent::Bitfield bitset_;
 
-        void fill_files();
+        bittorrent::Bitfield bitset_;
     };
 } // namespace bittorrent
 

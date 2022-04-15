@@ -24,40 +24,46 @@
 namespace ba = boost::asio;
 
 namespace network {
+    struct participant : public std::enable_shared_from_this<participant> {
+    public:
+        explicit participant(Listener &listener, ba::ip::tcp::socket socket)
+            : listener_(listener), socket_(std::move(socket)), timeout_(socket_.get_executor()) {}
+
+        auto Get() { return shared_from_this(); }
+
+        void Verify();
+
+    private:
+        ba::ip::tcp::socket socket_;
+
+        Listener &listener_;
+
+        uint8_t buff[bittorrent_constants::handshake_length];
+
+        ba::deadline_timer timeout_;
+    };
+
     struct Listener {
     public:
         explicit Listener(const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
+
         ~Listener();
 
         [[nodiscard]] size_t GetPort() const { return port_; }
+
         void AddTorrent(const std::shared_ptr<bittorrent::Torrent> &new_torrent);
 
     private:
         void get_port();
+
         void do_accept();
-
-        struct participant : public std::enable_shared_from_this<participant> {
-        public:
-            explicit participant(Listener &listener, ba::ip::tcp::socket socket)
-                : listener_(listener), socket_(std::move(socket)), timeout_(socket_.get_executor()) {}
-            auto Get() { return shared_from_this(); }
-            void Verify();
-
-        private:
-            ba::ip::tcp::socket socket_;
-            Listener &listener_;
-
-            uint8_t buff[bittorrent_constants::handshake_length];
-
-            ba::deadline_timer timeout_;
-        };
-        friend struct participant;
 
         std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents;
 
         size_t port_ = bittorrent_constants::begin_port;
 
         ba::ip::tcp::acceptor acceptor_;
+
         ba::ip::tcp::socket socket_;
     };
 } // namespace network

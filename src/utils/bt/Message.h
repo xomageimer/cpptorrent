@@ -28,10 +28,13 @@ namespace bittorrent {
     struct Message {
     public:
         static const inline int max_body_length = bittorrent_constants::MTU;
+
         static const inline int header_length = 4;
+
         static const inline int id_length = 1;
 
         Message() : body_length_() {}
+
         Message(const Message &other) = default;
 
         [[nodiscard]] inline const uint8_t *data() const { return data_; }
@@ -54,13 +57,16 @@ namespace bittorrent {
         [[nodiscard]] MESSAGE_TYPE GetMessageType() const { return MESSAGE_TYPE{data()[header_length + 1]}; }
 
         void encode_header();
+
         void decode_header();
 
     private:
         uint8_t data_[header_length + id_length + max_body_length]{};
+
         size_t body_length_{};
     };
-    Message MakeMessage(const std::string & msg);
+
+    Message MakeMessage(const std::string &msg);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_MESSAGE_H

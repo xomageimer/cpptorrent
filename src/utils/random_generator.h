@@ -8,10 +8,12 @@
 struct random_generator : public std::mt19937_64 {
 public:
     static random_generator &Random();
+
     template <typename T> T GetNumber() {
         std::lock_guard lock(m);
         return GetNumberBetween<T>(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
     }
+
     template <typename T> T GetNumberBetween(T lower_bound, T upper_bound) {
         std::lock_guard lock(m);
         if constexpr (std::is_integral_v<T>) {
@@ -25,6 +27,7 @@ public:
 
 private:
     random_generator();
+
     std::recursive_mutex m;
 };
 

@@ -25,21 +25,28 @@ namespace network {
     struct TrackerRequester {
     public:
         explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker) : tracker_(*tracker) {}
+
         TrackerRequester(TrackerRequester const &) = delete;
+
         TrackerRequester(TrackerRequester &&) = delete;
 
         virtual void Connect(const bittorrent::Query &query) = 0;
+
         virtual void Disconnect() { is_set = true; }
+
         [[nodiscard]] virtual boost::future<bittorrent::Response> GetResponse() { return promise_of_resp.get_future(); };
+
         virtual ~TrackerRequester() { LOG("Destruction"); }
 
     protected:
         bool is_set = false;
 
         boost::promise<bittorrent::Response> promise_of_resp;
+
         bittorrent::Tracker &tracker_;
 
         virtual void SetResponse() = 0;
+
         virtual void SetException(const std::string &exc) {
             if (is_set) return;
 
@@ -57,6 +64,7 @@ namespace network {
             : resolver_(executor), socket_(executor), timeout_(executor), TrackerRequester(tracker) {}
 
         void Connect(const bittorrent::Query &query) override;
+
         void Disconnect() override {
             timeout_.cancel();
             socket_.close();
@@ -66,10 +74,15 @@ namespace network {
 
     private:
         void do_resolve();
+
         void do_connect(ba::ip::tcp::resolver::iterator endpoints);
+
         void do_request();
+
         void do_read_response_status();
+
         void do_read_response_header();
+
         void do_read_response_body();
 
         void deadline();
@@ -77,9 +90,11 @@ namespace network {
         void SetResponse() override;
 
         ba::streambuf request_;
+
         ba::streambuf response_;
 
         ba::ip::tcp::resolver resolver_;
+
         ba::ip::tcp::socket socket_;
 
         ba::deadline_timer timeout_;
@@ -92,6 +107,7 @@ namespace network {
             : resolver_(executor), socket_(executor), connect_timeout_(executor), announce_timeout_(executor), TrackerRequester(tracker) {}
 
         void Connect(const bittorrent::Query &query) override;
+
         void Disconnect() override {
             announce_timeout_.cancel();
             connect_timeout_.cancel();
@@ -104,34 +120,47 @@ namespace network {
         void do_resolve();
 
         void do_try_connect();
+
         void do_connect();
+
         void do_connect_response();
 
         void do_try_announce();
+
         void do_announce();
+
         void do_announce_response();
 
         void connect_deadline();
+
         void announce_deadline();
+
         void UpdateEndpoint();
 
         void SetResponse() override;
 
         void make_announce_request();
+
         void make_connect_request();
 
         uint8_t buff[bittorrent_constants::short_buff_size];
+
         uint8_t request[bittorrent_constants::middle_buff_size];
+
         uint8_t response[bittorrent_constants::MTU];
 
         ba::ip::udp::resolver resolver_;
+
         ba::ip::udp::socket socket_;
+
         ba::ip::udp::resolver::iterator endpoints_it_;
 
         size_t attempts_ = 0;
+
         size_t announce_attempts_ = 0;
 
         ba::deadline_timer connect_timeout_;
+
         ba::deadline_timer announce_timeout_;
 
         bittorrent::Query query_;
@@ -141,6 +170,7 @@ namespace network {
             uint32_t action{0};
             uint32_t transaction_id{};
         } c_req;
+
         struct connect_response {
             uint32_t action{0};
             uint32_t transaction_id{};

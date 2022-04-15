@@ -22,6 +22,7 @@ namespace bittorrent {
 
 namespace network {
     struct PeerClient;
+
     struct Listener;
 } // namespace network
 
@@ -29,14 +30,20 @@ namespace bittorrent {
     struct Peer {
     public:
         Peer();
+
         Peer(uint32_t ip_address, uint16_t port_number);
+
         Peer(uint32_t ip_address, uint16_t port_number, const uint8_t *key);
+
         [[maybe_unused]] explicit Peer(const uint8_t *key_arg);
 
         [[nodiscard]] const uint8_t *GetID() const { return id; }
+
         [[nodiscard]] virtual uint16_t GetPort() const { return port; }
+
         [[nodiscard]] size_t GetIP() const { return ip; }
-        [[nodiscard]] bittorrent::Bitfield & GetBitfield() { return bitfield_; }
+
+        [[nodiscard]] bittorrent::Bitfield &GetBitfield() { return bitfield_; }
 
     protected:
         uint8_t id[20];
@@ -60,26 +67,39 @@ namespace bittorrent {
         explicit MasterPeer(bittorrent::Torrent &tor) : torrent(tor) { MakeHandshake(); }
 
         void InitiateJob(boost::asio::io_service &service, std::vector<PeerImage> const &peers);
-        auto Get() { return shared_from_this(); }
-        size_t GetApplicationPort() const;
-        bencode::Node const &GetChunkHashes() const;
-        bittorrent::Bitfield &GetOwnerBitfield() { return bitfield_; }
-        std::string GetInfoHash() const;
-        size_t GetTotalPiecesCount() const;
-        const uint8_t *GetHandshake() const;
-        void request_block(uint32_t index, uint32_t begin, uint32_t length);
 
         void Subscribe(const std::shared_ptr<network::PeerClient> &new_sub);
+
         void Unsubscribe(IP unsub_ip);
+
+        void RequestBlock(uint32_t index, uint32_t begin, uint32_t length);
+
+        auto Get() { return shared_from_this(); }
+
+        bittorrent::Torrent GetTorrent();
+
+        std::string GetInfoHash() const;
+
+        size_t GetApplicationPort() const;
+
+        size_t GetTotalPiecesCount() const;
+
+        const uint8_t *GetHandshake() const;
+
+        bencode::Node const &GetChunkHashes() const;
+
+        bittorrent::Bitfield &GetOwnerBitfield() { return bitfield_; }
 
     private:
         void MakeHandshake();
+
         uint8_t handshake_message[bittorrent_constants::handshake_length]{};
 
         friend class bittorrent::Torrent;
         bittorrent::Torrent &torrent;
 
         std::mutex mut_;
+
         std::map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
     };
 } // namespace bittorrent

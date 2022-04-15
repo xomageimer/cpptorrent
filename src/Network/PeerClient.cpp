@@ -82,7 +82,7 @@ void network::PeerClient::try_again_connect() {
 
 void network::PeerClient::StartConnection() {
     auto self = Get();
-    post (socket_.get_executor(), [this, self]{
+    post(socket_.get_executor(), [this, self] {
         if (socket_.is_open()) {
             do_verify();
         } else {
@@ -136,10 +136,13 @@ void network::PeerClient::do_connect(ba::ip::tcp::resolver::iterator endpoint) {
                                 if ((!ec || ec == ba::error::eof) && bytes_transferred >= 68 && buff.data()[0] == 0x13 &&
                                     memcmp(&buff.data()[1], "BitTorrent protocol", 19) == 0 &&
                                     memcmp(&buff.data()[28], &master_peer_.GetHandshake()[28], 20) == 0) {
+                                    GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
 
                                     LOG(GetStrIP(), " was connected!");
 
-                                    GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
+                                    send_interested();
+                                    send_bitfield();
+
                                     drop_timeout();
                                     do_read_header();
                                 } else {
@@ -249,7 +252,7 @@ void network::PeerClient::do_read_body() {
                         }
                         status_ &= ~peer_choking;
 
-                        // TODO запросить необходимые куски!
+                        try_to_request_piece();
 
                         break;
                     case bittorrent::MESSAGE_TYPE::interested:
@@ -283,8 +286,10 @@ void network::PeerClient::do_read_body() {
                             Disconnect();
                             break;
                         }
-
                         GetPeerBitfield().Set(i);
+
+                        try_to_request_piece();
+
                         break;
                     }
                     case bittorrent::MESSAGE_TYPE::bitfield:
@@ -307,7 +312,7 @@ void network::PeerClient::do_read_body() {
                         }
 
                         if (GetPeerBitfield().Popcount() != TotalPiecesCount()) {
-                            // TODO тогда запросить еще куски
+                            try_to_request_piece();
                         }
 
                         break;
@@ -337,6 +342,8 @@ void network::PeerClient::do_read_body() {
                             Disconnect();
                         }
 
+
+
                         break;
                     case bittorrent::MESSAGE_TYPE::piece_block:
 
@@ -361,8 +368,14 @@ void network::PeerClient::do_read_body() {
         });
 }
 
-void network::PeerClient::send_unchoke() {}
-
 void network::PeerClient::request_piece(size_t piece_index) {}
-
 void network::PeerClient::cancel_piece(size_t piece_index) {}
+
+void network::PeerClient::send_interested() {}
+void network::PeerClient::send_choke() {}
+void network::PeerClient::send_unchoke() {}
+void network::PeerClient::send_bitfield() {}
+void network::PeerClient::send_have() {}
+void network::PeerClient::send_request() {}
+void network::PeerClient::send_piece() {}
+void network::PeerClient::try_to_request_piece() {}

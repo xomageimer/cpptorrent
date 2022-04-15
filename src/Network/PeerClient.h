@@ -36,19 +36,29 @@ namespace network {
     public:
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
+
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr);
+
         ~PeerClient();
 
         void StartConnection();
 
         std::string GetStrIP() const;
+
         auto Get() { return shared_from_this(); }
+
         const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
+
         bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
+
         size_t TotalPiecesCount() { return master_peer_.GetTotalPiecesCount(); }
+
         bool IsClientChoked() const { return status_ & am_choking; }
+
         bool IsRemoteChoked() const { return status_ & peer_choking; }
+
         bool IsClientInterested() const { return status_ & am_interested; }
+
         bool IsRemoteInterested() const { return status_ & peer_interested; }
 
         void Disconnect();
@@ -57,16 +67,23 @@ namespace network {
 
     private:
         void do_resolve();
+
         void do_connect(ba::ip::tcp::resolver::iterator endpoint);
+
         void do_verify();
 
         void try_again_connect();
+
         void deadline();
+
         void drop_timeout();
 
         template <typename Function> void do_send_message(Function &&callback);
+
         template <typename Function> void send(std::string binstring, Function &&callback);
+
         void do_read_header();
+
         void do_read_body();
 
         mutable std::string cash_ip_;
@@ -76,17 +93,36 @@ namespace network {
 
         ba::deadline_timer timeout_;
         bool is_disconnected = false;
+        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
+
+        void send_interested();
+
+        void send_choke();
 
         void send_unchoke();
+
+        void send_bitfield();
+
+        void send_have();
+
+        void send_request();
+
+        void send_piece();
+
+        void try_to_request_piece();
+
         void request_piece(size_t piece_index);
+
         void cancel_piece(size_t piece_index);
 
         bittorrent::MasterPeer &master_peer_;
+
         bittorrent::Peer slave_peer_;
+
         bittorrent::Message buff{};
+
         std::deque<bittorrent::Message> message_queue_;
 
-        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
 
         // TODO задать битовое поле из торрент структуры

@@ -27,6 +27,7 @@ private:
         T full;
         unsigned char u8[sizeof(T)];
     } dest;
+
     static inline const bool is_native_are_little = is_little_endian();
 
 public:

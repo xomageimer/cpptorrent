@@ -81,4 +81,9 @@ size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
     return torrent.GetPieceCount();
 }
 
-void bittorrent::MasterPeer::request_block(uint32_t index, uint32_t begin, uint32_t length) {}
+bittorrent::Torrent bittorrent::MasterPeer::GetTorrent() {
+    return torrent;
+}
+
+void bittorrent::MasterPeer::RequestBlock(uint32_t index, uint32_t begin, uint32_t length) {}
+

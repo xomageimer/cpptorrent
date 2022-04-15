@@ -8,16 +8,21 @@
 namespace bittorrent {
     struct Block {
         size_t size = 0;
-        uint8_t * data = nullptr;
+
+        uint8_t *data = nullptr;
 
         explicit Block() = default;
-        ~Block() { delete [] data; }
+
+        ~Block() { delete[] data; }
     };
+
     struct Piece {
         std::vector<Block> blocks;
 
         size_t current_block;
+
         size_t blocks_count;
+
         size_t index;
     };
 } // namespace bittorrent

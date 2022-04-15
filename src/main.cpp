@@ -15,15 +15,15 @@ int main()
 #endif
     LOG("Start");
     auto start = std::chrono::steady_clock::now();
+    std::vector<std::thread> threads(std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() - 1 : 1);
     boost::asio::io_service service;
     boost::asio::io_service::work worker(service);
 
     auto listener = std::make_shared<network::Listener>(boost::asio::make_strand(service));
 
-    std::thread t1 ([&] {service.run();});
-    std::thread t2 ([&] {service.run();});
-    std::thread t3 ([&] {service.run();});
-    std::thread t4 ([&] {service.run();});
+    for (auto & thread : threads) {
+        thread = std::thread([&]{ service.run(); });
+    }
 
     auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
@@ -51,10 +51,9 @@ int main()
     std::cin >> c;
     service.stop();
 
-    t1.join();
-    t2.join();
-    t3.join();
-    t4.join();
+    for (auto & thread : threads) {
+        thread.join();
+    }
 
     std::cout << "gonna die" << std::endl;
 
