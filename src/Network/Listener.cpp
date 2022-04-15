@@ -1,6 +1,6 @@
 #include "Listener.h"
 
-void network::Listener::participant::Verify() {
+void network::participant::Verify() {
     LOG("Listener"
         " : ",
         __FUNCTION__);

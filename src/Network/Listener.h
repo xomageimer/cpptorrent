@@ -58,6 +58,8 @@ namespace network {
 
         void do_accept();
 
+        friend struct participant;
+
         std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents;
 
         size_t port_ = bittorrent_constants::begin_port;
