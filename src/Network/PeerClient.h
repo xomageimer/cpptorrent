@@ -49,13 +49,13 @@ namespace network {
 
         auto Get() { return shared_from_this(); }
 
-        const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
-
         bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
 
         bittorrent::Torrent &GetTorrent() { return master_peer_.GetTorrent(); }
 
-        size_t TotalPiecesCount() { return master_peer_.GetTotalPiecesCount(); }
+        const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
+
+        size_t TotalPiecesCount() const { return master_peer_.GetTotalPiecesCount(); }
 
         const bittorrent::Bitfield &GetOwnerBitfield() const { return master_peer_.GetBitfield(); }
 
@@ -131,7 +131,8 @@ namespace network {
 
         bittorrent::Peer slave_peer_;
 
-        bittorrent::Message buff{};
+        // TODO сделать отдельно сетевой интерфейс в виде сокета
+        bittorrent::PeerMessage buff{};
 
         std::deque<bittorrent::Message> message_queue_;
 
@@ -145,7 +146,7 @@ namespace network {
 
         post(socket_.get_executor(), [this, self, msg, callback]() {
             bool write_in_progress = !message_queue_.empty();
-            auto new_msgs = bittorrent::MakeMessage(msg);
+            auto new_msgs = bittorrent::MakePeerMessage(msg);
             message_queue_.push_back(new_msgs);
             if (!write_in_progress) {
                 do_send_message(callback);

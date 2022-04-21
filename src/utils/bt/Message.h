@@ -12,7 +12,45 @@
 #include "constants.h"
 
 namespace bittorrent {
-    enum MESSAGE_TYPE : uint8_t {
+    enum ByteOrder {
+        BigEndian,
+        LittleEndian
+    };
+
+    struct Message {
+    public:
+        static const inline size_t max_body_length = bittorrent_constants::MTU;
+
+        Message() : body_length_(0), pos_(0) {}
+
+        Message(const Message &other) = default;
+
+        virtual uint8_t * ReleaseData() { auto release_data = data_; data_ = nullptr; return data_;}
+
+        [[nodiscard]] const uint8_t *GetDataPointer() const { return data_; }
+
+        uint8_t *GetDataPointer() { return data_; }
+
+        [[nodiscard]] virtual const uint8_t *Body() const { return data_; }
+
+        virtual uint8_t *Body() { return data_; }
+
+        [[nodiscard]] virtual std::size_t TotalLength() const { return body_length_; }
+
+        [[nodiscard]] std::size_t BodyLength() const { return body_length_; }
+
+        virtual void Resize(std::size_t new_length);
+
+        virtual void Reset(std::size_t length);
+
+    protected:
+        uint8_t *data_{};
+        size_t body_length_{};
+        size_t pos_{};
+        ByteOrder order = ByteOrder::BigEndian;
+    };
+
+    enum PEER_MESSAGE_TYPE : uint8_t {
         choke = 0,
         unchoke = 1,
         interested = 2,
@@ -24,49 +62,39 @@ namespace bittorrent {
         cancel = 8,
         port = 9
     };
-    // TODO сделать другой message, а этот унаследовать от него и модифицировать под bittorrent!
-    struct Message {
+
+    struct PeerMessage : public Message {
     public:
-        static const inline int max_body_length = bittorrent_constants::MTU;
+        static const inline size_t max_body_length = bittorrent_constants::most_request_size;
 
-        static const inline int header_length = 4;
+        static const inline size_t header_length = 4;
 
-        static const inline int id_length = 1;
+        static const inline size_t id_length = 1;
 
-        Message() : body_length_() {}
+        PeerMessage() : Message() { data_ = new uint8_t[header_length]; }
 
-        Message(const Message &other) = default;
+        uint8_t * ReleaseData() override { auto release_data = data_; data_ = nullptr; return data_;}
 
-        [[nodiscard]] inline const uint8_t *data() const { return data_; }
+        [[nodiscard]] inline std::size_t TotalLength() const override { return header_length + body_length_; }
 
-        inline uint8_t *data() { return data_; }
+        [[nodiscard]] const uint8_t *Body() const override { return data_ + header_length + id_length; }
 
-        [[nodiscard]] inline std::size_t length() const { return header_length + body_length_; }
+        uint8_t *Body() override { return data_ + header_length + id_length; }
 
-        [[nodiscard]] const uint8_t *body() const { return data_ + header_length + id_length; }
+        void Resize(std::size_t new_length) override { Message::Resize(new_length + header_length + id_length); }
 
-        uint8_t *body() { return data_ + header_length + id_length; }
+        void Reset(std::size_t length) override { Message::Reset(header_length + id_length + body_length_); }
 
-        [[nodiscard]] std::size_t body_length() const { return body_length_; }
+        void SetMessageType(PEER_MESSAGE_TYPE type) { GetDataPointer()[header_length] = uint8_t(type); }
 
-        void body_length(std::size_t new_length) {
-            body_length_ = new_length;
-            if (body_length_ > max_body_length) body_length_ = max_body_length;
-        }
+        [[nodiscard]] PEER_MESSAGE_TYPE GetMessageType() const { return PEER_MESSAGE_TYPE{GetDataPointer()[header_length]}; }
 
-        [[nodiscard]] MESSAGE_TYPE GetMessageType() const { return MESSAGE_TYPE{data()[header_length]}; }
+        void EncodeHeader();
 
-        void encode_header();
-
-        void decode_header();
-
-    private:
-        uint8_t data_[header_length + id_length + max_body_length]{};
-
-        size_t body_length_{};
+        void DecodeHeader();
     };
 
-    Message MakeMessage(const std::string &msg);
+    PeerMessage MakePeerMessage(const std::string &msg);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_MESSAGE_H

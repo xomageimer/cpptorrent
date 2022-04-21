@@ -63,6 +63,27 @@ int IpToInt(const std::string &ip_address) {
     return 0;
 }
 
+std::string IpToStr(size_t ip) {
+    std::vector<uint8_t> ip_address;
+    while (ip) {
+        ip_address.push_back(ip & 255);
+        ip >>= 8;
+    }
+    std::reverse(ip_address.begin(), ip_address.end());
+
+    std::string ip_address_str;
+    bool is_first = true;
+    for (auto &el : ip_address) {
+        if (!is_first) {
+            ip_address_str += '.';
+        }
+        is_first = false;
+        ip_address_str += std::to_string(el);
+    }
+    
+    return std::move(ip_address_str);
+}
+
 std::string BytesToHumanReadable(uint32_t bytes) {
     if (bytes < 1024 )
         return std::to_string(bytes) + " B";
@@ -76,9 +97,11 @@ std::string BytesToHumanReadable(uint32_t bytes) {
 
     return os.str();
 }
+
 long double BytesToGiga(long long bytes) {
     return static_cast<long double>(bytes) / powf(1024.f, 3);
 }
+
 unsigned long long GigaToBytes(long double gigabytes) {
     return gigabytes * powf(1024.f, 3);
 }

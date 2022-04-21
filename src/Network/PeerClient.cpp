@@ -21,26 +21,7 @@ network::PeerClient::PeerClient(
 
 std::string network::PeerClient::GetStrIP() const {
     if (!cash_ip_.empty()) return cash_ip_;
-
-    size_t ip = slave_peer_.GetIP();
-    std::vector<uint8_t> ip_address;
-    while (ip) {
-        ip_address.push_back(ip & 255);
-        ip >>= 8;
-    }
-    std::reverse(ip_address.begin(), ip_address.end());
-
-    std::string ip_address_str;
-    bool is_first = true;
-    for (auto &el : ip_address) {
-        if (!is_first) {
-            ip_address_str += '.';
-        }
-        is_first = false;
-        ip_address_str += std::to_string(el);
-    }
-
-    cash_ip_ = ip_address_str;
+    cash_ip_ = IpToStr(slave_peer_.GetIP());
     return cash_ip_;
 }
 
@@ -209,11 +190,11 @@ void network::PeerClient::do_read_header() {
     LOG("trying to read message");
     auto self = Get();
 
-    ba::async_read(socket_, ba::buffer(buff.data(), bittorrent::Message::header_length),
+    ba::async_read(socket_, ba::buffer(buff.data(), bittorrent::PeerMessage::header_length),
         [this, self](boost::system::error_code ec, std::size_t length) {
-            if (!ec || length < bittorrent::Message::header_length) {
+            if (!ec || length < bittorrent::PeerMessage::header_length) {
                 drop_timeout();
-                buff.decode_header();
+                buff.DecodeHeader();
 
                 if (!buff.body_length()) {
                     LOG("Keep-alive message");
@@ -230,7 +211,7 @@ void network::PeerClient::do_read_body() {
     LOG("trying to read payload of message");
 
     auto self = Get();
-    ba::async_read(socket_, ba::buffer(buff.body(), bittorrent::Message::id_length + buff.body_length()),
+    ba::async_read(socket_, ba::buffer(buff.body(), bittorrent::PeerMessage::id_length + buff.body_length()),
         [this, self](boost::system::error_code ec, std::size_t /*length*/) {
             if (!ec) {
                 auto message_type = buff.GetMessageType();

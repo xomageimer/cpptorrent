@@ -10,12 +10,13 @@
 std::string GetSHA1(const std::string &p_arg);
 std::string UrlEncode(std::string const &url_to_encode);
 int IpToInt(std::string const &ip_address);
+std::string IpToStr(size_t ip);
 
 std::string BytesToHumanReadable(uint32_t bytes);
 double long BytesToGiga(long long bytes);
 unsigned long long GigaToBytes(long double gigabytes);
 
-// TODO сделать специальный message кт и будет отправляться и котоырй будет определять порядок байт при конструировании, например: \
+// TODO сделать специальный message кт и будет отправляться и который будет определять порядок байт при конструировании, например: \
     OutputMessage out(ByteOrder::BigEndian, 17);
 bool is_little_endian();
 // TODO мб неудачное название! + переделать по виду функций типа ReadBE(...) / WriteLE(...) и тп.

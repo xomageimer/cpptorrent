@@ -84,4 +84,3 @@ size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
 bittorrent::Torrent & bittorrent::MasterPeer::GetTorrent() {
     return torrent;
 }
-

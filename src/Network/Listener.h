@@ -38,6 +38,7 @@ namespace network {
 
         Listener &listener_;
 
+        // TODO заменить на message
         uint8_t buff[bittorrent_constants::handshake_length];
 
         ba::deadline_timer timeout_;
