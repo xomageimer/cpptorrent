@@ -135,12 +135,32 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
     master_peer->InitiateJob(GetService(), GetResponse().peers);
 }
 
+void bittorrent::Torrent::ReceivePieceBlock(uint32_t idx, uint32_t begin, Block block) {
+    uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
+    file_manager->SetPieceBlock(idx, blockIndex, std::move(block));
+}
+
+bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
+    return bittorrent::Query{.event = bittorrent::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left, .compact = true};
+}
+
+boost::asio::io_service &bittorrent::Torrent::GetService() const {
+    return service;
+}
+
+const bittorrent::Response &bittorrent::Torrent::GetResponse() const {
+    if (!data_from_tracker) {
+        throw std::logic_error("Trackers have not yet been polled");
+    }
+    return *data_from_tracker;
+}
+
 bool bittorrent::Torrent::FillTrackers() {
     std::vector<std::shared_ptr<bittorrent::Tracker>> trackers;
     auto make_tracker = [&](const std::string &announce_url) {
         trackers.emplace_back(std::make_shared<bittorrent::Tracker>(
-                announce_url,
-                *this));
+            announce_url,
+            *this));
     };
 
     try {
@@ -167,23 +187,4 @@ bool bittorrent::Torrent::FillTrackers() {
     std::shuffle(trackers.begin(), trackers.end(), random_generator::Random());
     active_trackers.insert(active_trackers.end(), std::make_move_iterator(trackers.begin()), std::make_move_iterator(trackers.end()));
     return true;
-}
-
-bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
-    return bittorrent::Query{.event = bittorrent::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left, .compact = true};
-}
-
-boost::asio::io_service &bittorrent::Torrent::GetService() const {
-    return service;
-}
-
-const bittorrent::Response &bittorrent::Torrent::GetResponse() const {
-    if (!data_from_tracker) {
-        throw std::logic_error("Trackers have not yet been polled");
-    }
-    return *data_from_tracker;
-}
-
-void bittorrent::Torrent::RequestBlock(uint32_t index, uint32_t begin, uint32_t length) {
-
 }

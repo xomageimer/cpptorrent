@@ -4,10 +4,11 @@
 #include "bt/Bitfield.h"
 #include "bt/Piece.h"
 
-#include <queue>
+#include <vector>
 #include <unordered_map>
 #include <fstream>
 #include <filesystem>
+#include <mutex>
 
 // TODO структура отвечает за правильную обработку файлов торрента
 namespace bittorrent {
@@ -26,15 +27,21 @@ namespace bittorrent {
 
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB; }; // GigaBytes
 
+        void SetPieceBlock(uint32_t piece_idx, uint32_t index, Block block);
+
+        [[nodiscard]] bool PieceDone(uint32_t index) const;
+
     private:
         void fill_files();
 
         Torrent &torrent_;
 
-        // TODO мб queue не подойдет
-        std::queue<std::pair<size_t, Piece>> pieces; // TODO не должно хранить все pieces
+        std::mutex pieces_lock;
+        std::map<size_t, Piece> active_pieces;
 
-        long long last_piece_size{};
+        size_t piece_size {};
+
+        size_t last_piece_size{};
 
         const std::filesystem::path path_to_download;
 

@@ -17,6 +17,7 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
 
 void bittorrent::TorrentFilesManager::fill_files() {
     auto file_info = torrent_.GetMeta()["info"];
+    piece_size = file_info["piece length"].AsNumber();
     if (file_info.TryAt("length")) {
         auto bytes_size = file_info["length"].AsNumber();
         total_size_GB = BytesToGiga(bytes_size);
@@ -54,4 +55,19 @@ void bittorrent::TorrentFilesManager::fill_files() {
         }
         last_piece_size = cur_piece_begin;
     }
+}
+
+void bittorrent::TorrentFilesManager::SetPieceBlock(uint32_t piece_idx, uint32_t index, Block block) {
+    std::lock_guard lk(pieces_lock); // TODO мб мьютекс должен быть у каждого piece
+    auto & piece = active_pieces[piece_idx];
+    piece.blocks[index] = std::move(block);
+    ++piece.current_block;
+    if (piece.current_block == piece.block_count){
+        // TODO записываем его в файл и удаляем из active_pieces
+    }
+}
+
+
+bool bittorrent::TorrentFilesManager::PieceDone(uint32_t index) const {
+    return bitset_.Test(index);
 }

@@ -2,7 +2,7 @@
 #define CPPTORRENT_PEER_H
 
 #include <cctype>
-#include <set>
+#include <unordered_map>
 #include <string>
 
 #include <boost/asio.hpp>
@@ -72,11 +72,9 @@ namespace bittorrent {
 
         void Unsubscribe(IP unsub_ip);
 
-        void RequestBlock(uint32_t index, uint32_t begin, uint32_t length);
-
         auto Get() { return shared_from_this(); }
 
-        bittorrent::Torrent GetTorrent();
+        bittorrent::Torrent & GetTorrent();
 
         std::string GetInfoHash() const;
 
@@ -88,8 +86,6 @@ namespace bittorrent {
 
         bencode::Node const &GetChunkHashes() const;
 
-        bittorrent::Bitfield &GetOwnerBitfield() { return bitfield_; }
-
     private:
         void MakeHandshake();
 
@@ -100,7 +96,7 @@ namespace bittorrent {
 
         std::mutex mut_;
 
-        std::map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
+        std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
     };
 } // namespace bittorrent
 

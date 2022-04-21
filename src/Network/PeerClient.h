@@ -25,6 +25,8 @@
 
 namespace ba = boost::asio;
 
+// TODO вынести основную часть сети куда-нибудь отдельно и наследоваться от нее
+
 namespace network {
     enum STATE : uint8_t {
         am_choking = 0b0001,     // this client is choking the peer
@@ -51,7 +53,11 @@ namespace network {
 
         bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
 
+        bittorrent::Torrent &GetTorrent() { return master_peer_.GetTorrent(); }
+
         size_t TotalPiecesCount() { return master_peer_.GetTotalPiecesCount(); }
+
+        const bittorrent::Bitfield &GetOwnerBitfield() const { return master_peer_.GetBitfield(); }
 
         bool IsClientChoked() const { return status_ & am_choking; }
 
@@ -60,6 +66,8 @@ namespace network {
         bool IsClientInterested() const { return status_ & am_interested; }
 
         bool IsRemoteInterested() const { return status_ & peer_interested; }
+
+        bool IsClientRequested(uint32_t idx) const {}
 
         void Disconnect();
 
@@ -95,25 +103,29 @@ namespace network {
         bool is_disconnected = false;
         size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
-        void send_interested();
+        void try_to_request_piece();
+
+        void receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block);
 
         void send_choke();
 
         void send_unchoke();
 
-        void send_bitfield();
+        void send_interested();
+
+        void send_not_interested();
 
         void send_have();
 
-        void send_request();
+        void send_bitfield();
 
-        void send_piece();
+        void send_request(size_t piece_request_index);
 
-        void try_to_request_piece();
+        void send_piece(uint32_t pieceIdx, uint32_t offset, uint32_t length);
 
-        void request_piece(size_t piece_index);
+        void send_cancel(size_t piece_index);
 
-        void cancel_piece(size_t piece_index);
+        void send_port(size_t port);
 
         bittorrent::MasterPeer &master_peer_;
 
@@ -129,7 +141,6 @@ namespace network {
     };
 
     template <typename Function> void PeerClient::SendPeerMessage(std::string const &msg, Function &&callback) {
-        drop_timeout();
         auto self = Get();
 
         post(socket_.get_executor(), [this, self, msg, callback]() {
@@ -157,7 +168,6 @@ namespace network {
     }
 
     template <typename Function> void PeerClient::send(std::string binstring, Function &&callback) {
-        drop_timeout();
         auto self = Get();
 
         // TODO попытки отправки при исчерпании которых соединение закрывается

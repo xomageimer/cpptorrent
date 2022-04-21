@@ -24,7 +24,7 @@ namespace bittorrent {
         cancel = 8,
         port = 9
     };
-    // TODO сделать другой message, а этот унаследовать от него!
+    // TODO сделать другой message, а этот унаследовать от него и модифицировать под bittorrent!
     struct Message {
     public:
         static const inline int max_body_length = bittorrent_constants::MTU;
@@ -54,7 +54,7 @@ namespace bittorrent {
             if (body_length_ > max_body_length) body_length_ = max_body_length;
         }
 
-        [[nodiscard]] MESSAGE_TYPE GetMessageType() const { return MESSAGE_TYPE{data()[header_length + 1]}; }
+        [[nodiscard]] MESSAGE_TYPE GetMessageType() const { return MESSAGE_TYPE{data()[header_length]}; }
 
         void encode_header();
 

@@ -39,7 +39,11 @@ namespace bittorrent {
 
         void StartCommunicatingPeers();
 
-        void RequestBlock(uint32_t index, uint32_t begin, uint32_t length);
+        void ReceivePieceBlock(uint32_t idx, uint32_t begin, Block block);
+
+        bool IsPieceCompleted(uint32_t idx);
+
+        [[nodiscard]] bool PieceDone(uint32_t idx) const { return file_manager->PieceDone(idx); };
 
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info.info_hash; }
 
