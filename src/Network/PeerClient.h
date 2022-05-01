@@ -13,6 +13,7 @@
 
 #include "NetExceptions.h"
 
+#include "Primitives/Socket.h"
 #include "Peer.h"
 
 #include "bt/Message.h"
@@ -34,7 +35,8 @@ namespace network {
         peer_choking = 0b0100,   // peer is choking this client
         peer_interested = 0b1000 // peer is interested in this client
     };
-    struct PeerClient : public std::enable_shared_from_this<PeerClient> {
+    // TODO переписать с использованием сокета
+    struct PeerClient : public TCPSocket {
     public:
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
@@ -46,8 +48,6 @@ namespace network {
         void StartConnection();
 
         std::string GetStrIP() const;
-
-        auto Get() { return shared_from_this(); }
 
         bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
 
@@ -71,41 +71,36 @@ namespace network {
 
         void Disconnect();
 
-        template <typename Function> void SendPeerMessage(std::string const &msg, Function &&callback);
-
     private:
-        void do_resolve();
+        bool check_handshake(bittorrent::Message msg) const;
 
-        void do_connect(ba::ip::tcp::resolver::iterator endpoint);
+        void verify_handshake();
 
-        void do_verify();
+        void access();
 
         void try_again_connect();
 
-        void deadline();
-
         void drop_timeout();
-
-        template <typename Function> void do_send_message(Function &&callback);
-
-        template <typename Function> void send(std::string binstring, Function &&callback);
 
         void do_read_header();
 
         void do_read_body();
 
+        void handle_response();
+
+        void error_callback(const std::string & err);
+
         mutable std::string cash_ip_;
 
-        ba::ip::tcp::socket socket_;
-        ba::ip::tcp::resolver resolver_;
-
-        ba::deadline_timer timeout_;
         bool is_disconnected = false;
+
         size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
         void try_to_request_piece();
 
         void receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block);
+
+        void send_handshake();
 
         void send_choke();
 
@@ -132,52 +127,12 @@ namespace network {
         bittorrent::Peer slave_peer_;
 
         // TODO сделать отдельно сетевой интерфейс в виде сокета
-        bittorrent::PeerMessage buff{};
-
-        std::deque<bittorrent::Message> message_queue_;
+        bittorrent::PeerMessage msg_{};
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
 
         // TODO задать битовое поле из торрент структуры
     };
-
-    template <typename Function> void PeerClient::SendPeerMessage(std::string const &msg, Function &&callback) {
-        auto self = Get();
-
-        post(socket_.get_executor(), [this, self, msg, callback]() {
-            bool write_in_progress = !message_queue_.empty();
-            auto new_msgs = bittorrent::MakePeerMessage(msg);
-            message_queue_.push_back(new_msgs);
-            if (!write_in_progress) {
-                do_send_message(callback);
-            }
-        });
-    }
-
-    template <typename Function> void PeerClient::do_send_message(Function &&callback) {
-        auto self = Get();
-
-        send(std::string(reinterpret_cast<const char *>(message_queue_.front().data()), message_queue_.front().length()),
-            [this, self, callback]() {
-                message_queue_.pop_front();
-                if (!message_queue_.empty()) {
-                    do_send_message(callback);
-                } else {
-                    callback();
-                }
-            });
-    }
-
-    template <typename Function> void PeerClient::send(std::string binstring, Function &&callback) {
-        auto self = Get();
-
-        // TODO попытки отправки при исчерпании которых соединение закрывается
-        ba::async_write(socket_, ba::buffer(binstring), [this, self, callback](boost::system::error_code ec, std::size_t /*length*/) {
-            if (!ec) {
-                callback();
-            }
-        });
-    }
 } // namespace network
 
 #endif // CPPTORRENT_PEERCLIENT_H

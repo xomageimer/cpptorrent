@@ -26,6 +26,7 @@ add_library(helpers SHARED src/utils/constants.h
         src/utils/bt/Bitfield.h src/utils/bt/Bitfield.cpp
         src/utils/bt/Piece.h src/utils/bt/Piece.cpp)
 add_library(bittorrent STATIC
+        src/Network/Primitives/Socket.h
         src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
         src/Network/PeerClient.h src/Network/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
 

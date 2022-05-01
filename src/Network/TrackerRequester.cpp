@@ -53,9 +53,9 @@ void network::httpRequester::SetResponse() {
             std::string bin = std::string(std::begin(peer), std::end(peer)); // raw data from tracker
 
             /* ip as little endian */
-            uint32_t ip = SwapEndian(*(uint32_t *)&peer[0]);
+            uint32_t ip = BigToNative(*(uint32_t *)&peer[0]);
             /* port as little endian */
-            uint16_t port = SwapEndian(*(uint16_t *)&peer[4]);
+            uint16_t port = BigToNative(*(uint16_t *)&peer[4]);
 
             bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
             resp.peers.push_back(std::move(pi));
@@ -69,8 +69,8 @@ void network::httpRequester::SetResponse() {
             ValueToArray(p["port"].AsNumber(), reinterpret_cast<uint8_t *>(&peer_as_array[4]));
 
             /* port and peer id as little endian */
-            uint32_t ip = SwapEndian(p["ip"].AsNumber());
-            uint16_t port = SwapEndian(p["port"].AsNumber());
+            uint32_t ip = BigToNative(p["ip"].AsNumber());
+            uint16_t port = BigToNative(p["port"].AsNumber());
 
             if (p.TryAt("peer id")) {
                 const char *key = p["peer id"].AsString().data();
@@ -244,7 +244,7 @@ void network::udpRequester::SetResponse() {
 
     bittorrent::Response resp;
 
-    resp.interval = std::chrono::seconds(as_big_endian<uint32_t>(&response[8]).AsValue());
+    resp.interval = std::chrono::seconds(NativeToBig(ArrayToValue<uint32_t>(&response[8])));
 
     for (size_t i = 20; response[i] != (uint8_t)'\0'; i += 6) {
         uint8_t peer[6];
@@ -254,9 +254,9 @@ void network::udpRequester::SetResponse() {
         std::string bin = std::string(std::begin(peer), std::end(peer)); // raw data from tracker
 
         /* ip as little endian */
-        uint32_t ip = SwapEndian(*(uint32_t *)&peer[0]);
+        uint32_t ip = BigToNative(*(uint32_t *)&peer[0]);
         /* port as little endian */
-        uint16_t port = SwapEndian(*(uint16_t *)&peer[4]);
+        uint16_t port = BigToNative(*(uint16_t *)&peer[4]);
 
         bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
         resp.peers.push_back(std::move(pi));
@@ -427,12 +427,12 @@ void network::udpRequester::do_announce_response() {
             uint32_t val;
             std::memcpy(&val, &response[4], sizeof(connect_response::transaction_id));
 
-            uint32_t action = as_big_endian<uint32_t>(&response[0]).AsValue();
+            uint32_t action = NativeToBig(ArrayToValue<uint32_t>(&response[0]));
 
             LOG(tracker_.GetUrl().Host, " : ", "\n!ec: ", (bool)!ec, "\nbytes_transferred: ", std::dec, bytes_transferred,
                 "\nval == c_resp.transaction_id.value(): ", (val == c_resp.transaction_id),
-                "\nresponse[0] != 0: ", (as_big_endian<uint32_t>(&response[0]).AsValue() != 0), "\nresponse[0] = ", std::hex,
-                as_big_endian<uint32_t>(&response[0]).AsValue());
+                "\nresponse[0] != 0: ", (NativeToBig(ArrayToValue<uint32_t>(&response[0])) != 0), "\nresponse[0] = ", std::hex,
+                NativeToBig(ArrayToValue<uint32_t>(&response[0])));
 
             if (!ec && bytes_transferred >= 20 && val == c_resp.transaction_id && action == 1) {
                 announce_timeout_.cancel();
@@ -494,8 +494,8 @@ void network::udpRequester::UpdateEndpoint() {
 void network::udpRequester::make_connect_request() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    c_req.transaction_id = as_big_endian(static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>())).AsValue();
-    c_req.protocol_id = as_big_endian(static_cast<uint64_t>(0x41727101980)).AsValue();
+    c_req.transaction_id =  NativeToBig(static_cast<uint32_t>(random_generator::Random().GetNumber<size_t>()));
+    c_req.protocol_id = NativeToBig(static_cast<uint64_t>(0x41727101980));
 }
 
 void network::udpRequester::make_announce_request() {
@@ -504,13 +504,13 @@ void network::udpRequester::make_announce_request() {
     std::memcpy(&request[16], tracker_.GetInfoHash().c_str(), 20);
     std::memcpy(&request[36], tracker_.GetMasterPeerId(), 20);
 
-    as_big_endian((uint32_t)1).AsArray(&request[8]);
-    as_big_endian(query_.downloaded).AsArray(&request[56]);
-    as_big_endian(query_.left).AsArray(&request[64]);
-    as_big_endian(query_.uploaded).AsArray(&request[72]);
-    as_big_endian(static_cast<int>(query_.event)).AsArray(&request[80]);
-    as_big_endian((query_.ip ? IpToInt(query_.ip.value()) : 0)).AsArray(&request[84]);
-    as_big_endian((query_.key ? std::stoi(query_.key.value()) : 0)).AsArray(&request[88]);
-    as_big_endian<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)).AsArray(&request[92]);
-    as_big_endian((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)).AsArray(&request[96]);
+    ValueToArray(NativeToBig((uint32_t)1), &request[8]);
+    ValueToArray(NativeToBig(query_.downloaded), &request[56]);
+    ValueToArray(NativeToBig(query_.left), &request[64]);
+    ValueToArray(NativeToBig(query_.uploaded), &request[72]);
+    ValueToArray(NativeToBig(static_cast<int>(query_.event)), &request[80]);
+    ValueToArray(NativeToBig((query_.ip ? IpToInt(query_.ip.value()) : 0)), &request[84]);
+    ValueToArray(NativeToBig((query_.key ? std::stoi(query_.key.value()) : 0)), &request[88]);
+    ValueToArray(NativeToBig<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)), &request[92]);
+    ValueToArray(NativeToBig((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0)), &request[96]);
 }

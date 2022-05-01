@@ -16,11 +16,7 @@ std::string BytesToHumanReadable(uint32_t bytes);
 double long BytesToGiga(long long bytes);
 unsigned long long GigaToBytes(long double gigabytes);
 
-// TODO сделать специальный message кт и будет отправляться и который будет определять порядок байт при конструировании, например: \
-    OutputMessage out(ByteOrder::BigEndian, 17);
-bool is_little_endian();
-// TODO мб неудачное название! + переделать по виду функций типа ReadBE(...) / WriteLE(...) и тп.
-template <typename T> struct as_big_endian {
+template <typename T> struct endian_changer {
     static_assert(CHAR_BIT == bittorrent_constants::byte_size, "CHAR_BIT != 8");
 
 private:
@@ -29,31 +25,23 @@ private:
         unsigned char u8[sizeof(T)];
     } dest;
 
-    static inline const bool is_native_are_little = is_little_endian();
-
 public:
-    explicit as_big_endian(T u) {
+    explicit endian_changer(T u) {
         value_type source{};
         source.full = u;
 
         for (size_t k = 0; k < sizeof(T); k++) {
-            if (is_native_are_little)
-                dest.u8[k] = source.u8[sizeof(T) - k - 1];
-            else
-                dest.u8[k] = source.u8[k];
+            dest.u8[k] = source.u8[sizeof(T) - k - 1];
         }
     }
-    explicit as_big_endian(const unsigned char *u_arr) {
+    explicit endian_changer(const char *arr) {
         value_type source{};
         for (size_t k = 0; k < sizeof(T); k++) {
-            source.u8[k] = u_arr[k];
+            source.u8[k] = arr[k];
         }
 
         for (size_t k = 0; k < sizeof(T); k++) {
-            if (is_native_are_little)
-                dest.u8[k] = source.u8[sizeof(T) - k - 1];
-            else
-                dest.u8[k] = source.u8[k];
+            dest.u8[k] = source.u8[sizeof(T) - k - 1];
         }
     }
 
@@ -65,9 +53,33 @@ public:
     [[nodiscard]] T AsValue() const { return dest.full; }
 };
 
-template <typename T> T SwapEndian(T value) {
-    return as_big_endian(value).AsValue();
+bool is_little_endian();
+
+template <typename T> T BigToNative(T value) {
+    if (is_little_endian())
+        return endian_changer(value).AsValue();
+    else value;
 }
+
+template <typename T> T NativeToBig(T value) {
+    if (is_little_endian())
+        return endian_changer(value).AsValue();
+    else value;
+}
+
+template <typename T> T LittleToNative(T value) {
+    if (!is_little_endian())
+        return endian_changer(value).AsValue();
+    else value;
+}
+
+template <typename T> T NativeToLittle(T value) {
+    if (!is_little_endian())
+        return endian_changer(value).AsValue();
+    else value;
+}
+
+
 template <typename T> void ValueToArray(T value, uint8_t *arr) {
     while (value) {
         *arr = value % 10;
@@ -75,7 +87,8 @@ template <typename T> void ValueToArray(T value, uint8_t *arr) {
         value /= 10;
     }
 }
-template <typename T> T ArrayToValue(uint8_t *arr) {
+
+template <typename T> T ArrayToValue(const uint8_t *arr) {
     union value_type {
         T full;
         unsigned char u8[sizeof(T)];

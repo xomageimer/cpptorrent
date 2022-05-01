@@ -15,6 +15,7 @@
 
 #include "constants.h"
 
+#include "Primitives/Socket.h"
 #include "NetExceptions.h"
 #include "PeerClient.h"
 
@@ -68,6 +69,8 @@ namespace network {
         ba::ip::tcp::acceptor acceptor_;
 
         ba::ip::tcp::socket socket_;
+
+
     };
 } // namespace network
 
