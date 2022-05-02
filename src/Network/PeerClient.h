@@ -45,7 +45,7 @@ namespace network {
 
         ~PeerClient();
 
-        void StartConnection();
+        void Process();
 
         std::string GetStrIP() const;
 
@@ -72,7 +72,7 @@ namespace network {
         void Disconnect();
 
     private:
-        bool check_handshake(bittorrent::Message msg) const;
+        bool check_handshake(const bittorrent::Message& msg) const;
 
         void verify_handshake();
 

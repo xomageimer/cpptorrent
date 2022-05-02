@@ -15,6 +15,7 @@ network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &m
 network::PeerClient::PeerClient(
     const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
     : TCPSocket(std::move(socket)), master_peer_(*master_peer) {
+
     asio::ip::tcp::endpoint remote_ep = socket_.remote_endpoint();
     uint32_t ip_int = IpToInt(remote_ep.address().to_string());
     uint16_t port = remote_ep.port();
@@ -62,7 +63,7 @@ void network::PeerClient::try_again_connect() {
         Disconnect();
 }
 
-void network::PeerClient::StartConnection() {
+void network::PeerClient::Process() {
     if (socket_.is_open()) {
         Post([this] { verify_handshake(); });
     } else {
@@ -144,15 +145,15 @@ void network::PeerClient::verify_handshake() {
 
     if (check_handshake(std::move(DowngradeMsg(msg_)))) {
         Send(
-            {msg_.GetDataPointer(), bittorrent_constants::handshake_length}, [this](size_t) { access(); },
+            msg_, [this](size_t) { access(); },
             std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
     } else {
         Disconnect();
     }
 }
 
-bool network::PeerClient::check_handshake(bittorrent::Message msg) const {
-    if (msg_.GetDataPointer()[0] == 0x13 && memcmp(&msg_.GetDataPointer()[1], "BitTorrent protocol", 19) == 0) {
+bool network::PeerClient::check_handshake(const bittorrent::Message& msg) const {
+    if (msg.GetDataPointer()[0] == 0x13 && memcmp(&msg.GetDataPointer()[1], "BitTorrent protocol", 19) == 0) {
         return true;
     }
     return false;
@@ -172,13 +173,17 @@ void network::PeerClient::send_handshake() {
             Read(
                 bittorrent_constants::handshake_length,
                 [this](Data data) {
-                    LOG(GetStrIP(), " : correct message");
+                    LOG(GetStrIP(), " : correct answer");
 
                     bittorrent::Message hndshke(bittorrent_constants::handshake_length);
                     std::memcpy(hndshke.GetDataPointer(), data.data(), data.size());
 
+                    LOG (GetStrIP(), " : \"hndshke.BodyLength() >= bittorrent_constants::handshake_length\" == ", hndshke.BodyLength() >= bittorrent_constants::handshake_length);
+                    LOG (GetStrIP(), " : \"memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0\" == ", memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0);
+
                     if (hndshke.BodyLength() >= bittorrent_constants::handshake_length && check_handshake(hndshke)
                         && memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0) {
+                        LOG (GetStrIP(), " : correct verify");
                         access();
                     }
                 },

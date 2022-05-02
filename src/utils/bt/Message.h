@@ -47,6 +47,10 @@ namespace bittorrent {
 
         virtual uint8_t *ReleaseData();
 
+        operator Data() {
+            return {GetDataPointer(), TotalLength()};
+        }
+
         [[nodiscard]] const uint8_t *GetDataPointer() const { return data_; }
 
         uint8_t *GetDataPointer() { return data_; }
@@ -57,7 +61,7 @@ namespace bittorrent {
 
         void SetOrder(ByteOrder bo) { order_ = bo; }
 
-        ByteOrder GetOrder() const { return order_; }
+        [[nodiscard]] ByteOrder GetOrder() const { return order_; }
 
         virtual void Resize(std::size_t new_length);
 

@@ -8,8 +8,8 @@
 #include <boost/function_output_iterator.hpp>
 
 bool is_little_endian() {
-    int num = 1;
-    return (*reinterpret_cast<char *>(&num) == 1);
+    static bool is_little = [] {int num = 1; return (*reinterpret_cast<char *>(&num) == 1); }();
+    return is_little;
 }
 
 std::string GetSHA1(const std::string &p_arg) {

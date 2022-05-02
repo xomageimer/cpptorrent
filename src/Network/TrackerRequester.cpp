@@ -53,9 +53,9 @@ void network::httpRequester::SetResponse() {
             std::string bin = std::string(std::begin(peer), std::end(peer)); // raw data from tracker
 
             /* ip as little endian */
-            uint32_t ip = BigToNative(*(uint32_t *)&peer[0]);
+            uint32_t ip = BigToNative(ArrayToValue<uint32_t>(&peer[0]));
             /* port as little endian */
-            uint16_t port = BigToNative(*(uint16_t *)&peer[4]);
+            uint16_t port = BigToNative(ArrayToValue<uint16_t>(&peer[4]));
 
             bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
             resp.peers.push_back(std::move(pi));
@@ -254,9 +254,9 @@ void network::udpRequester::SetResponse() {
         std::string bin = std::string(std::begin(peer), std::end(peer)); // raw data from tracker
 
         /* ip as little endian */
-        uint32_t ip = BigToNative(*(uint32_t *)&peer[0]);
+        uint32_t ip = BigToNative(ArrayToValue<uint32_t>(&peer[0]));
         /* port as little endian */
-        uint16_t port = BigToNative(*(uint16_t *)&peer[4]);
+        uint16_t port = BigToNative(ArrayToValue<uint16_t>(&peer[4]));
 
         bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
         resp.peers.push_back(std::move(pi));

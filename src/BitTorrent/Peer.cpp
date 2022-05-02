@@ -52,7 +52,7 @@ void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient
     LOG(new_sub->GetStrIP(), " was subscribed!");
 
     auto it = peers_subscribers_.emplace(new_sub->GetPeerData().GetIP(), new_sub);
-    if (it.second) it.first->second->StartConnection();
+    if (it.second) it.first->second->Process();
 }
 
 void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {

@@ -58,34 +58,33 @@ bool is_little_endian();
 template <typename T> T BigToNative(T value) {
     if (is_little_endian())
         return endian_changer(value).AsValue();
-    else value;
+    else return value;
 }
 
 template <typename T> T NativeToBig(T value) {
     if (is_little_endian())
         return endian_changer(value).AsValue();
-    else value;
+    else return value;
 }
 
 template <typename T> T LittleToNative(T value) {
     if (!is_little_endian())
         return endian_changer(value).AsValue();
-    else value;
+    else return value;
 }
 
 template <typename T> T NativeToLittle(T value) {
     if (!is_little_endian())
         return endian_changer(value).AsValue();
-    else value;
+    else return value;
 }
 
-
 template <typename T> void ValueToArray(T value, uint8_t *arr) {
-    while (value) {
-        *arr = value % 10;
-        arr++;
-        value /= 10;
-    }
+    union value_type {
+        T full;
+        unsigned char u8[sizeof(T)];
+    } smart_value{value};
+    memcpy(arr, &smart_value.u8, sizeof(T));
 }
 
 template <typename T> T ArrayToValue(const uint8_t *arr) {
