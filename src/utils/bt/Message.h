@@ -45,11 +45,13 @@ namespace bittorrent {
 
         Message &operator=(Message &&other) noexcept;
 
+        virtual ~Message() { delete[] data_; }
+
         virtual uint8_t *ReleaseData();
 
-        operator Data() {
-            return {GetDataPointer(), TotalLength()};
-        }
+        void Add(const uint8_t * add_data, size_t size);
+
+        operator Data() { return {GetDataPointer(), TotalLength()}; }
 
         [[nodiscard]] const uint8_t *GetDataPointer() const { return data_; }
 
@@ -67,6 +69,10 @@ namespace bittorrent {
 
         virtual void Reset(std::size_t length);
 
+        bool Empty(){
+            return out_pos_ == TotalLength();
+        }
+
         template <typename T> Message &operator>>(T &value) {
             static_assert(std::is_integral_v<T>);
 
@@ -80,6 +86,22 @@ namespace bittorrent {
         }
 
         template <typename T> const Message &operator>>(T &value) const { return const_cast<Message &>(*this).template operator>>(value); }
+
+        std::string GetString() {
+            std::string value;
+            while (out_pos_ < body_length_ && (data_[out_pos_] != ' ' || data_[out_pos_] != '\n')) {
+                value.push_back(static_cast<char>(data_[out_pos_]));
+            }
+            return value;
+        }
+
+        std::string GetLine(){
+            std::string value;
+            while (out_pos_ < body_length_ && data_[out_pos_] != '\n') {
+                value.push_back(static_cast<char>(data_[out_pos_]));
+            }
+            return value;
+        }
 
         template <typename T> Message &operator<<(T &value) {
             static_assert(std::is_integral_v<T>);

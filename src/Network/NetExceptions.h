@@ -17,14 +17,6 @@ namespace network {
         explicit BadConnect(std::string arg) : exception(std::move(arg)){};
         [[nodiscard]] const char *what() const noexcept override { return exception.data(); }
     };
-
-    struct DriedUpSources : public boost::exception, public std::exception {
-    private:
-        std::string exception;
-    public:
-        explicit DriedUpSources(std::string arg) : exception(std::move(arg)){};
-        [[nodiscard]] const char *what() const noexcept override { return exception.data(); }
-    };
 } // namespace network
 
 #endif // CPPTORRENT_NETEXCEPTIONS_H

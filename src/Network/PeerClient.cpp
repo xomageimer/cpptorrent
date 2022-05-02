@@ -73,8 +73,8 @@ void network::PeerClient::Process() {
     }
 }
 
-void network::PeerClient::error_callback(const std::string &err) {
-    LOG(GetStrIP(), " get error : ", err);
+void network::PeerClient::error_callback(boost::system::error_code ec) {
+    LOG(GetStrIP(), " get error : ", ec.message());
     Disconnect();
 }
 
@@ -162,7 +162,7 @@ bool network::PeerClient::check_handshake(const bittorrent::Message& msg) const 
 void network::PeerClient::send_handshake() {
     LOG(GetStrIP(), " : send handshake");
 
-    auto failed_attempt = [this](const std::string &) {
+    auto failed_attempt = [this](boost::system::error_code ec) {
         LOG(GetStrIP(), " : try connect again");
         try_again_connect();
     };

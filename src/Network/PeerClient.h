@@ -88,7 +88,7 @@ namespace network {
 
         void handle_response();
 
-        void error_callback(const std::string & err);
+        void error_callback(boost::system::error_code ec);
 
         mutable std::string cash_ip_;
 

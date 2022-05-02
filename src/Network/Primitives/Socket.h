@@ -31,7 +31,7 @@ namespace network {
         using PromoteCallback = std::function<void()>;
         using WriteCallback = std::function<void(size_t)>;
         using ReadCallback = std::function<void(Data)>;
-        using ErrorCallback = std::function<void(const std::string &)>;
+        using ErrorCallback = std::function<void(boost::system::error_code ec)>;
 
         explicit Impl(Executor executor) : resolver_(executor), socket_(executor), timeout_(executor) {
 #ifdef OS_WIN
@@ -97,7 +97,7 @@ namespace network {
                         do_connect(endpoint_iter_, connect_callback, error_callback);
                     }
                 } else {
-                    error_callback("Unable to resolve host: " + ec.message());
+                    error_callback(ec);
                 }
             });
         }
@@ -109,7 +109,7 @@ namespace network {
                     if (!ec) {
                         connect_callback();
                     } else {
-                        error_callback("Unable to connect host: " + ec.message());
+                        error_callback(ec);
                     }
                 });
         }
@@ -140,7 +140,7 @@ namespace network {
                     if (!ec) {
                         write_callback(xfr);
                     } else {
-                        error_callback(ec.message());
+                        error_callback(ec);
                     }
                 });
             });
@@ -155,7 +155,7 @@ namespace network {
                             auto data = asio::buffer_cast<const uint8_t *>(buff_.data());
                             read_callback({data, length});
                         } else {
-                            error_callback(ec.message());
+                            error_callback(ec);
                         }
                         buff_.consume(length);
                     });
@@ -170,7 +170,7 @@ namespace network {
                         auto data = asio::buffer_cast<const uint8_t *>(buff_.data());
                         read_callback({data, xfr});
                     } else {
-                        error_callback(ec.message());
+                        error_callback(ec);
                     }
                     buff_.consume(xfr);
                 });
@@ -188,7 +188,7 @@ namespace network {
                         if (!ec) {
                             write_callback(xfr);
                         } else {
-                            error_callback(ec.message());
+                            error_callback(ec);
                         }
                     });
             });
@@ -203,24 +203,26 @@ namespace network {
                         if (!ec) {
                             read_callback({asio::buffer_cast<const uint8_t *>(buff_.data()), xfr});
                         } else {
-                            error_callback(ec.message());
+                            error_callback(ec);
                         }
                     });
             });
         }
 
-        std::future<void> Promote() {
-            return Post(std::packaged_task<void()>([this, self = shared_from_this()] {
-                socket_.cancel();
-                if (endpoint_iter_ != boost::asio::ip::udp::resolver::iterator())
-                    endpoint_iter_++;
-                else
-                    throw DriedUpSources("ran out of endpoints");
-            }));
+        void Promote() {
+            if (endpoint_iter_ != boost::asio::ip::udp::resolver::iterator())
+                endpoint_iter_++;
+            else
+                is_endpoints_dried = true;
+        }
+
+        bool IsEndpointsDried () const {
+            return is_endpoints_dried;
         }
 
     protected:
         asio::ip::udp::endpoint sender_;
+        bool is_endpoints_dried = false;
     };
 } // namespace network
 

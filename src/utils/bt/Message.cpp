@@ -85,6 +85,12 @@ bittorrent::Message &bittorrent::Message::operator=(const bittorrent::Message &o
     return *this;
 }
 
+void bittorrent::Message::Add(const uint8_t *add_data, size_t size) {
+    auto prev_s = body_length_;
+    Resize(prev_s + size);
+    std::memcpy(data_ + prev_s, add_data, size);
+}
+
 void bittorrent::PeerMessage::EncodeHeader() {
     char header[header_length + 1]{};
     size_t encode_body_length = 0;

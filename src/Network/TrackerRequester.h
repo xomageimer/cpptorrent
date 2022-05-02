@@ -12,9 +12,11 @@
 
 #include <utility>
 
+#include "bt/Message.h"
 #include "constants.h"
 #include "NetExceptions.h"
 #include "Tracker.h"
+#include "Primitives/Socket.h"
 #include "logger.h"
 
 // TODO сделать чтобы буффер респоунс был динамическим и не ограниченным в 1500 байт
@@ -45,39 +47,35 @@ namespace network {
 
         bittorrent::Tracker &tracker_;
 
+        bittorrent::Message msg_;
+
         virtual void SetResponse() = 0;
 
-        virtual void SetException(const std::string &exc) {
+        void SetException(const std::string & err) {
             if (is_set) return;
 
             LOG(tracker_.GetUrl().Host, " : ", " get exception");
 
-            promise_of_resp.set_exception(network::BadConnect(exc));
+            promise_of_resp.set_exception(network::BadConnect(err));
             Disconnect();
         }
     };
 
-    struct httpRequester : public TrackerRequester {
+    struct httpRequester : public TrackerRequester, private TCPSocket {
     public:
         explicit httpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-            : resolver_(executor), socket_(executor), timeout_(executor), TrackerRequester(tracker) {}
+            : TCPSocket(executor), TrackerRequester(tracker) {}
 
         void Connect(const bittorrent::Query &query) override;
 
         void Disconnect() override {
-            timeout_.cancel();
-            socket_.close();
-
+            cancel_operation();
             TrackerRequester::Disconnect();
         }
 
     private:
-        void do_resolve();
-
-        void do_connect(ba::ip::tcp::resolver::iterator endpoints);
-
-        void do_request();
+        void do_request(std::string request_str);
 
         void do_read_response_status();
 
@@ -85,43 +83,24 @@ namespace network {
 
         void do_read_response_body();
 
-        void deadline();
-
         void SetResponse() override;
-
-        ba::streambuf request_;
-
-        ba::streambuf response_;
-
-        ba::ip::tcp::resolver resolver_;
-
-        ba::ip::tcp::socket socket_;
-
-        ba::deadline_timer timeout_;
     };
 
-    struct udpRequester : public TrackerRequester {
+    struct udpRequester : public TrackerRequester, private UDPSocket {
     public:
         explicit udpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-            : resolver_(executor), socket_(executor), connect_timeout_(executor), announce_timeout_(executor), TrackerRequester(tracker) {}
+            : UDPSocket(executor), TrackerRequester(tracker) {}
 
         void Connect(const bittorrent::Query &query) override;
 
         void Disconnect() override {
-            announce_timeout_.cancel();
-            connect_timeout_.cancel();
-            socket_.close();
-
+            cancel_operation();
             TrackerRequester::Disconnect();
         };
 
     private:
-        void do_resolve();
-
         void do_try_connect();
-
-        void do_connect();
 
         void do_connect_response();
 
@@ -131,11 +110,7 @@ namespace network {
 
         void do_announce_response();
 
-        void connect_deadline();
-
-        void announce_deadline();
-
-        void UpdateEndpoint();
+        void update_endpoint();
 
         void SetResponse() override;
 
@@ -143,25 +118,12 @@ namespace network {
 
         void make_connect_request();
 
-        uint8_t buff[bittorrent_constants::short_buff_size];
+        size_t connect_attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
-        uint8_t request[bittorrent_constants::middle_buff_size];
+        size_t announce_attempts_ = bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS;
 
-        uint8_t response[bittorrent_constants::MTU];
-
-        ba::ip::udp::resolver resolver_;
-
-        ba::ip::udp::socket socket_;
-
-        ba::ip::udp::resolver::iterator endpoints_it_;
-
-        size_t attempts_ = 0;
-
-        size_t announce_attempts_ = 0;
-
-        ba::deadline_timer connect_timeout_;
-
-        ba::deadline_timer announce_timeout_;
+        bittorrent::Message connect_req_msg_;
+        bittorrent::Message announce_req_msg_;
 
         bittorrent::Query query_;
 
@@ -169,13 +131,13 @@ namespace network {
             uint64_t protocol_id;
             uint32_t action{0};
             uint32_t transaction_id{};
-        } c_req;
+        } c_req_;
 
         struct connect_response {
             uint32_t action{0};
             uint32_t transaction_id{};
             uint64_t connection_id{};
-        } c_resp;
+        } c_resp_;
         // TODO add scrape
     };
 } // namespace network
