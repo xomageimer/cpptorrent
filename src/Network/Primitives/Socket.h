@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 
+// TODO change Data to bt/Message
 using Data = std::basic_string_view<uint8_t>;
 
 namespace network {
@@ -87,10 +88,10 @@ namespace network {
 
         void do_resolve(std::string const &host, std::string const &port, ConnectCallback connect_callback, ErrorCallback error_callback) {
             resolver_.async_resolve(host, port, [=, this, self = shared_from_this()](error_code ec, endpoint_iter_type endpoints) {
-                stop_await();
                 if (!ec) {
                     endpoint_iter_ = std::move(endpoints);
                     if constexpr (is_datagram) {
+                        stop_await();
                         socket_.open(endpoint_iter_->endpoint().protocol());
                         connect_callback();
                     } else {
@@ -162,9 +163,9 @@ namespace network {
             });
         }
 
-        void ReadUntil(std::string until_str, const ReadCallback &read_callback, const ErrorCallback &error_callback) {
+        void ReadUntil(std::string until_str, ReadCallback read_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
-                async_read_until(socket_, buff_, until_str, [=, this](error_code ec, size_t xfr) {
+                async_read_until(socket_, buff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
                     stop_await();
                     if (!ec) {
                         auto data = asio::buffer_cast<const uint8_t *>(buff_.data());

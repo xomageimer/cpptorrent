@@ -118,6 +118,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
 
         return true;
     } catch (boost::exception &excp) {
+        std::cerr << "got exception" << std::endl;
         for (auto & tracker : active_trackers) {
             tracker->Stop();
         }

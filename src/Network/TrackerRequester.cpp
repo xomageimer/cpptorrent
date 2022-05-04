@@ -156,6 +156,7 @@ void network::httpRequester::do_read_response_status() {
             }
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
+    Await(connect_waiting_);
 }
 
 void network::httpRequester::do_read_response_header() {
@@ -168,6 +169,7 @@ void network::httpRequester::do_read_response_header() {
             do_read_response_body();
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
+    Await(connect_waiting_);
 }
 
 void network::httpRequester::do_read_response_body() {
@@ -187,6 +189,7 @@ void network::httpRequester::do_read_response_body() {
                 SetException(ec.message());
             }
         });
+    Await(connect_waiting_);
 }
 
 // TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
@@ -273,8 +276,7 @@ void network::udpRequester::do_try_connect_delay(boost::posix_time::time_duratio
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     auto new_dur = connect_waiting_ - dur;
-    Await(new_dur.is_negative() ? new_dur : boost::posix_time::milliseconds(0),
-        [this] {do_try_connect();});
+    Await(new_dur.is_negative() ? new_dur : boost::posix_time::milliseconds(0), [this] { do_try_connect(); });
 }
 
 void network::udpRequester::do_connect_response() {
@@ -345,8 +347,7 @@ void network::udpRequester::do_try_announce_delay(boost::posix_time::time_durati
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     auto new_dur = announce_waiting_ - dur;
-    Await(new_dur.is_negative() ? new_dur : boost::posix_time::milliseconds(0),
-        [this] {do_try_announce();});
+    Await(new_dur.is_negative() ? new_dur : boost::posix_time::milliseconds(0), [this] { do_try_announce(); });
 }
 
 void network::udpRequester::do_announce_response() {
@@ -426,5 +427,6 @@ void network::udpRequester::make_announce_request() {
     ValueToArray(NativeToBig((query_.key ? std::stoi(query_.key.value()) : 0)), &announce_req_msg_.GetDataPointer()[88]);
     ValueToArray(
         NativeToBig<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)), &announce_req_msg_.GetDataPointer()[92]);
-    ValueToArray(NativeToBig(static_cast<uint16_t>((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0))), &announce_req_msg_.GetDataPointer()[96]);
+    ValueToArray(NativeToBig(static_cast<uint16_t>((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0))),
+        &announce_req_msg_.GetDataPointer()[96]);
 }
