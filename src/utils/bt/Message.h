@@ -45,7 +45,7 @@ namespace bittorrent {
 
         Message &operator=(Message &&other) noexcept;
 
-        virtual ~Message() { delete[] data_; }
+//        virtual ~Message() { delete[] data_; }
 
         virtual uint8_t *ReleaseData();
 
@@ -70,7 +70,7 @@ namespace bittorrent {
         virtual void Reset(std::size_t length);
 
         bool Empty(){
-            return out_pos_ == TotalLength();
+            return out_pos_ <= TotalLength();
         }
 
         template <typename T> Message &operator>>(T &value) {

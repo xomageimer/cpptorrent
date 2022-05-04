@@ -198,21 +198,20 @@ namespace network {
             Post([=, this, self = shared_from_this()] {
                 sender_ = *endpoint_iter_;
                 socket_.async_receive_from(
-                    boost::asio::buffer(buff_.prepare(max_size)), sender_, [this, self, read_callback, error_callback](error_code ec, size_t xfr) {
+                    boost::asio::buffer(buff_.prepare(max_size)), sender_, [max_size, this, self, read_callback, error_callback](error_code ec, size_t xfr) {
                         this->stop_await();
                         if (!ec) {
                             read_callback({asio::buffer_cast<const uint8_t *>(buff_.data()), xfr});
                         } else {
                             error_callback(ec);
                         }
+                        buff_.consume(max_size);
                     });
             });
         }
 
         void Promote() {
-            if (endpoint_iter_ != boost::asio::ip::udp::resolver::iterator())
-                endpoint_iter_++;
-            else
+            if (++endpoint_iter_ == boost::asio::ip::udp::resolver::iterator())
                 is_endpoints_dried = true;
         }
 

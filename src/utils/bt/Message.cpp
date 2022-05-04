@@ -53,7 +53,6 @@ void bittorrent::Message::Resize(std::size_t new_length) {
 
 void bittorrent::Message::Reset(std::size_t length) {
     body_length_ = length;
-    if (body_length_ > max_body_length) body_length_ = max_body_length;
     delete[] data_;
     data_ = new uint8_t[body_length_];
     in_pos_ = 0;

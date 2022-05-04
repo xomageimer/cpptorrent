@@ -19,8 +19,6 @@
 #include "Primitives/Socket.h"
 #include "logger.h"
 
-// TODO сделать чтобы буффер респоунс был динамическим и не ограниченным в 1500 байт
-
 namespace ba = boost::asio;
 
 namespace network {
@@ -51,7 +49,7 @@ namespace network {
 
         virtual void SetResponse() = 0;
 
-        void SetException(const std::string & err) {
+        void SetException(const std::string &err) {
             if (is_set) return;
 
             LOG(tracker_.GetUrl().Host, " : ", " get exception");
@@ -61,11 +59,11 @@ namespace network {
         }
     };
 
-    struct httpRequester : public TrackerRequester, private TCPSocket {
+    struct httpRequester : public TrackerRequester, public TCPSocket {
     public:
         explicit httpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-            : TCPSocket(executor), TrackerRequester(tracker) {}
+            : TrackerRequester(tracker), TCPSocket(executor) {}
 
         void Connect(const bittorrent::Query &query) override;
 
@@ -86,11 +84,11 @@ namespace network {
         void SetResponse() override;
     };
 
-    struct udpRequester : public TrackerRequester, private UDPSocket {
+    struct udpRequester : public TrackerRequester, public UDPSocket {
     public:
         explicit udpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-            : UDPSocket(executor), TrackerRequester(tracker) {}
+            : TrackerRequester(tracker), UDPSocket(executor) {}
 
         void Connect(const bittorrent::Query &query) override;
 
@@ -105,8 +103,6 @@ namespace network {
         void do_connect_response();
 
         void do_try_announce();
-
-        void do_announce();
 
         void do_announce_response();
 
@@ -123,6 +119,7 @@ namespace network {
         size_t announce_attempts_ = bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS;
 
         bittorrent::Message connect_req_msg_;
+
         bittorrent::Message announce_req_msg_;
 
         bittorrent::Query query_;
