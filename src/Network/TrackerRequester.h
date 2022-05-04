@@ -43,6 +43,8 @@ namespace network {
 
         boost::promise<bittorrent::Response> promise_of_resp;
 
+        const boost::posix_time::time_duration connect_waiting_ = bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon;
+
         bittorrent::Tracker &tracker_;
 
         bittorrent::Message msg_;
@@ -100,9 +102,13 @@ namespace network {
     private:
         void do_try_connect();
 
+        void do_try_connect_delay(boost::posix_time::time_duration dur);
+
         void do_connect_response();
 
         void do_try_announce();
+
+        void do_try_announce_delay(boost::posix_time::time_duration dur);
 
         void do_announce_response();
 
@@ -116,9 +122,11 @@ namespace network {
 
         size_t connect_attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
+        bittorrent::Message connect_req_msg_;
+
         size_t announce_attempts_ = bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS;
 
-        bittorrent::Message connect_req_msg_;
+        const boost::posix_time::time_duration announce_waiting_ = bittorrent_constants::announce_waiting_time + bittorrent_constants::epsilon;
 
         bittorrent::Message announce_req_msg_;
 

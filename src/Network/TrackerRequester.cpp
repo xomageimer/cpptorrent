@@ -115,7 +115,7 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
         tracker_.GetUrl().Host, tracker_.GetUrl().Port,
         [this, req_str = std::move(request_sstream.str())]() mutable { do_request(std::move(req_str)); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
-    Await(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
+    Await(connect_waiting_);
 }
 
 void network::httpRequester::do_request(std::string request_str) {
@@ -250,12 +250,13 @@ void network::udpRequester::do_try_connect() {
         connect_req_msg_ << c_req_.action;
         connect_req_msg_ << c_req_.transaction_id;
 
+        boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
         Send(
             connect_req_msg_,
-            [this](size_t bytes_transferred) {
+            [this, time_before](size_t bytes_transferred) {
                 if (bytes_transferred < 16) {
                     connect_attempts_ = 0;
-                    do_try_connect();
+                    do_try_connect_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 } else {
                     LOG(tracker_.GetUrl().Host, " : ", "send successfull completly");
                     do_connect_response();
@@ -268,14 +269,23 @@ void network::udpRequester::do_try_connect() {
     }
 }
 
+void network::udpRequester::do_try_connect_delay(boost::posix_time::time_duration dur) {
+    LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
+
+    auto new_dur = connect_waiting_ - dur;
+    Await(new_dur.is_negative() ? new_dur : boost::posix_time::milliseconds(0),
+        [this] {do_try_connect();});
+}
+
 void network::udpRequester::do_connect_response() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
+    boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
     Read(
         bittorrent_constants::short_buff_size,
-        [this](Data data) {
+        [this, time_before](Data data) {
             if (data.size() < 16) {
                 LOG(tracker_.GetUrl().Host, " : ", "get low size: ", data.size());
-                do_try_connect();
+                do_try_connect_delay(boost::posix_time::microsec_clock::local_time() - time_before);
             } else {
                 msg_.Reset(data.size());
                 std::memcpy(msg_.GetDataPointer(), data.data(), data.size());
@@ -293,7 +303,7 @@ void network::udpRequester::do_connect_response() {
 
                     do_try_announce();
                 } else {
-                    do_try_connect();
+                    do_try_connect_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 }
             }
         },
@@ -301,7 +311,7 @@ void network::udpRequester::do_connect_response() {
             LOG(tracker_.GetUrl().Host, " : ", "get error ", ec.message());
             do_try_connect();
         });
-    Await(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
+    Await(connect_waiting_);
 }
 
 void network::udpRequester::do_try_announce() {
@@ -314,13 +324,14 @@ void network::udpRequester::do_try_announce() {
         std::memcpy(&announce_req_msg_.GetDataPointer()[0], &c_resp_.connection_id, sizeof(c_resp_.connection_id));
         std::memcpy(&announce_req_msg_.GetDataPointer()[12], &c_resp_.transaction_id, sizeof(c_resp_.transaction_id));
 
+        boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
         Send(
             announce_req_msg_,
-            [this](size_t bytes_transferred) {
-                LOG (tracker_.GetUrl().Host, " : received ", bytes_transferred);
+            [this, time_before](size_t bytes_transferred) {
+                LOG(tracker_.GetUrl().Host, " : received ", bytes_transferred);
                 if (bytes_transferred != bittorrent_constants::middle_buff_size) {
                     announce_attempts_ = connect_attempts_ = 0;
-                    do_try_announce();
+                    do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 } else {
                     LOG(tracker_.GetUrl().Host, " : ", "announce send successfull completly");
                     do_announce_response();
@@ -330,17 +341,26 @@ void network::udpRequester::do_try_announce() {
     }
 }
 
+void network::udpRequester::do_try_announce_delay(boost::posix_time::time_duration dur) {
+    LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
+
+    auto new_dur = announce_waiting_ - dur;
+    Await(new_dur.is_negative() ? new_dur : boost::posix_time::milliseconds(0),
+        [this] {do_try_announce();});
+}
+
 void network::udpRequester::do_announce_response() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
+    boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
     Read(
         bittorrent_constants::MTU,
-        [this](Data data) {
+        [this, time_before](Data data) {
             msg_.Reset(data.size() + 1);
             std::memcpy(msg_.GetDataPointer(), data.data(), data.size()); // TODO сделать с out_pos_ (чтобы он сдвигался)
 
             if (data.size() < 8) {
-                do_try_announce();
+                do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
             } else {
                 LOG(tracker_.GetUrl().Host, " : ", "announce successful completion receive ", data.size(), " bytes");
 
@@ -358,14 +378,14 @@ void network::udpRequester::do_announce_response() {
                 } else if (!data.empty() && val == c_resp_.transaction_id && action == 3) {
                     LOG(tracker_.GetUrl().Host, " : ",
                         "catch error from tracker announce: ", static_cast<const unsigned char *>(&msg_.GetDataPointer()[8]));
-                    do_try_announce();
+                    do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 } else {
-                    do_try_announce();
+                    do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 }
             }
         },
         [this](boost::system::error_code ec) { do_try_announce(); });
-    Await(bittorrent_constants::announce_waiting_time + bittorrent_constants::epsilon);
+    Await(announce_waiting_);
 }
 
 void network::udpRequester::update_endpoint() {

@@ -54,7 +54,6 @@ void network::Listener::do_accept() {
     LOG("Listener"
         " : ",
         __FUNCTION__);
-    return ;
 
     acceptor_.async_accept(socket_, [this](boost::system::error_code ec) {
         if (!ec) {

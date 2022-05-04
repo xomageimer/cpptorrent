@@ -45,7 +45,7 @@ namespace bittorrent {
 
         Message &operator=(Message &&other) noexcept;
 
-//        virtual ~Message() { delete[] data_; }
+        virtual ~Message() { delete[] data_; }
 
         virtual uint8_t *ReleaseData();
 
