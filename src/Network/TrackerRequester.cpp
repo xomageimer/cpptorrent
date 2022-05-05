@@ -169,6 +169,7 @@ void network::httpRequester::do_read_response_header() {
         [this](Data data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response header");
             msg_.Reset(0);
+            msg_.Add(reinterpret_cast<const uint8_t *>(data.data()), data.size());
             do_read_response_body();
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
@@ -179,7 +180,6 @@ void network::httpRequester::do_read_response_body() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     ReadToEof(
-        bittorrent_constants::MTU,
         [this](Data data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response body");
             msg_.Add(reinterpret_cast<const uint8_t *>(data.data()), data.size());
