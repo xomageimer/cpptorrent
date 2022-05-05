@@ -147,6 +147,25 @@ namespace network {
             });
         }
 
+        void ReadToEof(size_t size, ReadCallback read_callback, ReadCallback eof_callback, ErrorCallback error_callback) {
+            Post([=, this, self = shared_from_this()] {
+                async_read(
+                    socket_, asio::buffer(buff_.prepare(size)), [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
+                        stop_await();
+                        if (!ec) {
+                            auto data = asio::buffer_cast<const uint8_t *>(buff_.data());
+                            read_callback({data, length});
+                        } else if (ec == boost::asio::error::eof) {
+                            auto data = asio::buffer_cast<const uint8_t *>(buff_.data());
+                            eof_callback({data, length});
+                        } else {
+                            error_callback(ec);
+                        }
+                        buff_.consume(length);
+                    });
+            });
+        }
+
         void Read(size_t size, ReadCallback read_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
                 async_read(

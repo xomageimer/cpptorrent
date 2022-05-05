@@ -8,6 +8,7 @@
 #include <deque>
 #include <string>
 #include <utility>
+#include <cctype>
 
 #include "constants.h"
 #include "auxiliary.h"
@@ -89,7 +90,9 @@ namespace bittorrent {
 
         std::string GetString() {
             std::string value;
-            while (out_pos_ < body_length_ && (data_[out_pos_] != ' ' || data_[out_pos_] != '\n')) {
+            while (out_pos_ < body_length_ && std::isspace(data_[out_pos_]))
+                out_pos_++;
+            while (out_pos_ < body_length_ && !std::isspace(data_[out_pos_])) {
                 value.push_back(static_cast<char>(data_[out_pos_++]));
             }
             return value;

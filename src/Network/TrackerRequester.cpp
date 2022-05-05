@@ -24,6 +24,7 @@ void network::httpRequester::SetResponse() {
     boost::regex expression("(^d(?:.|\\n)*e\\Z)");
     if (!boost::regex_split(std::back_inserter(bencode_response), resp_str, expression)) {
         SetException("Bad response, can't split to bencode format");
+        return;
     }
 
     std::stringstream ss(bencode_response.back());
@@ -116,8 +117,7 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
     std::memcpy(msg_.GetDataPointer(), str.data(), str.size());
 
     TCPSocket::Connect(
-        tracker_.GetUrl().Host, tracker_.GetUrl().Port,
-        [this]() mutable { do_request(); },
+        tracker_.GetUrl().Host, tracker_.GetUrl().Port, [this]() mutable { do_request(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
 }
@@ -137,7 +137,6 @@ void network::httpRequester::do_read_response_status() {
     ReadUntil(
         "\r\n",
         [this](Data data) {
-            std::cerr << data.size() << std::endl;
             msg_.Reset(data.size());
             std::memcpy(msg_.GetDataPointer(), data.data(), data.size());
 
@@ -146,21 +145,19 @@ void network::httpRequester::do_read_response_status() {
 
             LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
 
-            uint8_t status_code;
-            msg_ >> status_code;
+            auto status_code = std::stoi(msg_.GetString());
             std::string status_message = msg_.GetLine();
 
-            if (!msg_.Empty() || http_version.substr(0, 5) != "HTTP/") {
+            if (http_version.substr(0, 5) != "HTTP/") {
                 SetException("Invalid response\n");
             } else if (status_code != 200) {
                 SetException("Response returned with status code " + std::to_string(status_code) + "\n");
             } else {
-
                 LOG(tracker_.GetUrl().Host, " : ", " correct http status");
                 do_read_response_header();
             }
         },
-        [this](boost::system::error_code ec) {     std::cerr << "nibger from exception" << std::endl; SetException(ec.message()); });
+        [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
 }
 
@@ -171,6 +168,7 @@ void network::httpRequester::do_read_response_header() {
         "\r\n\r\n",
         [this](Data data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response header");
+            msg_.Reset(0);
             do_read_response_body();
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
@@ -180,20 +178,18 @@ void network::httpRequester::do_read_response_header() {
 void network::httpRequester::do_read_response_body() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    Read(
+    ReadToEof(
         bittorrent_constants::MTU,
         [this](Data data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response body");
             msg_.Add(reinterpret_cast<const uint8_t *>(data.data()), data.size());
             do_read_response_body();
         },
-        [this](boost::system::error_code ec) {
-            if (ec == ba::error::eof) {
-                SetResponse();
-            } else {
-                SetException(ec.message());
-            }
-        });
+        [this](Data data) {
+            msg_.Add(reinterpret_cast<const uint8_t *>(data.data()), data.size());
+            SetResponse();
+        },
+        [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
 }
 
