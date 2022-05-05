@@ -111,18 +111,22 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
                     << "Accept: */*\r\n"
                     << "Connection: close\r\n\r\n";
 
+    auto str = request_sstream.str();
+    msg_.Reset(str.size());
+    std::memcpy(msg_.GetDataPointer(), str.data(), str.size());
+
     TCPSocket::Connect(
         tracker_.GetUrl().Host, tracker_.GetUrl().Port,
-        [this, req_str = std::move(request_sstream.str())]() mutable { do_request(std::move(req_str)); },
+        [this]() mutable { do_request(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
 }
 
-void network::httpRequester::do_request(std::string request_str) {
+void network::httpRequester::do_request() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     Send(
-        {reinterpret_cast<uint8_t *>(request_str.data()), request_str.size()}, [this](size_t /*length*/) { do_read_response_status(); },
+        msg_, [this](size_t /*length*/) { do_read_response_status(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
 }
 
@@ -133,6 +137,7 @@ void network::httpRequester::do_read_response_status() {
     ReadUntil(
         "\r\n",
         [this](Data data) {
+            std::cerr << data.size() << std::endl;
             msg_.Reset(data.size());
             std::memcpy(msg_.GetDataPointer(), data.data(), data.size());
 
@@ -141,7 +146,7 @@ void network::httpRequester::do_read_response_status() {
 
             LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
 
-            unsigned int status_code;
+            uint8_t status_code;
             msg_ >> status_code;
             std::string status_message = msg_.GetLine();
 
@@ -155,7 +160,7 @@ void network::httpRequester::do_read_response_status() {
                 do_read_response_header();
             }
         },
-        [this](boost::system::error_code ec) { SetException(ec.message()); });
+        [this](boost::system::error_code ec) {     std::cerr << "nibger from exception" << std::endl; SetException(ec.message()); });
     Await(connect_waiting_);
 }
 

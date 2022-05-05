@@ -90,7 +90,7 @@ namespace bittorrent {
         std::string GetString() {
             std::string value;
             while (out_pos_ < body_length_ && (data_[out_pos_] != ' ' || data_[out_pos_] != '\n')) {
-                value.push_back(static_cast<char>(data_[out_pos_]));
+                value.push_back(static_cast<char>(data_[out_pos_++]));
             }
             return value;
         }
@@ -98,7 +98,7 @@ namespace bittorrent {
         std::string GetLine(){
             std::string value;
             while (out_pos_ < body_length_ && data_[out_pos_] != '\n') {
-                value.push_back(static_cast<char>(data_[out_pos_]));
+                value.push_back(static_cast<char>(data_[out_pos_++]));
             }
             return value;
         }

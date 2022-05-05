@@ -75,7 +75,7 @@ namespace network {
         }
 
     private:
-        void do_request(std::string request_str);
+        void do_request();
 
         void do_read_response_status();
 
