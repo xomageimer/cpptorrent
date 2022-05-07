@@ -1,6 +1,8 @@
 #ifndef CPPTORRENT_MESSAGE_H
 #define CPPTORRENT_MESSAGE_H
 
+#include <boost/asio.hpp>
+
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -24,6 +26,59 @@ namespace bittorrent {
     enum ByteOrder {
         BigEndian,
         LittleEndian
+    };
+
+    struct MessageBuf : boost::asio::streambuf {
+    public:
+        using boost::asio::streambuf::streambuf;
+
+        MessageBuf() : inp(this), out(this){};
+
+        boost::asio::streambuf &GetOrigin() { return *this; }
+
+        void CopyTo(const MessageBuf &msg_buf);
+
+        void CopyFrom(void * data, size_t size);
+
+        template <typename T> MessageBuf &operator<<(const T &value) {
+            if constexpr (!std::is_arithmetic_v<T>) {
+                out << value;
+            } else {
+                if (order_ == BigEndian) {
+                    out << NativeToBig(value);
+                } else if (order_ == LittleEndian) {
+                    out << NativeToLittle(value);
+                }
+            }
+            return *this;
+        }
+
+        template <typename T> const MessageBuf &operator<<(const T &value) const {
+            return const_cast<MessageBuf &>(*this).template operator<<(value);
+        }
+
+        template <typename T> MessageBuf &operator>>(T &value) {
+            if constexpr (!std::is_arithmetic_v<T>) {
+                inp >> value;
+            } else {
+                inp >> value;
+                if (order_ == BigEndian) {
+                    value = BigToNative(value);
+                } else if (order_ == LittleEndian) {
+                    value = LittleToNative(value);
+                }
+            }
+            return *this;
+        }
+
+        template <typename T> const MessageBuf &operator>>(T &value) const {
+            return const_cast<MessageBuf &>(*this).template operator>>(value);
+        }
+
+    private:
+        ByteOrder order_ = ByteOrder::BigEndian;
+        std::istream inp;
+        std::ostream out;
     };
 
     struct Message {
@@ -50,7 +105,7 @@ namespace bittorrent {
 
         virtual uint8_t *ReleaseData();
 
-        void Add(const uint8_t * add_data, size_t size);
+        void Add(const uint8_t *add_data, size_t size);
 
         operator Data() { return {GetDataPointer(), TotalLength()}; }
 
@@ -69,10 +124,6 @@ namespace bittorrent {
         virtual void Resize(std::size_t new_length);
 
         virtual void Reset(std::size_t length);
-
-        bool Empty(){
-            return out_pos_ <= TotalLength();
-        }
 
         template <typename T> Message &operator>>(T &value) {
             static_assert(std::is_integral_v<T>);
@@ -98,7 +149,7 @@ namespace bittorrent {
             return value;
         }
 
-        std::string GetLine(){
+        std::string GetLine() {
             std::string value;
             while (out_pos_ < body_length_ && data_[out_pos_] != '\n') {
                 value.push_back(static_cast<char>(data_[out_pos_++]));

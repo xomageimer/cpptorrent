@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-// TODO change Data to bt/Message
+// TODO сапюрэ MESSAGE х ядекюрэ йюйни-рн нянаши йкюяя, опнярн дкъ пюганпю SV, аег йнохпнбюмхъ оюлърх!
 using Data = std::basic_string_view<uint8_t>;
 
 namespace network {

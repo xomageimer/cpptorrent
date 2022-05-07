@@ -302,7 +302,7 @@ void network::udpRequester::do_connect_response() {
 
                 if (value == c_req_.transaction_id && action == 0) {
                     c_resp_.connection_id = ArrayToValue<uint64_t>(&msg_.GetDataPointer()[8]);
-                    c_resp_.transaction_id = ArrayToValue<uint32_t>(&msg_.GetDataPointer()[16]);
+                    c_resp_.transaction_id = value;
 
                     do_try_announce();
                 } else {

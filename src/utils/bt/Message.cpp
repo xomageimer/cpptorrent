@@ -2,6 +2,15 @@
 
 #include <type_traits>
 
+void bittorrent::MessageBuf::CopyTo(const bittorrent::MessageBuf &msg_buf) {
+    std::size_t bytes_copied = boost::asio::buffer_copy(prepare(size()), msg_buf.data());
+    commit(bytes_copied);
+}
+
+void bittorrent::MessageBuf::CopyFrom(void *data, size_t size) {
+    inp.read(reinterpret_cast<char *>(data), size);
+}
+
 bittorrent::Message::Message(uint8_t *data, size_t size, bittorrent::ByteOrder order) : order_(order) {
     Message::Reset(size);
     std::memcpy(data_, data, size);
@@ -90,6 +99,7 @@ void bittorrent::Message::Add(const uint8_t *add_data, size_t size) {
     std::memcpy(data_ + prev_s, add_data, size);
 }
 
+// TODO не работает как надо!
 void bittorrent::PeerMessage::EncodeHeader() {
     char header[header_length + 1]{};
     size_t encode_body_length = 0;
