@@ -10,21 +10,20 @@
 
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-    : TCPSocket(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)) {}
+    : TCPSocket(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), msg_(std::make_shared<bittorrent::PeerMessage>()) {}
 
 network::PeerClient::PeerClient(
     const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
-    : TCPSocket(std::move(socket)), master_peer_(*master_peer) {
+    : TCPSocket(std::move(socket)), master_peer_(*master_peer), msg_(std::make_shared<bittorrent::PeerMessage>()) {
 
     asio::ip::tcp::endpoint remote_ep = socket_.remote_endpoint();
     uint32_t ip_int = IpToInt(remote_ep.address().to_string());
     uint16_t port = remote_ep.port();
     slave_peer_ = bittorrent::Peer{ip_int, port};
 
-    msg_.Reset(bittorrent_constants::handshake_length);
-    for (size_t i = 0; i < bittorrent_constants::handshake_length; i++) {
-        msg_.GetDataPointer()[i] = handshake_ptr[i];
-    }
+    msg_->consume(msg_->size());
+    msg_->prepare(bittorrent_constants::handshake_length);
+    msg_->CopyFrom(handshake_ptr, bittorrent_constants::handshake_length);
 }
 
 std::string network::PeerClient::GetStrIP() const {
@@ -86,14 +85,16 @@ void network::PeerClient::do_read_header() {
     LOG(GetStrIP(), " : ", "trying to read message");
 
     Read(
-        bittorrent::PeerMessage::header_length,
-        [this](Data data) {
+        sizeof(bittorrent::PeerMessage::header_length),
+        [this](const DataPtr& data_ptr) {
             drop_timeout();
 
-            msg_.SetHeader(ArrayToValue<uint32_t>(reinterpret_cast<const uint8_t *>(data.data())));
-            msg_.DecodeHeader();
+            auto & data = *data_ptr;
+            uint32_t header;
+            data >> header;
+            msg_->SetHeader(header);
 
-            if (!msg_.BodyLength()) {
+            if (!msg_->GetBodySize()) {
                 LOG(GetStrIP(), " : ", "Keep-alive message");
             } else {
                 do_read_body();
@@ -106,13 +107,11 @@ void network::PeerClient::do_read_body() {
     LOG("trying to read payload of message");
 
     Read(
-        bittorrent::PeerMessage::id_length + msg_.BodyLength(),
-        [this](Data data) {
-            LOG(GetStrIP(), " : correct message"); // TODO перенести msg в peer_message
+        bittorrent::PeerMessage::id_length + msg_->GetBodySize(),
+        [this](const DataPtr& data_ptr) {
+            LOG(GetStrIP(), " : correct message");
 
-            msg_.SetMessageType(bittorrent::PEER_MESSAGE_TYPE{data[0]});
-            std::memcpy(msg_.Body(), data.data() + 1, data.size() - 1);
-
+            msg_->CopyFrom(*data_ptr);
             handle_response();
         },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
@@ -143,7 +142,7 @@ void network::PeerClient::access() {
 void network::PeerClient::verify_handshake() {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
-    if (check_handshake(std::move(DowngradeMsg(msg_)))) {
+    if (check_handshake(msg_)) {
         Send(
             msg_, [this](size_t) { access(); },
             std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
@@ -152,8 +151,9 @@ void network::PeerClient::verify_handshake() {
     }
 }
 
-bool network::PeerClient::check_handshake(const bittorrent::Message& msg) const {
-    if (msg.GetDataPointer()[0] == 0x13 && memcmp(&msg.GetDataPointer()[1], "BitTorrent protocol", 19) == 0) {
+bool network::PeerClient::check_handshake(const DataPtr & msg_ptr) const {
+    auto & msg_data = *msg_ptr;
+    if (msg_data[0] == 0x13 && memcmp(&msg_data[1], "BitTorrent protocol", 19) == 0) {
         return true;
     }
     return false;
@@ -167,22 +167,22 @@ void network::PeerClient::send_handshake() {
         try_again_connect();
     };
 
+    msg_->consume(msg_->size());
+    msg_->CopyFrom(master_peer_.GetHandshake(), bittorrent_constants::handshake_length);
     Send(
-        {master_peer_.GetHandshake(), bittorrent_constants::handshake_length},
+        msg_,
         [this, failed_attempt](size_t size) {
             Read(
                 bittorrent_constants::handshake_length,
-                [this](Data data) {
+                [this](const DataPtr& data_ptr) {
                     LOG(GetStrIP(), " : correct answer");
 
-                    bittorrent::Message hndshke(bittorrent_constants::handshake_length);
-                    std::memcpy(hndshke.GetDataPointer(), data.data(), data.size());
+                    auto & handshake = *data_ptr;
+                    LOG (GetStrIP(), " : \"hndshke.BodyLength() >= bittorrent_constants::handshake_length\" == ", handshake.size() >= bittorrent_constants::handshake_length);
+                    LOG (GetStrIP(), " : \"memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0\" == ", memcmp(&handshake[28], &master_peer_.GetHandshake()[28], 20) == 0);
 
-                    LOG (GetStrIP(), " : \"hndshke.BodyLength() >= bittorrent_constants::handshake_length\" == ", hndshke.BodyLength() >= bittorrent_constants::handshake_length);
-                    LOG (GetStrIP(), " : \"memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0\" == ", memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0);
-
-                    if (hndshke.BodyLength() >= bittorrent_constants::handshake_length && check_handshake(hndshke)
-                        && memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0) {
+                    if (handshake.size() >= bittorrent_constants::handshake_length && check_handshake(data_ptr)
+                        && memcmp(&handshake[28], &master_peer_.GetHandshake()[28], 20) == 0) {
                         LOG (GetStrIP(), " : correct verify");
                         access();
                     }
@@ -214,9 +214,9 @@ void network::PeerClient::send_cancel(size_t piece_index) {}
 void network::PeerClient::send_port(size_t port) {}
 
 void network::PeerClient::handle_response() {
-    auto message_type = msg_.GetMessageType();
-    size_t payload_size = msg_.BodyLength();
-    auto & payload = msg_;
+    auto message_type = msg_->GetType();
+    size_t payload_size = msg_->GetBodySize();
+    auto & payload = *msg_;
 
     using namespace bittorrent;
     switch (message_type) {

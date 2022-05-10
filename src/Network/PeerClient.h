@@ -16,7 +16,7 @@
 #include "Primitives/Socket.h"
 #include "Peer.h"
 
-#include "bt/Message.h"
+#include "Primitives/Message.h"
 #include "bt/Bitfield.h"
 #include "bt/Piece.h"
 
@@ -25,6 +25,9 @@
 #include "logger.h"
 
 namespace ba = boost::asio;
+
+using DataPtr = std::shared_ptr<bittorrent::Message>;
+using PeerDataPtr = std::shared_ptr<bittorrent::PeerMessage>;
 
 // TODO вынести основную часть сети куда-нибудь отдельно и наследоваться от нее
 
@@ -72,7 +75,7 @@ namespace network {
         void Disconnect();
 
     private:
-        bool check_handshake(const bittorrent::Message& msg) const;
+        bool check_handshake(const DataPtr &) const;
 
         void verify_handshake();
 
@@ -127,7 +130,7 @@ namespace network {
         bittorrent::Peer slave_peer_;
 
         // TODO сделать отдельно сетевой интерфейс в виде сокета
-        bittorrent::PeerMessage msg_{};
+        PeerDataPtr msg_{};
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
 

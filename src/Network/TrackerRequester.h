@@ -12,7 +12,7 @@
 
 #include <utility>
 
-#include "bt/Message.h"
+#include "Primitives/Message.h"
 #include "constants.h"
 #include "NetExceptions.h"
 #include "Tracker.h"
@@ -21,10 +21,13 @@
 
 namespace ba = boost::asio;
 
+using DataPtr = std::shared_ptr<bittorrent::Message>;
+
 namespace network {
     struct TrackerRequester {
     public:
-        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker) : tracker_(*tracker) {}
+        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker)
+            : tracker_(*tracker), msg_(std::make_shared<bittorrent::Message>()) {}
 
         TrackerRequester(TrackerRequester const &) = delete;
 
@@ -43,13 +46,14 @@ namespace network {
 
         boost::promise<bittorrent::Response> promise_of_resp;
 
-        const boost::posix_time::time_duration connect_waiting_ = bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon;
+        const boost::posix_time::time_duration connect_waiting_ =
+            bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon;
 
         bittorrent::Tracker &tracker_;
 
-        bittorrent::Message msg_;
+        DataPtr msg_;
 
-        virtual void SetResponse() = 0;
+        virtual void SetResponse(DataPtr) = 0;
 
         void SetException(const std::string &err) {
             if (is_set) return;
@@ -83,7 +87,7 @@ namespace network {
 
         void do_read_response_body();
 
-        void SetResponse() override;
+        void SetResponse(DataPtr) override;
     };
 
     struct udpRequester : public TrackerRequester, public UDPSocket {
@@ -114,7 +118,7 @@ namespace network {
 
         void update_endpoint();
 
-        void SetResponse() override;
+        void SetResponse(DataPtr) override;
 
         void make_announce_request();
 
@@ -122,13 +126,10 @@ namespace network {
 
         size_t connect_attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
-        bittorrent::Message connect_req_msg_;
-
         size_t announce_attempts_ = bittorrent_constants::MAX_ANNOUNCE_ATTEMPTS;
 
-        const boost::posix_time::time_duration announce_waiting_ = bittorrent_constants::announce_waiting_time + bittorrent_constants::epsilon;
-
-        bittorrent::Message announce_req_msg_;
+        const boost::posix_time::time_duration announce_waiting_ =
+            bittorrent_constants::announce_waiting_time + bittorrent_constants::epsilon;
 
         bittorrent::Query query_;
 
@@ -143,6 +144,8 @@ namespace network {
             uint32_t transaction_id{};
             uint64_t connection_id{};
         } c_resp_;
+
+        uint8_t announce_req_[bittorrent_constants::middle_buff_size] {};
         // TODO add scrape
     };
 } // namespace network
