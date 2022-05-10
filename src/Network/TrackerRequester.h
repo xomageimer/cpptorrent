@@ -21,8 +21,6 @@
 
 namespace ba = boost::asio;
 
-using DataPtr = std::shared_ptr<bittorrent::Message>;
-
 namespace network {
     struct TrackerRequester {
     public:

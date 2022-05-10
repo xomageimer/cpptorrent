@@ -9,9 +9,6 @@
 #include "auxiliary.h"
 #include "random_generator.h"
 
-// TODO лучше всю работу с распарсиванием ответа убрать в класс Tracker, а промис будет от строки или бенкода
-// TODO все логи отметить их url'ми чтобы удобнее читать вывод логера
-
 // HTTP
 void network::httpRequester::SetResponse(DataPtr data_ptr) {
     if (is_set) return;
@@ -192,7 +189,6 @@ void network::httpRequester::do_read_response_body() {
     Await(connect_waiting_);
 }
 
-// TODO сделать так чтобы каждый из айпишников от одного урла сразу асихнронно тоже обрабатывался
 // UDP
 void network::udpRequester::SetResponse(DataPtr data_ptr) {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
@@ -239,6 +235,7 @@ void network::udpRequester::Connect(const bittorrent::Query &query) {
             do_try_connect();
         },
         [this](boost::system::error_code ec) { SetException("Unable to resolve host: " + ec.message()); });
+    Await(connect_waiting_);
 }
 
 void network::udpRequester::do_try_connect() {
