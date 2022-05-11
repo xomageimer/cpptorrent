@@ -45,10 +45,13 @@ namespace bittorrent {
             if constexpr (!std::is_arithmetic_v<T>) {
                 out << value;
             } else {
+                uint8_t bytes[sizeof(T)] {};
                 if (order_ == BigEndian) {
-                    out << NativeToBig(value);
+                    ValueToArray(NativeToBig(value), bytes);
+                    CopyFrom(bytes, sizeof(T));
                 } else if (order_ == LittleEndian) {
-                    out << NativeToLittle(value);
+                    ValueToArray(NativeToLittle(value), bytes);
+                    CopyFrom(bytes, sizeof(T));
                 }
             }
             return *this;
@@ -62,11 +65,12 @@ namespace bittorrent {
             if constexpr (!std::is_arithmetic_v<T>) {
                 inp >> value;
             } else {
-                inp >> value;
+                uint8_t bytes[sizeof(T)] {};
+                CopyTo(bytes, sizeof(T));
                 if (order_ == BigEndian) {
-                    value = BigToNative(value);
+                    value = BigToNative(ArrayToValue<T>(bytes));
                 } else if (order_ == LittleEndian) {
-                    value = LittleToNative(value);
+                    value = LittleToNative(ArrayToValue<T>(bytes));
                 }
             }
             return *this;

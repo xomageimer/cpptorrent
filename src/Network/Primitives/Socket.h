@@ -125,7 +125,7 @@ namespace network {
         endpoint_iter_type endpoint_iter_;
         socket_type socket_;
         asio::deadline_timer timeout_;
-        DataPtr buff_;
+        StreamBufPtr buff_;
     };
 
     using StrandEx = asio::executor;
@@ -135,7 +135,7 @@ namespace network {
 
         void Send(const DataPtr& msg_ptr, WriteCallback write_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
-                async_write(socket_, msg_ptr->data(), [self, write_callback, error_callback](error_code ec, size_t xfr) {
+                async_write(socket_, StreamBufPtr(msg_ptr)->data(), [self, write_callback, error_callback](error_code ec, size_t xfr) {
                     if (!ec) {
                         write_callback(xfr);
                     } else {
@@ -151,7 +151,7 @@ namespace network {
                     socket_, asio::buffer(buff_->prepare(size)), [this, self, read_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
                         if (!ec) {
-                            read_callback(buff_);
+                            read_callback(std::dynamic_pointer_cast<bittorrent::Message>(buff_));
                         } else {
                             error_callback(ec);
                         }
@@ -162,10 +162,10 @@ namespace network {
 
         void ReadUntil(std::string until_str, ReadCallback read_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
-                async_read_until(socket_, *StreamBufPtr(buff_), until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
+                async_read_until(socket_, *buff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
                     stop_await();
                     if (!ec) {
-                        read_callback(buff_);
+                        read_callback(std::dynamic_pointer_cast<bittorrent::Message>(buff_));
                     } else {
                         error_callback(ec);
                     }
@@ -177,12 +177,12 @@ namespace network {
         void ReadToEof(ReadCallback read_callback, ReadCallback eof_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
                 async_read(
-                    socket_, *StreamBufPtr(buff_), [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
+                    socket_, *buff_, [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
                         if (!ec) {
-                            read_callback(buff_);
+                            read_callback(std::dynamic_pointer_cast<bittorrent::Message>(buff_));
                         } else if (ec == boost::asio::error::eof) {
-                            eof_callback(buff_);
+                            eof_callback(std::dynamic_pointer_cast<bittorrent::Message>(buff_));
                         } else {
                             error_callback(ec);
                         }
@@ -198,7 +198,7 @@ namespace network {
         void Send(const DataPtr& msg_ptr, WriteCallback write_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
                 socket_.async_send_to(
-                    msg_ptr->data(), *endpoint_iter_, [=](error_code ec, size_t xfr) {
+                    StreamBufPtr(msg_ptr)->data(), *endpoint_iter_, [=](error_code ec, size_t xfr) {
                         if (!ec) {
                             write_callback(xfr);
                         } else {
@@ -214,8 +214,9 @@ namespace network {
                 socket_.async_receive_from(
                     boost::asio::buffer(buff_->prepare(max_size)), sender_, [max_size, this, self, read_callback, error_callback](error_code ec, size_t xfr) {
                         this->stop_await();
+//                        std::cerr << buff_->size() << " == " << xfr << std::endl;
                         if (!ec) {
-                            read_callback(buff_);
+                            read_callback(std::dynamic_pointer_cast<bittorrent::Message>(buff_));
                         } else {
                             error_callback(ec);
                         }
