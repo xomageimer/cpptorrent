@@ -2,22 +2,22 @@
 
 #include <type_traits>
 
-void bittorrent::Message::CopyFrom(const bittorrent::Message &msg_buf) {
-    std::size_t bytes_copied = boost::asio::buffer_copy(prepare(msg_buf.size()), msg_buf.data());
-    commit(bytes_copied);
+void bittorrent::Message::CopyFrom(const Message &msg_buf) {
+    std::size_t bytes_copied = boost::asio::buffer_copy(streambuf_ptr->prepare(msg_buf.GetBuf().size()), msg_buf.GetBuf().data());
+    streambuf_ptr->commit(bytes_copied);
 }
 
 void bittorrent::Message::CopyFrom(const void *data, size_t size) {
-    out.write(reinterpret_cast<const char *>(data), size);
+    out->write(reinterpret_cast<const char *>(data), size);
 }
 
 void bittorrent::Message::CopyTo(void *data, size_t size) {
-    inp.read(reinterpret_cast<char *>(data), size);
+    inp->read(reinterpret_cast<char *>(data), size);
 }
 
 std::string bittorrent::Message::GetLine() {
     std::string line;
-    std::getline(inp, line);
+    std::getline(*inp, line);
     return std::move(line);
 }
 

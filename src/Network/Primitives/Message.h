@@ -21,17 +21,21 @@ namespace bittorrent {
         LittleEndian
     };
 
-    struct Message : boost::asio::streambuf {
+    struct Message {
     public:
-        using boost::asio::streambuf::streambuf;
+        boost::asio::streambuf &GetBuf() { return *streambuf_ptr; }
 
-        explicit Message(ByteOrder bo = BigEndian) : order_(bo), inp(this), out(this){};
+        const boost::asio::streambuf &GetBuf() const { return *streambuf_ptr; }
 
-        boost::asio::streambuf &GetOrigin() { return *this; }
+        explicit Message(boost::asio::streambuf *ptr, ByteOrder bo = BigEndian)
+            : streambuf_ptr(ptr), order_(bo), inp(std::make_shared<std::istream>(streambuf_ptr)),
+              out(std::make_shared<std::ostream>(streambuf_ptr)){};
 
-        const auto &operator[](size_t i) const { return boost::asio::buffer_cast<const uint8_t *>(data())[i]; }
+        Message(const Message &msg) : streambuf_ptr(msg.streambuf_ptr), inp(msg.inp), out(msg.out), order_(msg.order_) {}
 
-        void Clear() { consume(size()); }
+        const auto &operator[](size_t i) const { return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data())[i]; }
+
+        void Clear() { GetBuf().consume(GetBuf().size()); }
 
         void CopyFrom(const Message &msg_buf);
 
@@ -43,9 +47,9 @@ namespace bittorrent {
 
         template <typename T> Message &operator<<(const T &value) {
             if constexpr (!std::is_arithmetic_v<T>) {
-                out << value;
+                (*out) << value;
             } else {
-                uint8_t bytes[sizeof(T)] {};
+                uint8_t bytes[sizeof(T)]{};
                 if (order_ == BigEndian) {
                     ValueToArray(NativeToBig(value), bytes);
                     CopyFrom(bytes, sizeof(T));
@@ -63,9 +67,9 @@ namespace bittorrent {
 
         template <typename T> Message &operator>>(T &value) {
             if constexpr (!std::is_arithmetic_v<T>) {
-                inp >> value;
+                (*inp) >> value;
             } else {
-                uint8_t bytes[sizeof(T)] {};
+                uint8_t bytes[sizeof(T)]{};
                 CopyTo(bytes, sizeof(T));
                 if (order_ == BigEndian) {
                     value = BigToNative(ArrayToValue<T>(bytes));
@@ -80,8 +84,9 @@ namespace bittorrent {
 
     protected:
         ByteOrder order_ = ByteOrder::BigEndian;
-        std::istream inp;
-        std::ostream out;
+        boost::asio::streambuf *streambuf_ptr;
+        std::shared_ptr<std::istream> inp;
+        std::shared_ptr<std::ostream> out;
     };
 
     enum PEER_MESSAGE_TYPE : uint8_t {
@@ -107,15 +112,13 @@ namespace bittorrent {
 
         static const inline size_t id_length = 1;
 
-        explicit PeerMessage(ByteOrder bo = BigEndian) : Message(bo) { }
-
-        const auto *Body() const {
-            return boost::asio::buffer_cast<const uint8_t *>(data()) + header_length + id_length;
-        }
+        const auto *Body() const { return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data()) + header_length + id_length; }
 
         size_t GetBodySize() const;
 
-        PEER_MESSAGE_TYPE GetType() const { return PEER_MESSAGE_TYPE{boost::asio::buffer_cast<const uint8_t *>(data())[header_length]}; };
+        PEER_MESSAGE_TYPE GetType() const {
+            return PEER_MESSAGE_TYPE{boost::asio::buffer_cast<const uint8_t *>(GetBuf().data())[header_length]};
+        };
 
         void SetHeader(uint32_t size);
 
@@ -123,8 +126,5 @@ namespace bittorrent {
         size_t body_size_ = 0;
     };
 } // namespace bittorrent
-
-using DataPtr = std::shared_ptr<bittorrent::Message>;
-using StreamBufPtr = std::shared_ptr<boost::asio::streambuf>;
 
 #endif // CPPTORRENT_MESSAGE_H

@@ -25,7 +25,7 @@ namespace network {
     struct TrackerRequester {
     public:
         explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker)
-            : tracker_(*tracker), msg_(std::make_shared<bittorrent::Message>()) {}
+            : tracker_(*tracker) {}
 
         TrackerRequester(TrackerRequester const &) = delete;
 
@@ -49,9 +49,9 @@ namespace network {
 
         bittorrent::Tracker &tracker_;
 
-        DataPtr msg_;
+        boost::asio::streambuf msg_;
 
-        virtual void SetResponse(DataPtr) = 0;
+        virtual void SetResponse(Data) = 0;
 
         void SetException(const std::string &err) {
             if (is_set) return;
@@ -85,7 +85,7 @@ namespace network {
 
         void do_read_response_body();
 
-        void SetResponse(DataPtr) override;
+        void SetResponse(Data) override;
     };
 
     struct udpRequester : public TrackerRequester, public UDPSocket {
@@ -116,7 +116,7 @@ namespace network {
 
         void update_endpoint();
 
-        void SetResponse(DataPtr) override;
+        void SetResponse(Data) override;
 
         void make_announce_request();
 

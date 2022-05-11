@@ -26,11 +26,6 @@
 
 namespace ba = boost::asio;
 
-using DataPtr = std::shared_ptr<bittorrent::Message>;
-using PeerDataPtr = std::shared_ptr<bittorrent::PeerMessage>;
-
-// TODO вынести основную часть сети куда-нибудь отдельно и наследоваться от нее
-
 namespace network {
     enum STATE : uint8_t {
         am_choking = 0b0001,     // this client is choking the peer
@@ -75,7 +70,7 @@ namespace network {
         void Disconnect();
 
     private:
-        bool check_handshake(const DataPtr &) const;
+        bool check_handshake(const Data &) const;
 
         void verify_handshake();
 
@@ -130,7 +125,7 @@ namespace network {
         bittorrent::Peer slave_peer_;
 
         // TODO сделать отдельно сетевой интерфейс в виде сокета
-        PeerDataPtr msg_{};
+        boost::asio::streambuf msg_;
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
 
