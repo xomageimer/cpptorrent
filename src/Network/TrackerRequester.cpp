@@ -228,11 +228,12 @@ void network::udpRequester::Connect(const bittorrent::Query &query) {
 
     query_ = query;
 
+    make_connect_request();
+    make_announce_request();
+
     UDPSocket::Connect(
         tracker_.GetUrl().Host, tracker_.GetUrl().Port,
         [this] {
-            make_connect_request();
-            make_announce_request();
             do_try_connect();
         },
         [this](boost::system::error_code ec) { SetException("Unable to resolve host: " + ec.message()); });
@@ -243,6 +244,7 @@ void network::udpRequester::do_try_connect() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     if (!connect_attempts_--) {
+        connect_attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
         update_endpoint();
     } else {
         LOG(tracker_.GetUrl().Host, " : ", "connect attempt: ", connect_attempts_);
@@ -303,8 +305,9 @@ void network::udpRequester::do_connect_response() {
                     " == ", c_req_.transaction_id, " -> ", (value == c_req_.transaction_id));
 
                 if (value == c_req_.transaction_id && action == 0) {
-                    c_resp_.connection_id = ArrayToValue<uint64_t>(&data[8]);
-                    c_resp_.transaction_id = value;
+                    data >> c_resp_.connection_id;
+                    c_resp_.connection_id = NativeToBig(c_resp_.connection_id);
+                    c_resp_.transaction_id = NativeToBig(value);
 
                     do_try_announce();
                 } else {
@@ -374,18 +377,19 @@ void network::udpRequester::do_announce_response() {
             } else {
                 LOG(tracker_.GetUrl().Host, " : ", "announce successful completion receive ", data.GetBuf().size(), " bytes");
 
-                auto action = BigToNative(ArrayToValue<uint32_t>(&data[0]));
-                auto val = ArrayToValue<uint32_t>(&data[4]);
+                uint32_t action, val;
+                data >> action;
+                data >> val;
 
                 LOG(tracker_.GetUrl().Host, " : ", "\nbytes_transferred: ", std::dec, data.GetBuf().size(),
-                    "\nval == c_resp.transaction_id.value(): ", (val == c_resp_.transaction_id),
-                    "\nresponse[0] != 0: ", (NativeToBig(ArrayToValue<uint32_t>(&data[0])) != 0), "\nresponse[0] = ", std::hex,
-                    NativeToBig(ArrayToValue<uint32_t>(&data[0])));
+                    "\nval == c_resp.transaction_id.value(): ", (val == BigToNative(c_resp_.transaction_id)),
+                    "\nresponse[0] != 0: ", (action != 0), "\nresponse[0] = ", std::hex,
+                    val);
 
-                if (data.GetBuf().size() >= 20 && val == c_resp_.transaction_id && action == 1) {
+                if (data.GetBuf().size() >= 20 && val ==  BigToNative(c_resp_.transaction_id) && action == 1) {
                     data << '\0';
                     SetResponse(data);
-                } else if (!data.GetBuf().size() && val == c_resp_.transaction_id && action == 3) {
+                } else if (data.GetBuf().size() && val == BigToNative(c_resp_.transaction_id) && action == 3) {
                     LOG(tracker_.GetUrl().Host, " : ", "catch error from tracker announce: ", static_cast<const unsigned char *>(&data[8]));
                     do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 } else {
@@ -400,7 +404,6 @@ void network::udpRequester::do_announce_response() {
 void network::udpRequester::update_endpoint() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
-    connect_attempts_ = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
     Promote();
 
     if (IsEndpointsDried()) {

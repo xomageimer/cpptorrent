@@ -153,6 +153,7 @@ namespace network {
                 async_read(
                     socket_, asio::buffer(buff_.prepare(size)), [this, self, read_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
+                        buff_.commit(length);
                         if (!ec) {
                             read_callback(bittorrent::Message(&buff_));
                         } else {
@@ -167,6 +168,7 @@ namespace network {
             Post([=, this, self = shared_from_this()] {
                 async_read_until(socket_, buff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
                     stop_await();
+                    buff_.commit(xfr);
                     if (!ec) {
                         read_callback(bittorrent::Message(&buff_));
                     } else {
@@ -182,6 +184,7 @@ namespace network {
                 async_read(
                     socket_, buff_, [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
+                        buff_.commit(length);
                         if (!ec) {
                             read_callback(bittorrent::Message(&buff_));
                         } else if (ec == boost::asio::error::eof) {
@@ -198,10 +201,10 @@ namespace network {
     struct UDPSocket : Impl<asio::ip::udp, StrandEx> {
         using base_type::base_type;
 
-        void Send(const Data& msg_ptr, WriteCallback write_callback, ErrorCallback error_callback) {
+        void Send(const Data& msg, WriteCallback write_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
                 socket_.async_send_to(
-                    msg_ptr.GetBuf().data(), *endpoint_iter_, [=](error_code ec, size_t xfr) {
+                    msg.GetBuf().data(), *endpoint_iter_, [=](error_code ec, size_t xfr) {
                         if (!ec) {
                             write_callback(xfr);
                         } else {
@@ -217,7 +220,7 @@ namespace network {
                 socket_.async_receive_from(
                     boost::asio::buffer(buff_.prepare(max_size)), sender_, [max_size, this, self, read_callback, error_callback](error_code ec, size_t xfr) {
                         this->stop_await();
-//                        std::cerr << buff_->size() << " == " << xfr << std::endl;
+                        buff_.commit(xfr);
                         if (!ec) {
                             read_callback(bittorrent::Message(&buff_));
                         } else {
