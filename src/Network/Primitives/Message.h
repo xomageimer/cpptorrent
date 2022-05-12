@@ -33,6 +33,8 @@ namespace bittorrent {
 
         Message(const Message &msg) : streambuf_ptr(msg.streambuf_ptr), inp(msg.inp), out(msg.out), order_(msg.order_) {}
 
+        void SetOrder(ByteOrder bo) { order_ = bo; }
+
         const auto &operator[](size_t i) const { return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data())[i]; }
 
         void Clear() { GetBuf().consume(GetBuf().size()); }
@@ -44,6 +46,8 @@ namespace bittorrent {
         void CopyTo(void *data, size_t size);
 
         std::string GetLine();
+
+        ByteOrder GetOrder() { return order_; }
 
         template <typename T> Message &operator<<(const T &value) {
             if constexpr (!std::is_arithmetic_v<T>) {

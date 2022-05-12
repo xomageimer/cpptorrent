@@ -96,9 +96,9 @@ void network::httpRequester::SetResponse(Data data) {
 void network::httpRequester::Connect(const bittorrent::Query &query) {
     LOG(tracker_.GetUrl().Host, " : ", "Make http request ");
 
-    Data msg_data(&msg_);
+    std::ostream msg_is (&msg_);
     auto my_hash = UrlEncode(tracker_.GetInfoHash());
-    msg_data << "GET /" << tracker_.GetUrl().Path.value_or("") << "?"
+    msg_is << "GET /" << tracker_.GetUrl().Path.value_or("") << "?"
 
             << "info_hash=" << UrlEncode(tracker_.GetInfoHash())
             << "&peer_id=" << UrlEncode(std::string(reinterpret_cast<const char *>(tracker_.GetMasterPeerId()), 20))
@@ -131,14 +131,15 @@ void network::httpRequester::do_read_response_status() {
     ReadUntil(
         "\r\n",
         [this](Data data) {
+            std::istream data_is(&data.GetBuf());
+
             std::string http_version;
-            data >> http_version;
+            data_is >> http_version;
 
             LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
 
-            std::istream is(&data.GetBuf());
             uint32_t status_code;
-            is >> status_code;
+            data_is >> status_code;
 
             std::string status_message = data.GetLine();
 
@@ -166,6 +167,7 @@ void network::httpRequester::do_read_response_header() {
             Data msg_data(&msg_);
             msg_data.Clear();
             msg_data.CopyFrom(data);
+            std::cerr << msg_data.GetBuf().size() << std::endl;
             do_read_response_body();
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
@@ -183,8 +185,10 @@ void network::httpRequester::do_read_response_body() {
             do_read_response_body();
         },
         [this](const Data & data) {
+            std::cerr << data.GetBuf().size() << std::endl;
             Data msg_data(&msg_);
             msg_data.CopyFrom(data);
+            std::cerr << msg_data.GetBuf().size() << std::endl;
             SetResponse(msg_data);
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
