@@ -92,7 +92,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
                                             .then([&](boost::future<std::vector<boost::future<bittorrent::Response>>> ready_results) {
                                                 auto results = ready_results.get();
                                                 bittorrent::Response resp;
-                                                int i = 0;
+                                                int i = 0, j = 0;
                                                 for (auto &el: results) {
                                                     if (!el.has_exception()) {
                                                         auto cur_resp = el.get();
@@ -102,9 +102,11 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
                                                             auto to_swap = std::next(active_trackers.begin(), i);
                                                             active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
                                                         }
-                                                    }
+                                                    } else j++;
                                                     i++;
                                                 }
+                                                if (j == results.size())
+                                                    throw std::logic_error("All get exceptions ");
                                                 return resp;
                                             })
                                             .get();
@@ -119,9 +121,6 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
         return true;
     } catch (boost::exception &excp) {
         std::cerr << "got exception" << std::endl;
-        for (auto & tracker : active_trackers) {
-            tracker->Stop();
-        }
 
         std::cerr << boost::diagnostic_information(excp) << std::endl;
         return false;

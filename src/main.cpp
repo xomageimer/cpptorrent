@@ -25,6 +25,13 @@ int main()
         thread = std::thread([&]{ service.run(); });
     }
 
+    auto service_exit = [&] {
+        service.stop();
+        for (auto & thread : threads) {
+            thread.join();
+        }
+    };
+
     auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
 
@@ -36,6 +43,7 @@ int main()
         if (!torrent->TryConnect(bittorrent::Launch::Best,
                 bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                              // параллельно вызвать Best, чтобы подменить на наиболее лучший
+            service_exit();
             return EXIT_SUCCESS;
         }
         std::cout << "make connect: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count() << "sec " << std::endl;
@@ -44,16 +52,13 @@ int main()
     catch (std::exception &e)
     {
         std::cerr << "ERROR: " << e.what() << std::endl;
+        service_exit();
         return EXIT_FAILURE;
     }
     std::cout << "PRESS KEY TO CANCEL!" << std::endl;
     char c;
     std::cin >> c;
-    service.stop();
-
-    for (auto & thread : threads) {
-        thread.join();
-    }
+    service_exit();
 
     std::cout << "gonna die" << std::endl;
 

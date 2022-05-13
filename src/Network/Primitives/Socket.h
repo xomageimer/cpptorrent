@@ -219,7 +219,6 @@ namespace network {
                         this->stop_await();
                         buff_.commit(xfr);
                         if (!ec) {
-                            std::cerr << buff_.size() << std::endl;
                             read_callback(bittorrent::Message(&buff_));
                         } else {
                             error_callback(ec);
