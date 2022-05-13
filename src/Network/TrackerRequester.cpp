@@ -17,7 +17,6 @@ void network::httpRequester::SetResponse(Data data) {
 
     std::string resp_str;
     resp_str.resize(data.GetBuf().size());
-    size_t size = data.GetBuf().size();
     data.CopyTo(resp_str.data(), resp_str.size());
 
     std::vector<std::string> bencode_response;
@@ -167,7 +166,6 @@ void network::httpRequester::do_read_response_header() {
             Data msg_data(&msg_);
             msg_data.Clear();
             msg_data.CopyFrom(data);
-            std::cerr << msg_data.GetBuf().size() << std::endl;
             do_read_response_body();
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
@@ -188,7 +186,6 @@ void network::httpRequester::do_read_response_body() {
             std::cerr << data.GetBuf().size() << std::endl;
             Data msg_data(&msg_);
             msg_data.CopyFrom(data);
-            std::cerr << msg_data.GetBuf().size() << std::endl;
             SetResponse(msg_data);
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });

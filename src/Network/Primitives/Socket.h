@@ -153,7 +153,6 @@ namespace network {
                 async_read(
                     socket_, asio::buffer(buff_.prepare(size)), [this, self, read_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
-                        buff_.commit(length);
                         if (!ec) {
                             read_callback(bittorrent::Message(&buff_));
                         } else {
@@ -168,7 +167,6 @@ namespace network {
             Post([=, this, self = shared_from_this()] {
                 async_read_until(socket_, buff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
                     stop_await();
-                    buff_.commit(xfr);
                     if (!ec) {
                         read_callback(bittorrent::Message(&buff_));
                     } else {
@@ -184,7 +182,6 @@ namespace network {
                 async_read(
                     socket_, buff_, [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
-                        buff_.commit(length);
                         if (!ec) {
                             read_callback(bittorrent::Message(&buff_));
                         } else if (ec == boost::asio::error::eof) {
@@ -222,11 +219,12 @@ namespace network {
                         this->stop_await();
                         buff_.commit(xfr);
                         if (!ec) {
+                            std::cerr << buff_.size() << std::endl;
                             read_callback(bittorrent::Message(&buff_));
                         } else {
                             error_callback(ec);
                         }
-                        buff_.consume(max_size);
+                        buff_.consume(xfr);
                     });
             });
         }
