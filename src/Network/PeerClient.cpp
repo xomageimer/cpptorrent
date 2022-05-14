@@ -155,7 +155,7 @@ void network::PeerClient::verify_handshake() {
 }
 
 bool network::PeerClient::check_handshake(const Data & data) const {
-    if (data[0] == 0x13 && memcmp(&data[1], "BitTorrent protocol", 19) == 0) {
+    if (data[0] == 0x13 && memcmp(&data[1], "BitTorrent protocol", 19) == 0 && memcmp(&data[28], &master_peer_.GetHandshake()[28], 20) == 0) {
         return true;
     }
     return false;
@@ -180,8 +180,9 @@ void network::PeerClient::send_handshake() {
                 [this](const Data& data) {
                     LOG(GetStrIP(), " : correct answer");
 
-                    LOG (GetStrIP(), " : \"hndshke.BodyLength() >= bittorrent_constants::handshake_length\" == ", data.GetBuf().size() >= bittorrent_constants::handshake_length);
-                    LOG (GetStrIP(), " : \"memcmp(&hndshke.GetDataPointer()[28], &master_peer_.GetHandshake()[28], 20) == 0\" == ", memcmp(&data[28], &master_peer_.GetHandshake()[28], 20) == 0);
+                    LOG (GetStrIP(), " : \"handshake.TotalLength() >= bittorrent_constants::handshake_length\" == ", data.GetBuf().size() >= bittorrent_constants::handshake_length);
+                    bool is_handshake_correct = check_handshake(data);
+                    LOG (GetStrIP(), " : \"is handshake correct == ", is_handshake_correct);
 
                     if (data.GetBuf().size() >= bittorrent_constants::handshake_length && check_handshake(data)
                         && memcmp(&data[28], &master_peer_.GetHandshake()[28], 20) == 0) {

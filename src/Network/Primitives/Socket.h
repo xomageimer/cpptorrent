@@ -153,6 +153,7 @@ namespace network {
                 async_read(
                     socket_, asio::buffer(buff_.prepare(size)), [this, self, read_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
+                        buff_.commit(length);
                         if (!ec) {
                             read_callback(bittorrent::Message(&buff_));
                         } else {

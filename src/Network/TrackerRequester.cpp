@@ -200,7 +200,7 @@ void network::udpRequester::SetResponse(Data data) {
 
     bittorrent::Response resp;
 
-    resp.interval = std::chrono::seconds(NativeToBig(ArrayToValue<uint32_t>(&data[8])));
+    resp.interval = std::chrono::seconds(BigToNative(ArrayToValue<uint32_t>(&data[8])));
 
     for (size_t i = 20; data[i] != (uint8_t)'\0'; i += 6) {
         uint8_t peer[6];
@@ -213,8 +213,6 @@ void network::udpRequester::SetResponse(Data data) {
         uint32_t ip = BigToNative(ArrayToValue<uint32_t>(&peer[0]));
         /* port as little endian */
         uint16_t port = BigToNative(ArrayToValue<uint16_t>(&peer[4]));
-
-        std::cerr << ip << " : " << port << std::endl;
 
         bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
         resp.peers.push_back(std::move(pi));
