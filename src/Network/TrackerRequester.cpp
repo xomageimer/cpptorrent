@@ -214,6 +214,8 @@ void network::udpRequester::SetResponse(Data data) {
         /* port as little endian */
         uint16_t port = BigToNative(ArrayToValue<uint16_t>(&peer[4]));
 
+        std::cerr << ip << " : " << port << std::endl;
+
         bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
         resp.peers.push_back(std::move(pi));
     }

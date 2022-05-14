@@ -25,19 +25,22 @@ namespace bittorrent {
     public:
         boost::asio::streambuf &GetBuf() { return *streambuf_ptr; }
 
-        const boost::asio::streambuf &GetBuf() const { return *streambuf_ptr; }
+        [[nodiscard]] const boost::asio::streambuf &GetBuf() const { return *streambuf_ptr; }
 
         explicit Message(boost::asio::streambuf *ptr, ByteOrder bo = BigEndian)
-            : streambuf_ptr(ptr), order_(bo), inp(std::make_shared<std::istream>(streambuf_ptr)),
-              out(std::make_shared<std::ostream>(streambuf_ptr)){};
+            : streambuf_ptr(ptr), arr_(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size()),
+              order_(bo){};
 
-        Message(const Message &msg) : streambuf_ptr(msg.streambuf_ptr), inp(msg.inp), out(msg.out), order_(msg.order_) {}
+        Message(const Message &msg) : streambuf_ptr(msg.streambuf_ptr), arr_(msg.arr_), order_(msg.order_) {}
 
         void SetOrder(ByteOrder bo) { order_ = bo; }
 
-        const auto &operator[](size_t i) const { return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data())[i]; }
+        const auto &operator[](size_t i) const { return arr_[i]; }
 
-        void Clear() { GetBuf().consume(GetBuf().size()); }
+        void Clear() {
+            GetBuf().consume(GetBuf().size());
+            arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
+        }
 
         void CopyFrom(const Message &msg_buf);
 
@@ -47,20 +50,18 @@ namespace bittorrent {
 
         std::string GetLine();
 
+        std::string GetString();
+
         ByteOrder GetOrder() { return order_; }
 
         template <typename T> Message &operator<<(const T &value) {
-            if constexpr (!std::is_arithmetic_v<T>) {
-                (*out) << value;
-            } else {
-                uint8_t bytes[sizeof(T)]{};
-                if (order_ == BigEndian) {
-                    ValueToArray(NativeToBig(value), bytes);
-                    CopyFrom(bytes, sizeof(T));
-                } else if (order_ == LittleEndian) {
-                    ValueToArray(NativeToLittle(value), bytes);
-                    CopyFrom(bytes, sizeof(T));
-                }
+            uint8_t bytes[sizeof(T)]{};
+            if (order_ == BigEndian) {
+                ValueToArray(NativeToBig(value), bytes);
+                CopyFrom(bytes, sizeof(T));
+            } else if (order_ == LittleEndian) {
+                ValueToArray(NativeToLittle(value), bytes);
+                CopyFrom(bytes, sizeof(T));
             }
             return *this;
         }
@@ -70,16 +71,12 @@ namespace bittorrent {
         }
 
         template <typename T> Message &operator>>(T &value) {
-            if constexpr (!std::is_arithmetic_v<T>) {
-                (*inp) >> value;
-            } else {
-                uint8_t bytes[sizeof(T)]{};
-                CopyTo(bytes, sizeof(T));
-                if (order_ == BigEndian) {
-                    value = BigToNative(ArrayToValue<T>(bytes));
-                } else if (order_ == LittleEndian) {
-                    value = LittleToNative(ArrayToValue<T>(bytes));
-                }
+            uint8_t bytes[sizeof(T)]{};
+            CopyTo(bytes, sizeof(T));
+            if (order_ == BigEndian) {
+                value = BigToNative(ArrayToValue<T>(bytes));
+            } else if (order_ == LittleEndian) {
+                value = LittleToNative(ArrayToValue<T>(bytes));
             }
             return *this;
         }
@@ -89,8 +86,9 @@ namespace bittorrent {
     protected:
         ByteOrder order_ = ByteOrder::BigEndian;
         boost::asio::streambuf *streambuf_ptr;
-        std::shared_ptr<std::istream> inp;
-        std::shared_ptr<std::ostream> out;
+        std::basic_string_view<uint8_t> arr_;
+        size_t inp_pos_ = 0;
+        size_t out_pos_ = 0;
     };
 
     enum PEER_MESSAGE_TYPE : uint8_t {
@@ -116,11 +114,13 @@ namespace bittorrent {
 
         static const inline size_t id_length = 1;
 
-        const auto *Body() const { return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data()) + header_length + id_length; }
+        [[nodiscard]] const auto *Body() const {
+            return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data()) + header_length + id_length;
+        }
 
-        size_t GetBodySize() const;
+        [[nodiscard]] size_t GetBodySize() const;
 
-        PEER_MESSAGE_TYPE GetType() const {
+        [[nodiscard]] PEER_MESSAGE_TYPE GetType() const {
             return PEER_MESSAGE_TYPE{boost::asio::buffer_cast<const uint8_t *>(GetBuf().data())[header_length]};
         };
 

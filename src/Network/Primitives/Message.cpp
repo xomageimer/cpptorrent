@@ -5,20 +5,34 @@
 void bittorrent::Message::CopyFrom(const Message &msg_buf) {
     std::size_t bytes_copied = boost::asio::buffer_copy(streambuf_ptr->prepare(msg_buf.GetBuf().size()), msg_buf.GetBuf().data());
     streambuf_ptr->commit(bytes_copied);
+    arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
 }
 
 void bittorrent::Message::CopyFrom(const void *data, size_t size) {
-    out->write(reinterpret_cast<const char *>(data), size);
+    std::ostream out(streambuf_ptr);
+    out.write(reinterpret_cast<const char *>(data), size);
+    arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
 }
 
 void bittorrent::Message::CopyTo(void *data, size_t size) {
-    inp->read(reinterpret_cast<char *>(data), size);
+    std::memcpy(data, reinterpret_cast<const void *>(arr_.data() + inp_pos_) , size);
+    inp_pos_ += size;
 }
 
 std::string bittorrent::Message::GetLine() {
     std::string line;
-    std::getline(*inp, line);
+    while (out_pos_ != arr_.size() && arr_[out_pos_] != '\n') {
+        line.push_back(arr_[out_pos_++]);
+    }
     return std::move(line);
+}
+
+std::string bittorrent::Message::GetString() {
+    std::string str;
+    while (out_pos_ != arr_.size() && !std::isspace(arr_[out_pos_])) {
+        str.push_back(arr_[out_pos_++]);
+    }
+    return std::move(str);
 }
 
 size_t bittorrent::PeerMessage::GetBodySize() const {
