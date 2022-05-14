@@ -163,6 +163,8 @@ bool network::PeerClient::check_handshake(const Data &data) const {
 }
 
 void network::PeerClient::send_handshake() {
+    LOG(GetStrIP(), " thread num #", std::this_thread::get_id());
+
     LOG(GetStrIP(), " : send handshake");
 
     auto failed_attempt = [this](boost::system::error_code ec) {
@@ -225,6 +227,8 @@ void network::PeerClient::send_bitfield() {
 
     PeerData msg_data(&msg_);
     msg_data.Clear();
+
+    const auto & bitfs = GetOwnerBitfield();
 
     const auto bytesToSend = (size_t)ceil((float)GetOwnerBitfield().Size() / 8.0f);
     msg_data.SetHeader(1 + bytesToSend);

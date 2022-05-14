@@ -31,6 +31,8 @@ namespace bittorrent {
 
         [[nodiscard]] bool PieceDone(uint32_t index) const;
 
+        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const { return bitset_; }
+
     private:
         void fill_files();
 

@@ -18,22 +18,22 @@
 #include "logger.h"
 
 bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path, std::filesystem::path const &download_path, size_t listener_port)
-    : service(service), port(listener_port) {
+    : service_(service), port_(listener_port) {
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
         throw std::logic_error("can't open file\n");
     }
     auto doc = bencode::Deserialize::Load(torrent_file);
-    meta_info.dict = doc.GetRoot();
+    meta_info_.dict = doc.GetRoot();
 
-    auto &info_hash_bencode = meta_info.dict["info"];
+    auto &info_hash_bencode = meta_info_.dict["info"];
     std::stringstream hash_to_s;
     bencode::Serialize::MakeSerialize(info_hash_bencode, hash_to_s);
     auto hash_info_str = hash_to_s.str();
-    meta_info.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
+    meta_info_.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
 
-    master_peer = std::make_shared<MasterPeer>(*this);
-    file_manager = std::make_shared<TorrentFilesManager>(*this, download_path);
+    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path);
+    master_peer_ = std::make_shared<MasterPeer>(*this);
 
     FillTrackers();
 }
@@ -50,7 +50,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
     LOG("create requests");
     try {
         std::vector<boost::future<bittorrent::Response>> results;
-        for (auto &tracker: active_trackers) {
+        for (auto &tracker: active_trackers_) {
             results.push_back(tracker->Request(query));
         }
 
@@ -84,11 +84,11 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
                 };
                 boost::when_any(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
                         .then(DoneCheck{total_res});
-                data_from_tracker = total_res.get_future().get();
+                data_from_tracker_ = total_res.get_future().get();
                 break;
             }
             case Launch::Best: {
-                data_from_tracker = boost::when_all(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
+                data_from_tracker_ = boost::when_all(std::make_move_iterator(results.begin()), std::make_move_iterator(results.end()))
                                             .then([&](boost::future<std::vector<boost::future<bittorrent::Response>>> ready_results) {
                                                 auto results = ready_results.get();
                                                 bittorrent::Response resp;
@@ -99,8 +99,8 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
                                                         if (cur_resp.peers.size() > resp.peers.size()) {
                                                             resp = cur_resp;
 
-                                                            auto to_swap = std::next(active_trackers.begin(), i);
-                                                            active_trackers.splice(active_trackers.begin(), active_trackers, to_swap);
+                                                            auto to_swap = std::next(active_trackers_.begin(), i);
+                                                            active_trackers_.splice(active_trackers_.begin(), active_trackers_, to_swap);
                                                         }
                                                     } else j++;
                                                     i++;
@@ -114,7 +114,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
             }
         }
         std::cerr << "got tracker" << std::endl;
-        for (auto & tracker : active_trackers) {
+        for (auto & tracker : active_trackers_) {
             tracker->Stop();
         }
 
@@ -131,28 +131,30 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
     if (!GetPeersSize())
         return;
 
+    LOG ("Get ", GetResponse().peers.size(), " peers");
+
     std::cout << GetResponse().peers.size() << std::endl;
-    master_peer->InitiateJob(GetService(), GetResponse().peers);
+    master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 
 void bittorrent::Torrent::ReceivePieceBlock(uint32_t idx, uint32_t begin, Block block) {
     uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-    file_manager->SetPieceBlock(idx, blockIndex, std::move(block));
+    file_manager_->SetPieceBlock(idx, blockIndex, std::move(block));
 }
 
 bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
-    return bittorrent::Query{.event = bittorrent::Event::Empty, .uploaded = t_uploaded, .downloaded = t_downloaded, .left = t_left, .compact = true};
+    return bittorrent::Query{.event = bittorrent::Event::Empty, .uploaded = uploaded_, .downloaded = downloaded_, .left = left_, .compact = true};
 }
 
 boost::asio::io_service &bittorrent::Torrent::GetService() const {
-    return service;
+    return service_;
 }
 
 const bittorrent::Response &bittorrent::Torrent::GetResponse() const {
-    if (!data_from_tracker) {
+    if (!data_from_tracker_) {
         throw std::logic_error("Trackers have not yet been polled");
     }
-    return *data_from_tracker;
+    return *data_from_tracker_;
 }
 
 bool bittorrent::Torrent::FillTrackers() {
@@ -185,6 +187,6 @@ bool bittorrent::Torrent::FillTrackers() {
     }
 
     std::shuffle(trackers.begin(), trackers.end(), random_generator::Random());
-    active_trackers.insert(active_trackers.end(), std::make_move_iterator(trackers.begin()), std::make_move_iterator(trackers.end()));
+    active_trackers_.insert(active_trackers_.end(), std::make_move_iterator(trackers.begin()), std::make_move_iterator(trackers.end()));
     return true;
 }

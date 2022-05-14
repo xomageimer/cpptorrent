@@ -143,7 +143,7 @@ namespace network {
             uint64_t connection_id{};
         } c_resp_;
 
-        uint8_t announce_req_[bittorrent_constants::middle_buff_size] {};
+        uint8_t announce_req_[bittorrent_constants::middle_buff_size + 1] {};
         // TODO add scrape
     };
 } // namespace network

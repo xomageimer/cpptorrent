@@ -41,21 +41,21 @@ namespace bittorrent {
 
         void ReceivePieceBlock(uint32_t idx, uint32_t begin, Block block);
 
-        bool IsPieceCompleted(uint32_t idx);
+        [[nodiscard]] const bittorrent::Bitfield & GetOwnerBitfield() const { return file_manager_->GetBitfield(); }
 
-        [[nodiscard]] bool PieceDone(uint32_t idx) const { return file_manager->PieceDone(idx); };
+        [[nodiscard]] bool PieceDone(uint32_t idx) const { return file_manager_->PieceDone(idx); };
 
-        [[nodiscard]] std::string const &GetInfoHash() const { return meta_info.info_hash; }
+        [[nodiscard]] std::string const &GetInfoHash() const { return meta_info_.info_hash; }
 
-        [[nodiscard]] bencode::Node const &GetMeta() const { return meta_info.dict; }
+        [[nodiscard]] bencode::Node const &GetMeta() const { return meta_info_.dict; }
 
-        [[nodiscard]] size_t GetPeersSize() const { return data_from_tracker ? data_from_tracker.value().peers.size() : 0; }
+        [[nodiscard]] size_t GetPeersSize() const { return data_from_tracker_ ? data_from_tracker_.value().peers.size() : 0; }
 
-        [[nodiscard]] const uint8_t *GetMasterPeerKey() const { return master_peer->GetID(); }
+        [[nodiscard]] const uint8_t *GetMasterPeerKey() const { return master_peer_->GetID(); }
 
-        [[nodiscard]] std::shared_ptr<bittorrent::MasterPeer> GetRootPeer() { return master_peer; }
+        [[nodiscard]] std::shared_ptr<bittorrent::MasterPeer> GetRootPeer() { return master_peer_; }
 
-        [[nodiscard]] size_t GetPort() const { return port; }
+        [[nodiscard]] size_t GetPort() const { return port_; }
 
         [[nodiscard]] bittorrent::Query GetDefaultTrackerQuery() const;
 
@@ -65,37 +65,37 @@ namespace bittorrent {
 
         [[nodiscard]] size_t GetPieceSize() const { return GetMeta()["info"]["piece length"].AsNumber(); };
 
-        [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size; }
+        [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size_; }
 
-        [[nodiscard]] bool HasTrackers() const { return !active_trackers.empty(); }
+        [[nodiscard]] bool HasTrackers() const { return !active_trackers_.empty(); }
 
     private:
         bool FillTrackers();
 
         [[nodiscard]] boost::asio::io_service &GetService() const;
 
-        boost::asio::io_service &service; // обязательно в самом верху
+        boost::asio::io_service &service_; // обязательно в самом верху
 
-        size_t t_uploaded{};
+        size_t uploaded_{};
 
-        size_t t_downloaded{};
+        size_t downloaded_{};
 
-        size_t t_left{};
+        size_t left_{};
 
         friend class bittorrent::Tracker;
-        std::list<std::shared_ptr<bittorrent::Tracker>> active_trackers;
+        std::list<std::shared_ptr<bittorrent::Tracker>> active_trackers_;
 
-        std::optional<bittorrent::Response> data_from_tracker;
+        std::optional<bittorrent::Response> data_from_tracker_;
 
-        size_t port;
+        size_t port_;
 
-        meta_info_file meta_info;
+        meta_info_file meta_info_;
 
-        std::shared_ptr<bittorrent::MasterPeer> master_peer;
+        std::shared_ptr<bittorrent::MasterPeer> master_peer_;
 
-        size_t last_piece_size{};
+        size_t last_piece_size_{};
 
-        std::shared_ptr<TorrentFilesManager> file_manager;
+        std::shared_ptr<TorrentFilesManager> file_manager_;
     };
 } // namespace bittorrent
 

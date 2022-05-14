@@ -50,8 +50,7 @@ namespace bittorrent {
         uint32_t ip{};
         uint16_t port{};
 
-    public:
-        bittorrent::Bitfield bitfield_;
+        bittorrent::Bitfield bitfield_{0};
     };
 
     struct PeerImage {
@@ -64,7 +63,7 @@ namespace bittorrent {
     public:
         using IP = uint32_t;
 
-        explicit MasterPeer(bittorrent::Torrent &tor) : torrent(tor) { MakeHandshake(); }
+        explicit MasterPeer(bittorrent::Torrent &tor) : torrent_(tor) { MakeHandshake(); }
 
         void InitiateJob(boost::asio::io_service &service, std::vector<PeerImage> const &peers);
 
@@ -74,25 +73,27 @@ namespace bittorrent {
 
         auto Get() { return shared_from_this(); }
 
-        bittorrent::Torrent & GetTorrent();
+        [[nodiscard]] bittorrent::Torrent &GetTorrent();
 
-        std::string GetInfoHash() const;
+        [[nodiscard]] std::string GetInfoHash() const;
 
-        size_t GetApplicationPort() const;
+        [[nodiscard]] size_t GetApplicationPort() const;
 
-        size_t GetTotalPiecesCount() const;
+        [[nodiscard]] size_t GetTotalPiecesCount() const;
 
-        const uint8_t *GetHandshake() const;
+        [[nodiscard]] const uint8_t *GetHandshake() const;
 
-        bencode::Node const &GetChunkHashes() const;
+        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const;
+
+        [[nodiscard]] bencode::Node const &GetChunkHashes() const;
 
     private:
         void MakeHandshake();
 
-        uint8_t handshake_message[bittorrent_constants::handshake_length]{};
+        uint8_t handshake_message_[bittorrent_constants::handshake_length]{};
 
         friend class bittorrent::Torrent;
-        bittorrent::Torrent &torrent;
+        bittorrent::Torrent &torrent_;
 
         std::mutex mut_;
 

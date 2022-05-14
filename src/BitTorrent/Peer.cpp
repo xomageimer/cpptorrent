@@ -13,37 +13,39 @@ bittorrent::Peer::Peer() {
         id[8 + i] = random_generator::Random().GetNumber<uint8_t>();
     }
 }
+
 [[maybe_unused]] bittorrent::Peer::Peer(const uint8_t *key_arg) {
     for (size_t i = 0; i < 20; i++)
         id[i] = key_arg[i];
 }
+
 bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number) : Peer() {
     ip = ip_address;
     port = port_number;
 }
+
 bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t *key) : Peer(key) {
     ip = ip_address;
     port = port_number;
 }
 
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
-    bitfield_.Resize(torrent.GetPieceCount());
+    bitfield_.Resize(torrent_.GetPieceCount());
     for (auto &peer : peers) {
         Subscribe(std::make_shared<network::PeerClient>(Get(), peer.BE_struct, ba::make_strand(service)));
     }
-    //      Subscribe(std::make_shared<network::PeerClient>(Get(), peers.begin()->BE_struct, ba::make_strand(service)));
 }
 
 bencode::Node const &bittorrent::MasterPeer::GetChunkHashes() const {
-    return torrent.GetMeta()["info"]["files"];
+    return torrent_.GetMeta()["info"]["files"];
 }
 
 std::string bittorrent::MasterPeer::GetInfoHash() const {
-    return torrent.GetInfoHash();
+    return torrent_.GetInfoHash();
 }
 
 size_t bittorrent::MasterPeer::GetApplicationPort() const {
-    return torrent.GetPort();
+    return torrent_.GetPort();
 }
 
 void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient> &new_sub) {
@@ -62,25 +64,29 @@ void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
 
     peers_subscribers_.erase(unsub_ip);
 
-    LOG ("peers remain: ", peers_subscribers_.size());
+    LOG("peers remain: ", peers_subscribers_.size());
 }
 
 void bittorrent::MasterPeer::MakeHandshake() {
-    handshake_message[0] = 0x13;
-    std::memcpy(&handshake_message[1], "BitTorrent protocol", 19);
-    std::memset(&handshake_message[20], 0x00, 8); // reserved bytes (last |= 0x01 for DHT or last |= 0x04 for FPE)
-    std::memcpy(&handshake_message[28], GetInfoHash().data(), 20);
-    std::memcpy(&handshake_message[48], GetID(), 20);
+    handshake_message_[0] = 0x13;
+    std::memcpy(&handshake_message_[1], "BitTorrent protocol", 19);
+    std::memset(&handshake_message_[20], 0x00, 8); // reserved bytes (last |= 0x01 for DHT or last |= 0x04 for FPE)
+    std::memcpy(&handshake_message_[28], GetInfoHash().data(), 20);
+    std::memcpy(&handshake_message_[48], GetID(), 20);
 }
 
 const uint8_t *bittorrent::MasterPeer::GetHandshake() const {
-    return handshake_message;
+    return handshake_message_;
 }
 
 size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
-    return torrent.GetPieceCount();
+    return torrent_.GetPieceCount();
 }
 
-bittorrent::Torrent & bittorrent::MasterPeer::GetTorrent() {
-    return torrent;
+bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
+    return torrent_;
+}
+
+const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
+    return torrent_.GetOwnerBitfield();
 }
