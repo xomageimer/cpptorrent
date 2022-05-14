@@ -56,7 +56,7 @@ namespace network {
         void SetException(const std::string &err) {
             if (is_set) return;
 
-            LOG(tracker_.GetUrl().Host, " : ", " get exception");
+            LOG(tracker_.GetUrl().Host, " : ", " get exception (", err, ")");
 
             promise_of_resp.set_exception(network::BadConnect(err));
             Disconnect();

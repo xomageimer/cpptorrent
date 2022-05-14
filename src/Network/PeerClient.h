@@ -33,7 +33,7 @@ namespace network {
         peer_choking = 0b0100,   // peer is choking this client
         peer_interested = 0b1000 // peer is interested in this client
     };
-    // TODO переписать с использованием сокета
+
     struct PeerClient : public TCPSocket {
     public:
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer,
@@ -124,7 +124,6 @@ namespace network {
 
         bittorrent::Peer slave_peer_;
 
-        // TODO сделать отдельно сетевой интерфейс в виде сокета
         boost::asio::streambuf msg_;
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;

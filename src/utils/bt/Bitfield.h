@@ -23,7 +23,7 @@ namespace bittorrent {
 
         void Resize(size_t new_size);
 
-        bool Test(size_t i) const { return bits_[i]; }
+        [[nodiscard]] bool Test(size_t i) const { return bits_[i]; }
 
         void Set(size_t i) { bits_.set(i); }
 

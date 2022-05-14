@@ -8,7 +8,10 @@
 #include <boost/function_output_iterator.hpp>
 
 bool is_little_endian() {
-    static bool is_little = [] {int num = 1; return (*reinterpret_cast<char *>(&num) == 1); }();
+    static bool is_little = [] {
+        int num = 1;
+        return (*reinterpret_cast<char *>(&num) == 1);
+    }();
     return is_little;
 }
 
@@ -55,11 +58,11 @@ std::string UrlEncode(const std::string &url_to_encode) {
 }
 
 int IpToInt(const std::string &ip_address) {
-//    int iip = 0;
-//    for (auto const & el : ip_address) {
-//        iip <<= 8;
-//
-//    }
+    //    int iip = 0;
+    //    for (auto const & el : ip_address) {
+    //        iip <<= 8;
+    //
+    //    }
     return 0;
 }
 
@@ -80,16 +83,15 @@ std::string IpToStr(size_t ip) {
         is_first = false;
         ip_address_str += std::to_string(el);
     }
-    
+
     return std::move(ip_address_str);
 }
 
 std::string BytesToHumanReadable(uint32_t bytes) {
-    if (bytes < 1024 )
-        return std::to_string(bytes) + " B";
+    if (bytes < 1024) return std::to_string(bytes) + " B";
 
     auto exp = static_cast<size_t>(std::log(bytes) / std::log(1024));
-    const char * ci = "kMGTPE";
+    const char *ci = "kMGTPE";
 
     std::ostringstream os;
     os << static_cast<double>(bytes / std::pow(1024, exp)) << " ";
@@ -104,4 +106,11 @@ long double BytesToGiga(long long bytes) {
 
 unsigned long long GigaToBytes(long double gigabytes) {
     return gigabytes * powf(1024.f, 3);
+}
+
+unsigned char ReverseByte(unsigned char b) {
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
 }

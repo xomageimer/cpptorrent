@@ -35,16 +35,16 @@ namespace bittorrent {
 
         void SetOrder(ByteOrder bo) { order_ = bo; }
 
-        const auto &operator[](size_t i) const { return arr_[i]; }
+        const auto & operator[](size_t i) const { return arr_[i]; }
 
         void Clear() {
             GetBuf().consume(GetBuf().size());
             arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
         }
 
-        void CopyFrom(const Message &msg_buf);
+        void CopyFrom(const Message &msg_buf);          // all reference to operator[] are is invalidated
 
-        void CopyFrom(const void *data, size_t size);
+        void CopyFrom(const void *data, size_t size);   // all reference to operator[] are is invalidated
 
         void CopyTo(void *data, size_t size);
 

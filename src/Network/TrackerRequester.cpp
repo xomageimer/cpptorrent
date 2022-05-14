@@ -232,6 +232,8 @@ void network::udpRequester::Connect(const bittorrent::Query &query) {
     make_connect_request();
     make_announce_request();
 
+    LOG(tracker_.GetUrl().Host, " : ", "trying to connect");
+
     UDPSocket::Connect(
         tracker_.GetUrl().Host, tracker_.GetUrl().Port,
         [this] {
