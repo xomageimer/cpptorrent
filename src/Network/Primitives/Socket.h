@@ -6,12 +6,13 @@
 #include "Message.h"
 #include "NetExceptions.h"
 
+#include <list>
 #include <memory>
 #include <string>
 #include <utility>
 
-using Data = bittorrent::Message;
-using PeerData = bittorrent::PeerMessage;
+using SendData = bittorrent::SendingMessage;            // the oldest sending message class
+using ReceiveAnyData = bittorrent::ReceivingPeerMessage; // the most inherited receiving message class
 
 namespace network {
     namespace asio = boost::asio;
@@ -32,7 +33,7 @@ namespace network {
         using ConnectCallback = std::function<void()>;
         using PromoteCallback = std::function<void()>;
         using WriteCallback = std::function<void(size_t)>;
-        using ReadCallback = std::function<void(const Data &)>;
+        using ReadCallback = std::function<void(const ReceiveAnyData &)>;
         using ErrorCallback = std::function<void(boost::system::error_code ec)>;
 
         explicit Impl(Executor executor) : resolver_(executor), socket_(executor), timeout_(executor) {
@@ -79,9 +80,7 @@ namespace network {
         }
 
         void Cancel() {
-            Post([this, self = shared_from_this()] {
-                cancel_operation();
-            });
+            Post([this, self = shared_from_this()] { cancel_operation(); });
         }
 
     protected:
@@ -116,7 +115,7 @@ namespace network {
                 });
         }
 
-        void cancel_operation(){
+        void cancel_operation() {
             timeout_.cancel();
             resolver_.cancel();
             if (socket_.is_open()) {
@@ -128,7 +127,9 @@ namespace network {
         endpoint_iter_type endpoint_iter_;
         socket_type socket_;
         asio::deadline_timer timeout_;
-        boost::asio::streambuf buff_;
+
+        boost::asio::streambuf read_streambuff_;
+        std::list<SendData> queue_send_buff_;
     };
 
     using StrandEx = asio::executor;
@@ -136,9 +137,11 @@ namespace network {
     struct TCPSocket : Impl<asio::ip::tcp, StrandEx> {
         using base_type::base_type;
 
-        void Send(const Data& msg, WriteCallback write_callback, ErrorCallback error_callback) {
-            Post([=, this, self = shared_from_this()] {
-                async_write(socket_, msg.GetBuf().data(), [self, write_callback, error_callback](error_code ec, size_t xfr) {
+        void Send(SendData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+            auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
+            Post([=, self = shared_from_this()] {
+                async_write(socket_, asio::buffer(it->GetBufferData()), [=](error_code ec, size_t xfr) {
+                    queue_send_buff_.erase(it);
                     if (!ec) {
                         write_callback(xfr);
                     } else {
@@ -150,47 +153,52 @@ namespace network {
 
         void Read(size_t size, ReadCallback read_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
-                async_read(
-                    socket_, asio::buffer(buff_.prepare(size)), [this, self, read_callback, error_callback](error_code ec, size_t length) {
+                async_read(socket_, asio::buffer(read_streambuff_.prepare(size)),
+                    [this, self, read_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
-                        buff_.commit(length);
+                        read_streambuff_.commit(length);
                         if (!ec) {
-                            read_callback(bittorrent::Message(&buff_));
+                            auto data = asio::buffer_cast<const uint8_t *>(read_streambuff_.data());
+                            read_callback({data, read_streambuff_.size()});
                         } else {
                             error_callback(ec);
                         }
-                        buff_.consume(length);
+                        read_streambuff_.consume(length);
                     });
             });
         }
 
         void ReadUntil(std::string until_str, ReadCallback read_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
-                async_read_until(socket_, buff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
-                    stop_await();
-                    if (!ec) {
-                        read_callback(bittorrent::Message(&buff_));
-                    } else {
-                        error_callback(ec);
-                    }
-                    buff_.consume(xfr);
-                });
+                async_read_until(
+                    socket_, read_streambuff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
+                        stop_await();
+                        if (!ec) {
+                            auto data = asio::buffer_cast<const uint8_t *>(read_streambuff_.data());
+                            read_callback({data, read_streambuff_.size()});
+                        } else {
+                            error_callback(ec);
+                        }
+                        read_streambuff_.consume(xfr);
+                    });
             });
         }
 
         void ReadToEof(ReadCallback read_callback, ReadCallback eof_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
                 async_read(
-                    socket_, buff_, [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
+                    socket_, read_streambuff_, [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
                         if (!ec) {
-                            read_callback(bittorrent::Message(&buff_));
+                            auto data = asio::buffer_cast<const uint8_t *>(read_streambuff_.data());
+                            read_callback({data, read_streambuff_.size()});
                         } else if (ec == boost::asio::error::eof) {
-                            eof_callback(bittorrent::Message(&buff_));
+                            auto data = asio::buffer_cast<const uint8_t *>(read_streambuff_.data());
+                            eof_callback({data, read_streambuff_.size()});
                         } else {
                             error_callback(ec);
                         }
-                        buff_.consume(length);
+                        read_streambuff_.consume(length);
                     });
             });
         }
@@ -199,10 +207,13 @@ namespace network {
     struct UDPSocket : Impl<asio::ip::udp, StrandEx> {
         using base_type::base_type;
 
-        void Send(const Data& msg, WriteCallback write_callback, ErrorCallback error_callback) {
+        void Send(SendData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+            auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             Post([=, this, self = shared_from_this()] {
-                socket_.async_send_to(
-                    msg.GetBuf().data(), *endpoint_iter_, [=](error_code ec, size_t xfr) {
+                auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
+                socket_.async_send_to(asio::buffer(it->GetBufferData()), *endpoint_ptr,
+                    [this, it, endpoint_ptr, self, write_callback, error_callback](error_code ec, size_t xfr) {
+                        queue_send_buff_.erase(it);
                         if (!ec) {
                             write_callback(xfr);
                         } else {
@@ -214,32 +225,29 @@ namespace network {
 
         void Read(size_t max_size, ReadCallback read_callback, ErrorCallback error_callback) {
             Post([=, this, self = shared_from_this()] {
-                sender_ = *endpoint_iter_;
-                socket_.async_receive_from(
-                    boost::asio::buffer(buff_.prepare(max_size)), sender_, [max_size, this, self, read_callback, error_callback](error_code ec, size_t xfr) {
+                auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
+                socket_.async_receive_from(boost::asio::buffer(read_streambuff_.prepare(max_size)), *endpoint_ptr,
+                    [this, endpoint_ptr, self, read_callback, error_callback](error_code ec, size_t xfr) {
                         this->stop_await();
-                        buff_.commit(xfr);
+                        read_streambuff_.commit(xfr);
                         if (!ec) {
-                            read_callback(bittorrent::Message(&buff_));
+                            auto data = asio::buffer_cast<const uint8_t *>(read_streambuff_.data());
+                            read_callback({data, read_streambuff_.size()});
                         } else {
                             error_callback(ec);
                         }
-                        buff_.consume(xfr);
+                        read_streambuff_.consume(xfr);
                     });
             });
         }
 
         void Promote() {
-            if (++endpoint_iter_ == boost::asio::ip::udp::resolver::iterator())
-                is_endpoints_dried = true;
+            if (++endpoint_iter_ == boost::asio::ip::udp::resolver::iterator()) is_endpoints_dried = true;
         }
 
-        bool IsEndpointsDried () const {
-            return is_endpoints_dried;
-        }
+        bool IsEndpointsDried() const { return is_endpoints_dried; }
 
     protected:
-        asio::ip::udp::endpoint sender_;
         bool is_endpoints_dried = false;
     };
 } // namespace network

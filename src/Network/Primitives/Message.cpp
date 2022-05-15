@@ -1,45 +1,50 @@
 #include "Message.h"
 
-#include <type_traits>
-
-void bittorrent::Message::CopyFrom(const Message &msg_buf) {
-    std::size_t bytes_copied = boost::asio::buffer_copy(streambuf_ptr->prepare(msg_buf.GetBuf().size()), msg_buf.GetBuf().data());
-    streambuf_ptr->commit(bytes_copied);
-    arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
-}
-
-void bittorrent::Message::CopyFrom(const void *data, size_t size) {
-    std::ostream out(streambuf_ptr);
-    out.write(reinterpret_cast<const char *>(data), size);
-    arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
-}
-
-void bittorrent::Message::CopyTo(void *data, size_t size) {
+void bittorrent::ReceivingMessage::CopyTo(void *data, size_t size) {
     std::memcpy(data, reinterpret_cast<const void *>(arr_.data() + inp_pos_) , size);
     inp_pos_ += size;
 }
 
-std::string bittorrent::Message::GetLine() {
+std::string bittorrent::ReceivingMessage::GetLine() const {
     std::string line;
-    while (out_pos_ != arr_.size() && arr_[out_pos_] != '\n') {
-        line.push_back(arr_[out_pos_++]);
+    while (inp_pos_ != arr_.size() && arr_[inp_pos_] != '\n') {
+        line.push_back(arr_[inp_pos_++]);
     }
     return std::move(line);
 }
 
-std::string bittorrent::Message::GetString() {
+std::string bittorrent::ReceivingMessage::GetString() const {
     std::string str;
-    while (out_pos_ != arr_.size() && !std::isspace(arr_[out_pos_])) {
-        str.push_back(arr_[out_pos_++]);
+    while (inp_pos_ != arr_.size() && !std::isspace(arr_[inp_pos_])) {
+        str.push_back(arr_[inp_pos_++]);
     }
     return std::move(str);
 }
 
-size_t bittorrent::PeerMessage::GetBodySize() const {
-    return body_size_;
+void bittorrent::SendingMessage::CopyFrom(const Message &msg_buf) {
+    CopyFrom(msg_buf.GetBufferData().data(), msg_buf.Size());
 }
 
-void bittorrent::PeerMessage::SetHeader(uint32_t size) {
+void bittorrent::SendingMessage::CopyFrom(const uint8_t *data, size_t size) {
+    data_.reserve(size);
+    data_.insert(data_.end(), data, data + size);
+    out_pos_ += size;
+}
+
+void bittorrent::SendingMessage::Clear() {
+    data_.clear();
+    out_pos_ = 0;
+}
+
+bool bittorrent::ReceivingPeerMessage::DecodeHeader(uint32_t size) const {
+    body_size_ = size;
+    if (body_size_ > bittorrent_constants::most_request_size) {
+        return false;
+    }
+    return true;
+}
+
+void bittorrent::SendingPeerMessage::EncodeHeader(uint32_t size) {
     Clear();
     body_size_ = size;
 
@@ -51,5 +56,6 @@ void bittorrent::PeerMessage::SetHeader(uint32_t size) {
         encode_body_length = NativeToLittle(body_size_);
     }
     std::sprintf(header, "4%d", encode_body_length);
-    CopyFrom(header, header_length);
+    CopyFrom(reinterpret_cast<uint8_t *>(header), header_length);
+    data_.reserve(body_size_);
 }

@@ -26,6 +26,9 @@
 
 namespace ba = boost::asio;
 
+using RecvPeerData = bittorrent::ReceivingPeerMessage;
+using SendPeerData = bittorrent::SendingPeerMessage;
+
 namespace network {
     enum STATE : uint8_t {
         am_choking = 0b0001,     // this client is choking the peer
@@ -70,7 +73,7 @@ namespace network {
         void Disconnect();
 
     private:
-        bool check_handshake(const Data &) const;
+        bool check_handshake(const RecvPeerData &) const;
 
         void verify_handshake();
 
@@ -124,7 +127,7 @@ namespace network {
 
         bittorrent::Peer slave_peer_;
 
-        boost::asio::streambuf msg_;
+        RecvPeerData msg_to_read_;
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
 

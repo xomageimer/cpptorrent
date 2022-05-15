@@ -21,6 +21,8 @@
 
 namespace ba = boost::asio;
 
+using ReceiveData = bittorrent::ReceivingMessage;
+
 namespace network {
     struct TrackerRequester {
     public:
@@ -49,9 +51,7 @@ namespace network {
 
         bittorrent::Tracker &tracker_;
 
-        boost::asio::streambuf msg_;
-
-        virtual void SetResponse(Data) = 0;
+        virtual void SetResponse(ReceiveData) = 0;
 
         void SetException(const std::string &err) {
             if (is_set) return;
@@ -85,7 +85,9 @@ namespace network {
 
         void do_read_response_body();
 
-        void SetResponse(Data) override;
+        void SetResponse(ReceiveData) override;
+
+        SendData msg_;
     };
 
     struct udpRequester : public TrackerRequester, public UDPSocket {
@@ -116,7 +118,7 @@ namespace network {
 
         void update_endpoint();
 
-        void SetResponse(Data) override;
+        void SetResponse(ReceiveData) override;
 
         void make_announce_request();
 

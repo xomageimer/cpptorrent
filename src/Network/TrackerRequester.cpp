@@ -10,13 +10,13 @@
 #include "random_generator.h"
 
 // HTTP
-void network::httpRequester::SetResponse(Data data) {
+void network::httpRequester::SetResponse(ReceiveData data) {
     if (is_set) return;
 
     LOG(tracker_.GetUrl().Host, " : ", "Set response!");
 
     std::string resp_str;
-    resp_str.resize(data.GetBuf().size());
+    resp_str.resize(data.Size());
     data.CopyTo(resp_str.data(), resp_str.size());
 
     std::vector<std::string> bencode_response;
@@ -95,7 +95,8 @@ void network::httpRequester::SetResponse(Data data) {
 void network::httpRequester::Connect(const bittorrent::Query &query) {
     LOG(tracker_.GetUrl().Host, " : ", "Make http request ");
 
-    std::ostream msg_is (&msg_);
+    std::string str;
+    std::ostringstream msg_is (str);
     auto my_hash = UrlEncode(tracker_.GetInfoHash());
     msg_is << "GET /" << tracker_.GetUrl().Path.value_or("") << "?"
 
@@ -110,6 +111,8 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
             << "Accept: */*\r\n"
             << "Connection: close\r\n\r\n";
 
+    msg_.CopyFrom(reinterpret_cast<const uint8_t *>(str.data()), str.size());
+
     TCPSocket::Connect(
         tracker_.GetUrl().Host, tracker_.GetUrl().Port, [this]() mutable { do_request(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
@@ -120,7 +123,7 @@ void network::httpRequester::do_request() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     Send(
-        Data(&msg_), [this](size_t /*length*/) { do_read_response_status(); },
+        std::move(msg_), [this](size_t /*length*/) { do_read_response_status(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
 }
 
@@ -129,16 +132,14 @@ void network::httpRequester::do_read_response_status() {
 
     ReadUntil(
         "\r\n",
-        [this](Data data) {
-            std::istream data_is(&data.GetBuf());
-
+        [this](const ReceiveData & data) {
             std::string http_version;
-            data_is >> http_version;
+            http_version = data.GetLine();
 
             LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
 
             uint32_t status_code;
-            data_is >> status_code;
+            data >> status_code;
 
             std::string status_message = data.GetLine();
 
@@ -160,12 +161,11 @@ void network::httpRequester::do_read_response_header() {
 
     ReadUntil(
         "\r\n\r\n",
-        [this](const Data & data) {
+        [this](const ReceiveData & data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response header");
 
-            Data msg_data(&msg_);
-            msg_data.Clear();
-            msg_data.CopyFrom(data);
+            msg_.Clear();
+            msg_.CopyFrom(data);
             do_read_response_body();
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
@@ -176,24 +176,21 @@ void network::httpRequester::do_read_response_body() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     ReadToEof(
-        [this](const Data & data) {
+        [this](const ReceiveData & data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response body");
-            Data msg_data(&msg_);
-            msg_data.CopyFrom(data);
+            msg_.CopyFrom(data);
             do_read_response_body();
         },
-        [this](const Data & data) {
-            std::cerr << data.GetBuf().size() << std::endl;
-            Data msg_data(&msg_);
-            msg_data.CopyFrom(data);
-            SetResponse(msg_data);
+        [this](const ReceiveData & data) {
+            msg_.CopyFrom(data);
+            SetResponse(std::move(msg_.MakeReading()));
         },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
 }
 
 // UDP
-void network::udpRequester::SetResponse(Data data) {
+void network::udpRequester::SetResponse(ReceiveData data) {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     if (is_set) return;
@@ -252,16 +249,15 @@ void network::udpRequester::do_try_connect() {
     } else {
         LOG(tracker_.GetUrl().Host, " : ", "connect attempt: ", connect_attempts_);
 
-        Data msg_data(&msg_);
-        msg_data.Clear();
+        SendData msg;
 
-        msg_data << c_req_.protocol_id;
-        msg_data << c_req_.action;
-        msg_data << c_req_.transaction_id;
+        msg << c_req_.protocol_id;
+        msg << c_req_.action;
+        msg << c_req_.transaction_id;
 
         boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
         Send(
-            msg_data,
+            std::move(msg),
             [this, time_before](size_t bytes_transferred) {
                 if (bytes_transferred < 16) {
                     connect_attempts_ = 0;
@@ -294,9 +290,9 @@ void network::udpRequester::do_connect_response() {
     boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
     Read(
         bittorrent_constants::short_buff_size,
-        [this, time_before](const Data & data) {
-            if (data.GetBuf().size() < 16) {
-                LOG(tracker_.GetUrl().Host, " : ", "get low size: ", data.GetBuf().size());
+        [this, time_before](const ReceiveData & data) {
+            if (data.Size() < 16) {
+                LOG(tracker_.GetUrl().Host, " : ", "get low size: ", data.Size());
                 do_try_connect_delay(boost::posix_time::microsec_clock::local_time() - time_before);
             } else {
 
@@ -304,7 +300,7 @@ void network::udpRequester::do_connect_response() {
                 data >> action;
                 data >> value;
 
-                LOG(tracker_.GetUrl().Host, " : ", "\nreceive successfull completly ", data.GetBuf().size(), '\n', value,
+                LOG(tracker_.GetUrl().Host, " : ", "\nreceive successfull completly ", data.Size(), '\n', value,
                     " == ", c_req_.transaction_id, " -> ", (value == c_req_.transaction_id));
 
                 if (value == c_req_.transaction_id && action == 0) {
@@ -335,13 +331,12 @@ void network::udpRequester::do_try_announce() {
         std::memcpy(&announce_req_[0], &c_resp_.connection_id, sizeof(c_resp_.connection_id));
         std::memcpy(&announce_req_[12], &c_resp_.transaction_id, sizeof(c_resp_.transaction_id));
 
-        Data msg_data(&msg_);
-        msg_data.Clear();
-        msg_data.CopyFrom(announce_req_, bittorrent_constants::middle_buff_size);
+        SendData msg;
+        msg.CopyFrom(announce_req_, bittorrent_constants::middle_buff_size);
 
         boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
         Send(
-            msg_data,
+            std::move(msg),
             [this, time_before](size_t bytes_transferred) {
                 LOG(tracker_.GetUrl().Host, " : received ", bytes_transferred);
                 if (bytes_transferred != bittorrent_constants::middle_buff_size) {
@@ -374,25 +369,27 @@ void network::udpRequester::do_announce_response() {
     boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
     Read(
         bittorrent_constants::MTU,
-        [this, time_before](const Data & data) {
-            if (data.GetBuf().size() < 8) {
+        [this, time_before](const ReceiveData & data) {
+            if (data.Size() < 8) {
                 do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
             } else {
-                LOG(tracker_.GetUrl().Host, " : ", "announce successful completion receive ", data.GetBuf().size(), " bytes");
+                LOG(tracker_.GetUrl().Host, " : ", "announce successful completion receive ", data.Size(), " bytes");
 
                 uint32_t action, val;
                 data >> action;
                 data >> val;
 
-                LOG(tracker_.GetUrl().Host, " : ", "\nbytes_transferred: ", std::dec, data.GetBuf().size(),
+                LOG(tracker_.GetUrl().Host, " : ", "\nbytes_transferred: ", std::dec, data.Size(),
                     "\nval == c_resp.transaction_id.value(): ", (val == BigToNative(c_resp_.transaction_id)),
                     "\nresponse[0] != 0: ", (action != 0), "\nresponse[0] = ", std::hex,
                     val);
 
-                if (data.GetBuf().size() >= 20 && val ==  BigToNative(c_resp_.transaction_id) && action == 1) {
-                    data << '\0';
-                    SetResponse(data);
-                } else if (data.GetBuf().size() && val == BigToNative(c_resp_.transaction_id) && action == 3) {
+                if (data.Size() >= 20 && val ==  BigToNative(c_resp_.transaction_id) && action == 1) {
+                    SendData msg;
+                    msg.CopyFrom(data);
+                    msg << '\0';
+                    SetResponse(std::move(msg.MakeReading()));
+                } else if (data.Size() && val == BigToNative(c_resp_.transaction_id) && action == 3) {
                     LOG(tracker_.GetUrl().Host, " : ", "catch error from tracker announce: ", static_cast<const unsigned char *>(&data[8]));
                     do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
                 } else {

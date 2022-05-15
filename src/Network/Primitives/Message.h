@@ -23,38 +23,89 @@ namespace bittorrent {
 
     struct Message {
     public:
-        boost::asio::streambuf &GetBuf() { return *streambuf_ptr; }
+        explicit Message(ByteOrder bo = ByteOrder::BigEndian) : order_(bo) {}
 
-        [[nodiscard]] const boost::asio::streambuf &GetBuf() const { return *streambuf_ptr; }
+        Message(const Message &) = delete;
 
-        explicit Message(boost::asio::streambuf *ptr, ByteOrder bo = BigEndian)
-            : streambuf_ptr(ptr), arr_(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size()),
-              order_(bo){};
+        Message &operator=(const Message &) = delete;
 
-        Message(const Message &msg) : streambuf_ptr(msg.streambuf_ptr), arr_(msg.arr_), order_(msg.order_) {}
+        Message(Message &&) = default;
+
+        Message &operator=(Message &&) = default;
+
+        virtual ~Message() = default;
+
+        virtual const uint8_t &operator[](size_t i) const = 0;
+
+        [[nodiscard]] virtual std::basic_string_view<uint8_t> GetBufferData() const = 0;
+
+        [[nodiscard]] virtual size_t Size() const = 0;
 
         void SetOrder(ByteOrder bo) { order_ = bo; }
 
-        const auto & operator[](size_t i) const { return arr_[i]; }
+        [[nodiscard]] ByteOrder GetOrder() const { return order_; }
 
-        void Clear() {
-            GetBuf().consume(GetBuf().size());
-            arr_ = std::basic_string_view<uint8_t>(boost::asio::buffer_cast<const uint8_t *>(streambuf_ptr->data()), streambuf_ptr->size());
-        }
+    protected:
+        ByteOrder order_ = ByteOrder::BigEndian;
+    };
 
-        void CopyFrom(const Message &msg_buf);          // all reference to operator[] are is invalidated
+    struct ReceivingMessage : public Message {
+    public:
+        using Message::Message;
 
-        void CopyFrom(const void *data, size_t size);   // all reference to operator[] are is invalidated
+        ReceivingMessage(const uint8_t *data, size_t size, ByteOrder bo = ByteOrder::BigEndian) : arr_(data, size), Message(bo) {}
+
+        const uint8_t &operator[](size_t i) const override { return arr_[i]; }
+
+        [[nodiscard]] std::basic_string_view<uint8_t> GetBufferData() const override { return arr_; }
 
         void CopyTo(void *data, size_t size);
 
-        std::string GetLine();
+        std::string GetLine() const;
 
-        std::string GetString();
+        std::string GetString() const;
 
-        ByteOrder GetOrder() { return order_; }
+        [[nodiscard]] size_t Size() const override { return arr_.size(); }
 
-        template <typename T> Message &operator<<(const T &value) {
+        template <typename T> ReceivingMessage &operator>>(T &value) {
+            uint8_t bytes[sizeof(T)]{};
+            CopyTo(bytes, sizeof(T));
+            if (order_ == BigEndian) {
+                value = BigToNative(ArrayToValue<T>(bytes));
+            } else if (order_ == LittleEndian) {
+                value = LittleToNative(ArrayToValue<T>(bytes));
+            }
+            return *this;
+        }
+
+        template <typename T> const ReceivingMessage &operator>>(T &value) const {
+            return const_cast<ReceivingMessage &>(*this).template operator>>(value);
+        }
+
+    protected:
+        std::basic_string_view<uint8_t> arr_;
+        mutable size_t inp_pos_ = 0;
+    };
+
+    struct SendingMessage : public Message {
+    public:
+        using Message::Message;
+
+        const uint8_t &operator[](size_t i) const override { return data_[i]; }
+
+        [[nodiscard]] std::basic_string_view<uint8_t> GetBufferData() const override {
+            return std::basic_string_view<uint8_t>{data_.data(), data_.size()};
+        }
+
+        void CopyFrom(const Message &msg_buf); // all reference to operator[] are is invalidated
+
+        void CopyFrom(const uint8_t *data, size_t size); // all reference to operator[] are is invalidated
+
+        void Clear();
+
+        [[nodiscard]] size_t Size() const override { return data_.size(); }
+
+        template <typename T> SendingMessage &operator<<(const T &value) {
             uint8_t bytes[sizeof(T)]{};
             if (order_ == BigEndian) {
                 ValueToArray(NativeToBig(value), bytes);
@@ -66,28 +117,14 @@ namespace bittorrent {
             return *this;
         }
 
-        template <typename T> const Message &operator<<(const T &value) const {
-            return const_cast<Message &>(*this).template operator<<(value);
+        template <typename T> const SendingMessage &operator<<(const T &value) const {
+            return const_cast<SendingMessage &>(*this).template operator<<(value);
         }
 
-        template <typename T> Message &operator>>(T &value) {
-            uint8_t bytes[sizeof(T)]{};
-            CopyTo(bytes, sizeof(T));
-            if (order_ == BigEndian) {
-                value = BigToNative(ArrayToValue<T>(bytes));
-            } else if (order_ == LittleEndian) {
-                value = LittleToNative(ArrayToValue<T>(bytes));
-            }
-            return *this;
-        }
-
-        template <typename T> const Message &operator>>(T &value) const { return const_cast<Message &>(*this).template operator>>(value); }
+        ReceivingMessage MakeReading() { return std::move(ReceivingMessage{data_.data(), data_.size(), order_}); }
 
     protected:
-        ByteOrder order_ = ByteOrder::BigEndian;
-        boost::asio::streambuf *streambuf_ptr;
-        std::basic_string_view<uint8_t> arr_;
-        size_t inp_pos_ = 0;
+        std::vector<uint8_t> data_;
         size_t out_pos_ = 0;
     };
 
@@ -104,27 +141,43 @@ namespace bittorrent {
         port = 9
     };
 
-    struct PeerMessage : public Message {
+    static const inline size_t max_body_length = bittorrent_constants::most_request_size;
+
+    static const inline size_t header_length = 4;
+
+    static const inline size_t id_length = 1;
+
+    struct ReceivingPeerMessage : public ReceivingMessage {
     public:
-        using bittorrent::Message::Message;
+        using bittorrent::ReceivingMessage::ReceivingMessage;
 
-        static const inline size_t max_body_length = bittorrent_constants::most_request_size;
+        explicit ReceivingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : ReceivingMessage(nullptr, 0, bo) {}
 
-        static const inline size_t header_length = 4;
+        [[nodiscard]] const auto *Body() const { return arr_.data() + id_length; }
 
-        static const inline size_t id_length = 1;
+        [[nodiscard]] size_t BodySize() const { return body_size_; };
 
-        [[nodiscard]] const auto *Body() const {
-            return boost::asio::buffer_cast<const uint8_t *>(GetBuf().data()) + header_length + id_length;
-        }
+        [[nodiscard]] PEER_MESSAGE_TYPE Type() const { return PEER_MESSAGE_TYPE{GetBufferData()[header_length]}; };
 
-        [[nodiscard]] size_t GetBodySize() const;
+        bool DecodeHeader(uint32_t size) const;
 
-        [[nodiscard]] PEER_MESSAGE_TYPE GetType() const {
-            return PEER_MESSAGE_TYPE{boost::asio::buffer_cast<const uint8_t *>(GetBuf().data())[header_length]};
-        };
+        void SetBuffer(const uint8_t *data, size_t size) { arr_ = std::basic_string_view<uint8_t>{data, size}; }
 
-        void SetHeader(uint32_t size);
+    private:
+        mutable size_t body_size_ = 0;
+    };
+
+    struct SendingPeerMessage : public SendingMessage {
+    public:
+        using bittorrent::SendingMessage::SendingMessage;
+
+        [[nodiscard]] auto *Body() { return data_.data() + header_length + id_length; }
+
+        [[nodiscard]] size_t BodySize() const { return body_size_; }
+
+        [[nodiscard]] PEER_MESSAGE_TYPE Type() const { return PEER_MESSAGE_TYPE{GetBufferData()[header_length]}; };
+
+        void EncodeHeader(uint32_t size);
 
     private:
         size_t body_size_ = 0;
