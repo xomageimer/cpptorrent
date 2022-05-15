@@ -10,6 +10,8 @@ std::string bittorrent::ReceivingMessage::GetLine() const {
     while (inp_pos_ != arr_.size() && arr_[inp_pos_] != '\n') {
         line.push_back(arr_[inp_pos_++]);
     }
+    while (inp_pos_ != arr_.size() && std::isspace(arr_[inp_pos_]))
+        inp_pos_++;
     return std::move(line);
 }
 
@@ -18,6 +20,8 @@ std::string bittorrent::ReceivingMessage::GetString() const {
     while (inp_pos_ != arr_.size() && !std::isspace(arr_[inp_pos_])) {
         str.push_back(arr_[inp_pos_++]);
     }
+    while (inp_pos_ != arr_.size() && std::isspace(arr_[inp_pos_]))
+        inp_pos_++;
     return std::move(str);
 }
 

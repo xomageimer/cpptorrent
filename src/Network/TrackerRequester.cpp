@@ -95,8 +95,7 @@ void network::httpRequester::SetResponse(ReceiveData data) {
 void network::httpRequester::Connect(const bittorrent::Query &query) {
     LOG(tracker_.GetUrl().Host, " : ", "Make http request ");
 
-    std::string str;
-    std::ostringstream msg_is (str);
+    std::ostringstream msg_is;
     auto my_hash = UrlEncode(tracker_.GetInfoHash());
     msg_is << "GET /" << tracker_.GetUrl().Path.value_or("") << "?"
 
@@ -111,6 +110,7 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
             << "Accept: */*\r\n"
             << "Connection: close\r\n\r\n";
 
+    auto str = msg_is.str();
     msg_.CopyFrom(reinterpret_cast<const uint8_t *>(str.data()), str.size());
 
     TCPSocket::Connect(
@@ -134,12 +134,12 @@ void network::httpRequester::do_read_response_status() {
         "\r\n",
         [this](const ReceiveData & data) {
             std::string http_version;
-            http_version = data.GetLine();
+            http_version = data.GetString();
 
             LOG(tracker_.GetUrl().Host, " : ", " get response (", tracker_.GetUrl().Port, " ", http_version, ")");
 
             uint32_t status_code;
-            data >> status_code;
+            status_code = std::stoi(data.GetString());
 
             std::string status_message = data.GetLine();
 
