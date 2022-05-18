@@ -27,8 +27,6 @@ namespace bittorrent {
 
         uint8_t *m_data = nullptr;
         size_t m_size = 0;
-
-        ~Block() { delete[] m_data; }
     };
 
     struct Piece {

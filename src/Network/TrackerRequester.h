@@ -21,6 +21,7 @@
 
 namespace ba = boost::asio;
 
+using SendData = bittorrent::SendingMessage;
 using ReceiveData = bittorrent::ReceivingMessage;
 
 namespace network {

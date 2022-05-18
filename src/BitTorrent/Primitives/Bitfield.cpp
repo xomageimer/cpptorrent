@@ -3,10 +3,16 @@
 #include "auxiliary.h"
 
 bittorrent::Bitfield::Bitfield(const std::vector<uint8_t> &from_bytes) {
-    bits_.clear();
     bits_.reserve(from_bytes.size() * bittorrent_constants::byte_size);
     for (uint8_t number : from_bytes) {
         bits_.append(ReverseByte(number));
+    }
+}
+
+bittorrent::Bitfield::Bitfield(const uint8_t *data, size_t size) {
+    bits_.reserve(size * bittorrent_constants::byte_size);
+    for (size_t i = 0; i < size; i++) {
+        bits_.append(ReverseByte(data[i]));
     }
 }
 

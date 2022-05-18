@@ -35,7 +35,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path);
     master_peer_ = std::make_shared<MasterPeer>(*this);
 
-    FillTrackers();
+    fill_trackers();
 }
 
 bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Event event) {
@@ -137,9 +137,13 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
     master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 
-void bittorrent::Torrent::ReceivePieceBlock(uint32_t idx, uint32_t begin, Block block) {
-    uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-    file_manager_->SetPieceBlock(idx, blockIndex, std::move(block));
+void bittorrent::Torrent::DownloadPieceBlock(const WriteRequest & req) {
+
+}
+
+void bittorrent::Torrent::UploadPieceBlock(const ReadRequest & req) {
+//    uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
+//    file_manager_->SetPieceBlock(idx, blockIndex, std::move(block));
 }
 
 bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {
@@ -157,7 +161,7 @@ const bittorrent::Response &bittorrent::Torrent::GetResponse() const {
     return *data_from_tracker_;
 }
 
-bool bittorrent::Torrent::FillTrackers() {
+bool bittorrent::Torrent::fill_trackers() {
     std::vector<std::shared_ptr<bittorrent::Tracker>> trackers;
     auto make_tracker = [&](const std::string &announce_url) {
         trackers.emplace_back(std::make_shared<bittorrent::Tracker>(

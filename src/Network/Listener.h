@@ -35,11 +35,10 @@ namespace network {
         void Verify();
 
     private:
-        ba::ip::tcp::socket socket_;
-
         Listener &listener_;
 
-        // TODO заменить на message
+        ba::ip::tcp::socket socket_;
+
         uint8_t buff[bittorrent_constants::handshake_length];
 
         ba::deadline_timer timeout_;

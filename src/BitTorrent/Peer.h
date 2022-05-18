@@ -10,7 +10,7 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 
-#include "bt/Bitfield.h"
+#include "Primitives/Bitfield.h"
 
 #include "constants.h"
 #include "bencode_lib.h"
@@ -71,6 +71,8 @@ namespace bittorrent {
 
         void Unsubscribe(IP unsub_ip);
 
+        void SendHaveToAll(size_t piece_num);
+
         auto Get() { return shared_from_this(); }
 
         [[nodiscard]] bittorrent::Torrent &GetTorrent();
@@ -86,6 +88,8 @@ namespace bittorrent {
         [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const;
 
         [[nodiscard]] bencode::Node const &GetChunkHashes() const;
+
+        bool CanUnchokePeer(size_t peer_ip) const;
 
     private:
         void MakeHandshake();

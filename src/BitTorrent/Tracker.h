@@ -72,6 +72,7 @@ namespace bittorrent {
 
         std::optional<std::string> trackerid;
     };
+
     struct Response {
         std::chrono::seconds interval;
 

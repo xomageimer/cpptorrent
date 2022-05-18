@@ -1,14 +1,16 @@
 #ifndef CPPTORRENT_TORRENTFILESTRUCTMANAGER_H
 #define CPPTORRENT_TORRENTFILESTRUCTMANAGER_H
 
-#include "bt/Bitfield.h"
-#include "bt/Piece.h"
-
+#include <condition_variable>
 #include <vector>
 #include <unordered_map>
 #include <fstream>
 #include <filesystem>
 #include <mutex>
+
+#include "Primitives/ManagerRequests.h"
+#include "Primitives/Bitfield.h"
+#include "Primitives/Piece.h"
 
 // TODO структура отвечает за правильную обработку файлов торрента
 namespace bittorrent {
@@ -25,31 +27,46 @@ namespace bittorrent {
     public:
         explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path);
 
-        [[nodiscard]] long double GetFilesSize() const { return total_size_GB; }; // GigaBytes
+        void WritePieceToFile(size_t piece_num);
 
-        void SetPieceBlock(uint32_t piece_idx, uint32_t index, Block block);
+        [[nodiscard]] long double GetFilesSize() const { return total_size_GB_; }; // GigaBytes
+
+        void UploadBlock(const ReadRequest &);
+
+        void DownloadBlock(const WriteRequest &);
 
         [[nodiscard]] bool PieceDone(uint32_t index) const;
+
+        [[nodiscard]] bool PieceRequested(uint32_t index) const;
 
         [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const { return bitset_; }
 
     private:
+        void thread(); // TODO вызывать этот метод из конструктора!
+
         void fill_files();
 
         Torrent &torrent_;
 
-        std::mutex pieces_lock;
-        std::map<size_t, Piece> active_pieces;
+        std::mutex manager_m_;
 
-        size_t piece_size {};
+        std::condition_variable cv_;
 
-        size_t last_piece_size{};
+        struct PieceHandler {   // TODO нужно написать аналог FileInfo, и также хранить здесь дескриптор файла!
+            Piece piece;
+            std::mutex mut;
+        };
+        std::map<size_t, PieceHandler> active_pieces_;
 
-        const std::filesystem::path path_to_download;
+        size_t piece_size_{};
 
-        long double total_size_GB;
+        size_t last_piece_size_{};
 
-        std::vector<FileInfo> files;
+        const std::filesystem::path path_to_download_;
+
+        long double total_size_GB_;
+
+        std::vector<FileInfo> files_; // TODO наверное надо сделать map с ключами в виде piece_index, чтобы быстро записывать!
 
         bittorrent::Bitfield bitset_;
     };

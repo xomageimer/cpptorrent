@@ -6,8 +6,6 @@
 
 #include <utility>
 
-// TODO пускай всё работает с PeerMessage, чем с Message (check_handshake и тп, чтобы было понятнее)!
-
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
     : TCPSocket(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)) {}
@@ -84,15 +82,17 @@ void network::PeerClient::do_read_header() {
     LOG(GetStrIP(), " : ", "trying to read message");
 
     Read(
-        sizeof(bittorrent::header_length),
-        [this](const RecvPeerData & data) {
+        bittorrent::header_length,
+        [this](const RecvPeerData &data) {
             drop_timeout();
 
             uint32_t header;
             data >> header;
 
-            if (msg_to_read_.DecodeHeader(header)) {
-                LOG (GetStrIP(), " : ", "more than allowed to get, current message size is ", msg_to_read_.BodySize(), ", but the maximum size can be ", bittorrent_constants::most_request_size);
+            if (!msg_to_read_.DecodeHeader(header)) {
+                LOG(GetStrIP(), " : ", "more than allowed to get, current message size is ", msg_to_read_.BodySize(),
+                    ", but the maximum size can be ", bittorrent_constants::most_request_size);
+                Disconnect();
                 return;
             }
 
@@ -110,10 +110,11 @@ void network::PeerClient::do_read_body() {
 
     Read(
         msg_to_read_.BodySize(),
-        [this](const RecvPeerData &data) mutable {
+        [this](const RecvData &data) mutable {
             LOG(GetStrIP(), " : correct message");
 
-            msg_to_read_.SetBuffer(&data[0], data.Size());
+            msg_to_read_.SetBuffer(&data[0], msg_to_read_.BodySize());
+
             handle_response();
         },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
@@ -128,7 +129,7 @@ void network::PeerClient::try_to_request_piece() {
 }
 
 void network::PeerClient::receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block) {
-    GetTorrent().ReceivePieceBlock(index, begin, std::move(block));
+//    GetTorrent().DownloadPieceBlock(index, begin, std::move(block));
 }
 
 void network::PeerClient::access() {
@@ -201,58 +202,129 @@ void network::PeerClient::send_handshake() {
         failed_attempt);
 }
 
-void network::PeerClient::send_choke() {}
+void network::PeerClient::send_msg(SendData data) {
+    Send(
+        std::move(data), [this](size_t xfr) { LOG(GetStrIP(), " : data successfully sent"); },
+        std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
+}
 
-void network::PeerClient::send_unchoke() {}
+void network::PeerClient::send_keep_alive() {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+
+    SendPeerData msg;
+    msg.EncodeHeader();
+
+    send_msg(std::move(msg));
+}
+
+void network::PeerClient::send_choke() {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+    using namespace bittorrent;
+
+    SendPeerData msg;
+    msg << choke;
+    msg.EncodeHeader();
+
+    send_msg(std::move(msg));
+}
+
+void network::PeerClient::send_unchoke() {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+    using namespace bittorrent;
+
+    SendPeerData msg;
+    msg << unchoke;
+    msg.EncodeHeader();
+
+    send_msg(std::move(msg));
+}
 
 void network::PeerClient::send_interested() {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
     using namespace bittorrent;
 
     SendPeerData msg;
-
-    msg.EncodeHeader(1);
     msg << interested;
+    msg.EncodeHeader();
 
-    Send(
-        std::move(msg), [this](size_t xfr) { LOG(GetStrIP(), " : owner interested now"); },
-        std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
+    send_msg(std::move(msg));
 }
 
-void network::PeerClient::send_not_interested() {}
+void network::PeerClient::send_not_interested() {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+    using namespace bittorrent;
 
-void network::PeerClient::send_have() {}
+    SendPeerData msg;
+    msg << not_interested;
+    msg.EncodeHeader();
+
+    send_msg(std::move(msg));
+}
+
+void network::PeerClient::send_have(uint32_t idx) {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+    using namespace bittorrent;
+
+    SendPeerData msg;
+    msg << have;
+    msg << idx;
+    msg.EncodeHeader();
+
+    send_msg(std::move(msg));
+}
 
 void network::PeerClient::send_bitfield() {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
     using namespace bittorrent;
 
     SendPeerData msg;
-
-    const auto & bitfs = GetOwnerBitfield();
-
+    const auto &bitfs = GetOwnerBitfield();
     const auto bytesToSend = (size_t)ceil((float)GetOwnerBitfield().Size() / 8.0f);
-    msg.EncodeHeader(1 + bytesToSend);
     msg << bitfield;
-
     auto bits_like_bytes = GetOwnerBitfield().GetCast();
     msg.CopyFrom(bits_like_bytes.data(), bytesToSend);
+    msg.EncodeHeader();
 
-    Send(
-        std::move(msg), [this](size_t xfr) { LOG(GetStrIP(), " : owner bitfield of ", xfr, " bytes send"); },
-        std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
+    send_msg(std::move(msg));
 }
 
-void network::PeerClient::send_request(size_t piece_request_index) {}
+void network::PeerClient::send_request(uint32_t piece_request_index, uint32_t begin, uint32_t length) {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+    using namespace bittorrent;
 
-void network::PeerClient::send_piece(uint32_t pieceIdx, uint32_t offset, uint32_t length) {}
+    SendPeerData msg;
+    msg << request;
+    msg << piece_request_index << begin << length;
+    msg.EncodeHeader();
 
-void network::PeerClient::send_cancel(size_t piece_index) {}
+    send_msg(std::move(msg));
+}
 
-void network::PeerClient::send_port(size_t port) {}
+void network::PeerClient::send_piece(uint32_t pieceIdx, uint32_t offset, uint32_t length) {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+    // TODO передавать себя (shared_from_this) в какой-то метод и помещаться куда-нибудь в очередь, чтобы начать отправку! \
+        ключом может быть что-то типо указателя + piece index и тп.
+}
+
+void network::PeerClient::send_cancel(uint32_t pieceIdx, uint32_t offset, uint32_t length) {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+}
+
+void network::PeerClient::send_port(size_t port) {
+    LOG(GetStrIP(), " : ", __FUNCTION__);
+
+    SendPeerData msg;
+    msg << bittorrent::port;
+    msg << port;
+    msg.EncodeHeader();
+
+    send_msg(std::move(msg));
+}
 
 void network::PeerClient::handle_response() {
     auto message_type = msg_to_read_.Type();
     size_t payload_size = msg_to_read_.BodySize();
-    auto & payload = msg_to_read_;
+    auto &payload = msg_to_read_;
 
     using namespace bittorrent;
     switch (message_type) {
@@ -261,6 +333,7 @@ void network::PeerClient::handle_response() {
             if (payload_size != 0) {
                 LOG(GetStrIP(), " : invalid choke-message size");
                 Disconnect();
+                return;
             }
             status_ |= peer_choking;
 
@@ -270,6 +343,7 @@ void network::PeerClient::handle_response() {
             if (payload_size != 0) {
                 LOG(GetStrIP(), " : invalid unchoke-message size");
                 Disconnect();
+                return;
             }
             status_ &= ~peer_choking;
 
@@ -281,10 +355,11 @@ void network::PeerClient::handle_response() {
             if (payload_size != 0) {
                 LOG(GetStrIP(), " : invalid interested-message size");
                 Disconnect();
+                return;
             }
             status_ |= peer_interested;
 
-            if (IsClientChoked()) send_unchoke();
+            if (IsClientChoked() && master_peer_.CanUnchokePeer(GetPeerData().GetIP())) send_unchoke();
 
             break;
         case not_interested:
@@ -292,19 +367,23 @@ void network::PeerClient::handle_response() {
             if (payload_size != 0) {
                 LOG(GetStrIP(), " : invalid not_interested-message size");
                 Disconnect();
+                return;
             }
             status_ &= ~peer_interested;
+
+            // TODO добавить реакцию на такое сообщение!
 
             break;
         case have: {
             LOG(GetStrIP(), " : have-message");
-            if (payload_size != 4) {
+            if (payload_size != 5) {
                 LOG(GetStrIP(), " : invalid have-message size");
                 Disconnect();
+                return;
             }
             uint32_t i;
             payload >> i;
-            if (i < GetPeerBitfield().Size()) {
+            if (i <= GetPeerBitfield().Size()) {
                 Disconnect();
                 break;
             }
@@ -320,35 +399,31 @@ void network::PeerClient::handle_response() {
                 LOG(GetStrIP(), " : bitfield-message empty, all bits are zero");
                 return;
             }
-            for (size_t i = 0; i < payload_size; i++) {
-                for (size_t x = 0; x < 8; x++) {
-                    if (payload.Body()[i] & (1 << (7 - x))) {
-                        size_t idx = i * 8 + x;
-                        if (idx >= TotalPiecesCount()) {
-                            Disconnect();
-                            return;
-                        }
-                        GetPeerBitfield().Set(idx);
-                    }
-                }
+            if (payload_size - 1 >= TotalPiecesCount()) {
+                Disconnect();
+                return;
             }
+            GetPeerBitfield() = std::move(Bitfield(&payload.Body()[1], payload_size - 1));
 
             try_to_request_piece();
 
             break;
         case request: {
             LOG(GetStrIP(), " : request-message");
-            if (payload_size != 12) {
+            if (payload_size != 13) {
                 LOG(GetStrIP(), " : invalid request-message size");
                 Disconnect();
+                return;
             }
             if (!IsRemoteInterested()) {
                 LOG(GetStrIP(), " : peer requested piece block without showing interest");
                 Disconnect();
+                return;
             }
             if (IsClientChoked()) {
-                LOG(GetStrIP(), " : peer requested piece while choked");
+                LOG(GetStrIP(), " : peer requested piece while choked us");
                 Disconnect();
+                return;
             }
 
             uint32_t index, begin, length;
@@ -357,13 +432,11 @@ void network::PeerClient::handle_response() {
             payload >> length;
 
             LOG(GetStrIP(), " : size of message:", BytesToHumanReadable(length));
-            if (length > bittorrent_constants::most_request_size) {
-                LOG(GetStrIP(), " : invalid size");
-                Disconnect();
-            }
 
-            // TODO проверка на наличие такого куска
-            send_piece(index, begin, length);
+            if (IsClientAlreadyDone(index)) {
+
+                send_piece(index, begin, length); // TODO должен быть не send, а что-то типо request! так как send сразу не будет!
+            }
 
             break;
         }
@@ -372,13 +445,14 @@ void network::PeerClient::handle_response() {
             if (payload_size < 9) {
                 LOG(GetStrIP(), " : invalid piece message");
                 Disconnect();
+                return;
             }
 
             uint32_t index, begin;
             payload >> index;
             payload >> begin;
 
-            payload_size -= 8;
+            payload_size -= 9;
 
             // TODO реализовать метод IsClientRequested
             if (!IsClientRequested(index)) {
@@ -386,30 +460,49 @@ void network::PeerClient::handle_response() {
                 return;
             }
 
-            if (payload_size == 0 || payload_size > bittorrent_constants::most_request_size) {
-                LOG(GetStrIP(), " : received too big piece block of size ", BytesToHumanReadable(payload_size));
-            }
-
-            if (GetTorrent().PieceDone(index))
-                send_cancel(index);
-            else {
-                receive_piece_block(index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[8]), payload_size});
+            if (IsClientAlreadyDone(index)) {
+                // TODO мб это не имеет смысла!
+                LOG(GetStrIP(), " : received piece ", std::to_string(index), " which already done");
+                send_cancel(index, begin, payload_size);
+            } else {
+                // TODO заполнить кусок -> вызвать notify для conditional -> закончить данную функцию
+                receive_piece_block(index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size});
             }
 
             break;
         }
         case cancel:
+            LOG(GetStrIP(), " : cancel");
+            if (payload_size != 13) {
+                LOG(GetStrIP(), " : invalid cancel message");
+                Disconnect();
+                return;
+            }
+
+            uint32_t index, begin, length;
+            payload >> index;
+            payload >> begin;
+            payload >> length;
+
+            if (IsClientRequested(index)) {
+                // TODO если этот запрос еще не обрабатывается, то отменяем (делаем это у file manager'a)
+            }
 
             break;
         case port:
-            // TODO хз че тут надо
             if (payload_size != 2) {
                 LOG(GetStrIP(), " : invalid port-message size");
                 Disconnect();
+                return;
             }
             uint16_t port;
             payload >> port;
 
+            // TODO хз че тут надо
+
+            break;
+        default:
+            LOG(GetStrIP(), " : Unknown message of id ", (uint32_t)message_type, " received by peer. Ignoring.");
             break;
     }
 }

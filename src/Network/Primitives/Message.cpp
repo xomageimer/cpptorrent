@@ -25,6 +25,14 @@ std::string bittorrent::ReceivingMessage::GetString() const {
     return std::move(str);
 }
 
+bool bittorrent::ReceivingPeerMessage::DecodeHeader(uint32_t size) const {
+    body_size_ = size;
+    if (body_size_ > bittorrent_constants::most_request_size) {
+        return false;
+    }
+    return true;
+}
+
 void bittorrent::SendingMessage::CopyFrom(const Message &msg_buf) {
     CopyFrom(msg_buf.GetBufferData().data(), msg_buf.Size());
 }
@@ -40,26 +48,17 @@ void bittorrent::SendingMessage::Clear() {
     out_pos_ = 0;
 }
 
-bool bittorrent::ReceivingPeerMessage::DecodeHeader(uint32_t size) const {
-    body_size_ = size;
-    if (body_size_ > bittorrent_constants::most_request_size) {
-        return false;
-    }
-    return true;
-}
-
-void bittorrent::SendingPeerMessage::EncodeHeader(uint32_t size) {
-    Clear();
-    body_size_ = size;
-
+void bittorrent::SendingPeerMessage::EncodeHeader() {
+    auto body_size = Size();
     char header[header_length + 1]{};
+
     size_t encode_body_length = 0;
     if (order_ == BigEndian) {
-        encode_body_length = NativeToBig(body_size_);
+        encode_body_length = NativeToBig(body_size);
     } else if (order_ == LittleEndian) {
-        encode_body_length = NativeToLittle(body_size_);
+        encode_body_length = NativeToLittle(body_size);
     }
+
     std::sprintf(header, "4%d", encode_body_length);
-    CopyFrom(reinterpret_cast<uint8_t *>(header), header_length);
-    data_.reserve(body_size_);
+    std::memcpy(&data_[0], reinterpret_cast<uint8_t *>(header), header_length);
 }

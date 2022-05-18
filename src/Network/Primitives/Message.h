@@ -141,8 +141,6 @@ namespace bittorrent {
         port = 9
     };
 
-    static const inline size_t max_body_length = bittorrent_constants::most_request_size;
-
     static const inline size_t header_length = 4;
 
     static const inline size_t id_length = 1;
@@ -151,13 +149,13 @@ namespace bittorrent {
     public:
         using bittorrent::ReceivingMessage::ReceivingMessage;
 
-        explicit ReceivingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : ReceivingMessage(nullptr, 0, bo) {}
+        explicit ReceivingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : ReceivingMessage(nullptr, 0, bo) { inp_pos_ = 1; }
 
-        [[nodiscard]] const auto *Body() const { return arr_.data() + id_length; }
+        [[nodiscard]] const auto *Body() const { return arr_.data(); }
 
         [[nodiscard]] size_t BodySize() const { return body_size_; };
 
-        [[nodiscard]] PEER_MESSAGE_TYPE Type() const { return PEER_MESSAGE_TYPE{GetBufferData()[header_length]}; };
+        [[nodiscard]] PEER_MESSAGE_TYPE Type() const { return PEER_MESSAGE_TYPE{GetBufferData()[0]}; }
 
         bool DecodeHeader(uint32_t size) const;
 
@@ -171,16 +169,15 @@ namespace bittorrent {
     public:
         using bittorrent::SendingMessage::SendingMessage;
 
-        [[nodiscard]] auto *Body() { return data_.data() + header_length + id_length; }
+        explicit SendingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : SendingMessage(bo) { data_.resize(header_length, 0); }
 
-        [[nodiscard]] size_t BodySize() const { return body_size_; }
+        [[nodiscard]] auto *Body() { return data_.data() + header_length; }
 
-        [[nodiscard]] PEER_MESSAGE_TYPE Type() const { return PEER_MESSAGE_TYPE{GetBufferData()[header_length]}; };
+        [[nodiscard]] size_t BodySize() const { return ArrayToValue<uint32_t>(&data_[0]); }
 
-        void EncodeHeader(uint32_t size);
+        [[nodiscard]] PEER_MESSAGE_TYPE Type() { return PEER_MESSAGE_TYPE{GetBufferData()[header_length]}; }
 
-    private:
-        size_t body_size_ = 0;
+        void EncodeHeader();
     };
 } // namespace bittorrent
 

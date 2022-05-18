@@ -15,6 +15,7 @@ int main()
 #endif
     LOG("Start");
     auto start = std::chrono::steady_clock::now();
+    // TODO сделать количество потоков иначе!
     std::vector<std::thread> threads(std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() - 1 : 1);
     boost::asio::io_service service;
     boost::asio::io_service::work worker(service);
@@ -32,7 +33,7 @@ int main()
         }
     };
 
-    auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "No Country for Old Men2.torrent",
+    auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
 
     listener->AddTorrent(torrent);

@@ -12,12 +12,13 @@
 #include "Peer.h"
 #include "Tracker.h"
 
-#include "bt/Piece.h"
+#include "Primitives/Piece.h"
+#include "Primitives/ManagerRequests.h"
+
 #include "bencode_lib.h"
 #include "random_generator.h"
 
 // Объект с которым работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
-// TODO изменить стиль названий, поля должны кончаться на _, а название приватных методов быть name_name_name... ()
 
 namespace bittorrent {
     struct meta_info_file {
@@ -39,11 +40,17 @@ namespace bittorrent {
 
         void StartCommunicatingPeers();
 
-        void ReceivePieceBlock(uint32_t idx, uint32_t begin, Block block);
+        void DownloadPieceBlock(const WriteRequest & req);
 
-        [[nodiscard]] const bittorrent::Bitfield & GetOwnerBitfield() const { return file_manager_->GetBitfield(); }
+        void UploadPieceBlock(const ReadRequest & req);
+
+        void SayHave(size_t piece_num) { master_peer_->SendHaveToAll(piece_num); }
+
+        [[nodiscard]] const bittorrent::Bitfield &GetOwnerBitfield() const { return file_manager_->GetBitfield(); }
 
         [[nodiscard]] bool PieceDone(uint32_t idx) const { return file_manager_->PieceDone(idx); };
+
+        [[nodiscard]] bool PieceRequested(uint32_t idx) const { return file_manager_->PieceRequested(idx); };
 
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info_.info_hash; }
 
@@ -69,10 +76,10 @@ namespace bittorrent {
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers_.empty(); }
 
-    private:
-        bool FillTrackers();
-
         [[nodiscard]] boost::asio::io_service &GetService() const;
+
+    private:
+        bool fill_trackers();
 
         boost::asio::io_service &service_; // обязательно в самом верху
 

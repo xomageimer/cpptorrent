@@ -22,8 +22,9 @@ add_library(helpers SHARED src/utils/constants.h
         src/utils/random_generator.cpp src/utils/random_generator.h
         src/utils/logger.cpp src/utils/logger.h
 
-        src/utils/bt/Bitfield.h src/utils/bt/Bitfield.cpp
-        src/utils/bt/Piece.h src/utils/bt/Piece.cpp)
+        src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
+        src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
+        src/BitTorrent/Primitives/ManagerRequests.h)
 add_library(bittorrent STATIC
         src/Network/Primitives/Socket.h
         src/Network/Primitives/Message.h src/Network/Primitives/Message.cpp

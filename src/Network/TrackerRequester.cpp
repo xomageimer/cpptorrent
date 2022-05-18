@@ -382,7 +382,7 @@ void network::udpRequester::do_announce_response() {
                 LOG(tracker_.GetUrl().Host, " : ", "\nbytes_transferred: ", std::dec, data.Size(),
                     "\nval == c_resp.transaction_id.value(): ", (val == BigToNative(c_resp_.transaction_id)),
                     "\nresponse[0] != 0: ", (action != 0), "\nresponse[0] = ", std::hex,
-                    val);
+                    val, std::dec);
 
                 if (data.Size() >= 20 && val ==  BigToNative(c_resp_.transaction_id) && action == 1) {
                     SendData msg;

@@ -1,7 +1,9 @@
 #include "Peer.h"
+#include "Torrent.h"
+
 #include "Listener.h"
 #include "PeerClient.h"
-#include "Torrent.h"
+
 #include "auxiliary.h"
 #include "random_generator.h"
 
@@ -64,7 +66,7 @@ void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
 
     peers_subscribers_.erase(unsub_ip);
 
-    LOG("peers remain: ", peers_subscribers_.size());
+    LOG("peers remain: ", (int)peers_subscribers_.size());
 }
 
 void bittorrent::MasterPeer::MakeHandshake() {
@@ -89,4 +91,18 @@ bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
 
 const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
     return torrent_.GetOwnerBitfield();
+}
+
+bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {
+    if (!peers_subscribers_.count(peer_ip)) {
+        return false;
+    }
+    // TODO проверять, можно ли unchoke этот пир...
+    return true;
+}
+
+void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
+    for (auto & [id, peer] : peers_subscribers_){
+        peer->send_have(piece_num);
+    }
 }

@@ -11,7 +11,7 @@
 #include <string>
 #include <utility>
 
-using SendData = bittorrent::SendingMessage;            // the oldest sending message class
+using SendAnyData = bittorrent::SendingMessage;          // the most based sending message class
 using ReceiveAnyData = bittorrent::ReceivingPeerMessage; // the most inherited receiving message class
 
 namespace network {
@@ -129,7 +129,7 @@ namespace network {
         asio::deadline_timer timeout_;
 
         boost::asio::streambuf read_streambuff_;
-        std::list<SendData> queue_send_buff_;
+        std::list<SendAnyData> queue_send_buff_;
     };
 
     using StrandEx = asio::executor;
@@ -137,7 +137,7 @@ namespace network {
     struct TCPSocket : Impl<asio::ip::tcp, StrandEx> {
         using base_type::base_type;
 
-        void Send(SendData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+        void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
             auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             Post([=, self = shared_from_this()] {
                 async_write(socket_, asio::buffer(it->GetBufferData()), [=](error_code ec, size_t xfr) {
@@ -207,7 +207,7 @@ namespace network {
     struct UDPSocket : Impl<asio::ip::udp, StrandEx> {
         using base_type::base_type;
 
-        void Send(SendData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+        void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
             auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             Post([=, this, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);

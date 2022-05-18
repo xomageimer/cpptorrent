@@ -17,8 +17,8 @@
 #include "Peer.h"
 
 #include "Primitives/Message.h"
-#include "bt/Bitfield.h"
-#include "bt/Piece.h"
+#include "Primitives/Bitfield.h"
+#include "Primitives/Piece.h"
 
 #include "auxiliary.h"
 #include "constants.h"
@@ -26,6 +26,8 @@
 
 namespace ba = boost::asio;
 
+using SendData = bittorrent::SendingMessage;
+using RecvData = bittorrent::ReceivingMessage;
 using RecvPeerData = bittorrent::ReceivingPeerMessage;
 using SendPeerData = bittorrent::SendingPeerMessage;
 
@@ -54,6 +56,8 @@ namespace network {
 
         bittorrent::Torrent &GetTorrent() { return master_peer_.GetTorrent(); }
 
+        const bittorrent::Torrent &GetTorrent() const { return master_peer_.GetTorrent(); }
+
         const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
 
         size_t TotalPiecesCount() const { return master_peer_.GetTotalPiecesCount(); }
@@ -68,7 +72,9 @@ namespace network {
 
         bool IsRemoteInterested() const { return status_ & peer_interested; }
 
-        bool IsClientRequested(uint32_t idx) const {}
+        bool IsClientRequested(uint32_t idx) const { return GetTorrent().PieceRequested(idx); }
+
+        bool IsClientAlreadyDone(uint32_t idx) const { return GetTorrent().PieceDone(idx); }
 
         void Disconnect();
 
@@ -101,7 +107,11 @@ namespace network {
 
         void receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block);
 
+        void send_msg(SendData data);
+
         void send_handshake();
+
+        void send_keep_alive();
 
         void send_choke();
 
@@ -111,18 +121,19 @@ namespace network {
 
         void send_not_interested();
 
-        void send_have();
+        void send_have(uint32_t idx);
 
         void send_bitfield();
 
-        void send_request(size_t piece_request_index);
+        void send_request(uint32_t piece_request_index, uint32_t begin, uint32_t length);
 
         void send_piece(uint32_t pieceIdx, uint32_t offset, uint32_t length);
 
-        void send_cancel(size_t piece_index);
+        void send_cancel(uint32_t pieceIdx, uint32_t offset, uint32_t length);
 
         void send_port(size_t port);
 
+        friend class bittorrent::MasterPeer;
         bittorrent::MasterPeer &master_peer_;
 
         bittorrent::Peer slave_peer_;
@@ -130,8 +141,6 @@ namespace network {
         RecvPeerData msg_to_read_;
 
         uint8_t status_ = STATE::am_choking | STATE::peer_choking;
-
-        // TODO задать битовое поле из торрент структуры
     };
 } // namespace network
 
