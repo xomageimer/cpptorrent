@@ -44,6 +44,8 @@ namespace bittorrent {
 
         void UploadPieceBlock(ReadRequest req);
 
+        void CancelBlockUpload(ReadRequest req);
+
         void SayHave(size_t piece_num) { master_peer_->SendHaveToAll(piece_num); }
 
         [[nodiscard]] const bittorrent::Bitfield &GetOwnerBitfield() const { return file_manager_->GetBitfield(); }

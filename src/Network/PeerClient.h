@@ -107,6 +107,8 @@ namespace network {
 
         void receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block);
 
+        void cancel_piece(uint32_t id);
+
         void send_msg(SendPeerData data);
 
         void send_handshake();
@@ -127,7 +129,7 @@ namespace network {
 
         void send_request(uint32_t piece_request_index, uint32_t begin, uint32_t length);
 
-        void send_piece(uint32_t pieceIdx, uint32_t offset, uint32_t length);
+        void send_block(uint32_t pieceIdx, uint32_t offset, uint8_t * data, size_t size);
 
         void send_cancel(uint32_t pieceIdx, uint32_t offset, uint32_t length);
 

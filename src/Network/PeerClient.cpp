@@ -133,6 +133,16 @@ void network::PeerClient::receive_piece_block(uint32_t index, uint32_t begin, bi
     //    GetTorrent().DownloadPieceBlock(index, begin, std::move(block));
 }
 
+bool network::PeerClient::IsClientRequested(uint32_t idx) const {
+    return GetTorrent().PieceRequested(idx);
+}
+
+bool network::PeerClient::IsClientAlreadyDone(uint32_t idx) const {
+    return GetTorrent().PieceDone(idx);
+}
+
+void network::PeerClient::cancel_piece(uint32_t id) {}
+
 void network::PeerClient::access() {
     GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
 
@@ -204,6 +214,7 @@ void network::PeerClient::send_handshake() {
 }
 
 void network::PeerClient::send_msg(SendPeerData data) {
+    data.EncodeHeader();
     auto type = data.Type();
     Send(
         std::move(data), [this, type](size_t xfr) { LOG(GetStrIP(), " : data of type ", type, " successfully sent"); },
@@ -214,7 +225,6 @@ void network::PeerClient::send_keep_alive() {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
     SendPeerData msg;
-    msg.EncodeHeader();
 
     send_msg(std::move(msg));
 }
@@ -225,7 +235,6 @@ void network::PeerClient::send_choke() {
 
     SendPeerData msg;
     msg << choke;
-    msg.EncodeHeader();
 
     send_msg(std::move(msg));
 }
@@ -236,7 +245,6 @@ void network::PeerClient::send_unchoke() {
 
     SendPeerData msg;
     msg << unchoke;
-    msg.EncodeHeader();
 
     send_msg(std::move(msg));
 }
@@ -247,7 +255,6 @@ void network::PeerClient::send_interested() {
 
     SendPeerData msg;
     msg << interested;
-    msg.EncodeHeader();
 
     send_msg(std::move(msg));
 }
@@ -258,7 +265,6 @@ void network::PeerClient::send_not_interested() {
 
     SendPeerData msg;
     msg << not_interested;
-    msg.EncodeHeader();
 
     send_msg(std::move(msg));
 }
@@ -268,9 +274,7 @@ void network::PeerClient::send_have(uint32_t idx) {
     using namespace bittorrent;
 
     SendPeerData msg;
-    msg << have;
-    msg << idx;
-    msg.EncodeHeader();
+    msg << have << idx;
 
     send_msg(std::move(msg));
 }
@@ -285,7 +289,6 @@ void network::PeerClient::send_bitfield() {
     msg << bitfield;
     auto bits_like_bytes = GetOwnerBitfield().GetCast();
     msg.CopyFrom(bits_like_bytes.data(), bytesToSend);
-    msg.EncodeHeader();
 
     send_msg(std::move(msg));
 }
@@ -295,30 +298,37 @@ void network::PeerClient::send_request(uint32_t piece_request_index, uint32_t be
     using namespace bittorrent;
 
     SendPeerData msg;
-    msg << request;
-    msg << piece_request_index << begin << length;
-    msg.EncodeHeader();
+    msg << request << piece_request_index << begin << length;
 
     send_msg(std::move(msg));
 }
 
-void network::PeerClient::send_piece(uint32_t pieceIdx, uint32_t offset, uint32_t length) {
+void network::PeerClient::send_block(uint32_t pieceIdx, uint32_t offset, uint8_t *data, size_t size) {
     LOG(GetStrIP(), " : ", __FUNCTION__);
-    // TODO передавать себя (shared_from_this) в какой-то метод и помещаться куда-нибудь в очередь, чтобы начать отправку! \
-        ключом может быть что-то типо указателя + piece index и тп.
+    using namespace bittorrent;
+
+    SendPeerData msg;
+    msg << piece_block << pieceIdx << offset;
+    msg.CopyFrom(data, size);
+
+    send_msg(std::move(msg));
 }
 
 void network::PeerClient::send_cancel(uint32_t pieceIdx, uint32_t offset, uint32_t length) {
     LOG(GetStrIP(), " : ", __FUNCTION__);
+    using namespace bittorrent;
+
+    SendPeerData msg;
+    msg << cancel << pieceIdx << offset << length;
+
+    send_msg(std::move(msg));
 }
 
 void network::PeerClient::send_port(size_t port) {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
     SendPeerData msg;
-    msg << bittorrent::port;
-    msg << port;
-    msg.EncodeHeader();
+    msg << bittorrent::port << port;
 
     send_msg(std::move(msg));
 }
@@ -373,7 +383,10 @@ void network::PeerClient::handle_response() {
             }
             status_ &= ~peer_interested;
 
-            // TODO добавить реакцию на такое сообщение!
+            if (IsRemoteChoked()) {
+                send_choke();
+                // TODO что-то сделать если задушили пир
+            }
 
             break;
         case have: {
@@ -391,7 +404,7 @@ void network::PeerClient::handle_response() {
             }
             GetPeerBitfield().Set(i);
 
-            if (!IsClientAlreadyDone(i)) {
+            if (i < TotalPiecesCount() && !IsClientAlreadyDone(i)) {
                 try_to_request_piece();
             }
 
@@ -457,18 +470,15 @@ void network::PeerClient::handle_response() {
 
             payload_size -= 9;
 
-            // TODO реализовать метод IsClientRequested
             if (!IsClientRequested(index)) {
                 LOG(GetStrIP(), " : received piece ", std::to_string(index), " which didn't asked");
                 return;
             }
 
             if (IsClientAlreadyDone(index)) {
-                // TODO нужно будет отменять все block реквесты связанные с этим piece!
                 LOG(GetStrIP(), " : received piece ", std::to_string(index), " which already done");
-                //                send_cancel(index, begin, payload_size);
+                cancel_piece(index);
             } else {
-                // TODO заполнить кусок -> вызвать notify для conditional -> закончить данную функцию
                 GetTorrent().DownloadPieceBlock(
                     {shared_from(this), index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size}});
             }
@@ -489,7 +499,7 @@ void network::PeerClient::handle_response() {
             payload >> length;
 
             if (IsClientRequested(index)) {
-                // TODO если этот запрос еще не обрабатывается, то отменяем (делаем это у file manager'a)
+                GetTorrent().CancelBlockUpload({shared_from(this), index, begin, length});
             }
 
             break;
@@ -509,11 +519,4 @@ void network::PeerClient::handle_response() {
             LOG(GetStrIP(), " : Unknown message of id ", (uint32_t)message_type, " received by peer. Ignoring.");
             break;
     }
-}
-bool network::PeerClient::IsClientRequested(uint32_t idx) const {
-    return GetTorrent().PieceRequested(idx);
-}
-
-bool network::PeerClient::IsClientAlreadyDone(uint32_t idx) const {
-    return GetTorrent().PieceDone(idx);
 }

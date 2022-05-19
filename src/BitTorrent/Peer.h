@@ -4,6 +4,7 @@
 #include <cctype>
 #include <unordered_map>
 #include <string>
+#include <atomic>
 
 #include <boost/asio.hpp>
 #define BOOST_THREAD_PROVIDES_FUTURE
@@ -102,6 +103,8 @@ namespace bittorrent {
         std::mutex mut_;
 
         std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
+
+        std::atomic<size_t> available_unchoke_count_ { 35 };
     };
 } // namespace bittorrent
 

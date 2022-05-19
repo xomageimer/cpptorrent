@@ -10,15 +10,15 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
     fill_files();
     bitset_.Resize(torrent_.GetPieceCount());
 
-    for (auto & [piece, files] : pieces_by_files_) {
-        std::cerr << "piece id " << piece << ":\n";
-        size_t i = 0;
-        for (auto & file : files) {
-            std::cerr << "\tfile #" << i++ << " : " << file.path.filename() << "\n";
-            std::cerr << "started from " << file.begin << " file position" << std::endl;
-        }
-        std::cerr << std::endl;
-    }
+//    for (auto & [piece, files] : pieces_by_files_) {
+//        std::cerr << "piece id " << piece << ":\n";
+//        size_t i = 0;
+//        for (auto & file : files) {
+//            std::cerr << "\tfile #" << i++ << " : " << file.path.filename() << "\n";
+//            std::cerr << "\tstarted from " << file.begin << " piece position" << std::endl;
+//        }
+//        std::cerr << std::endl;
+//    }
 
     LOG("Torrent pieces count: ", torrent_.GetPieceCount());
     LOG("Torrent total size: ", total_size_GB_, " GB");
@@ -43,7 +43,6 @@ void bittorrent::TorrentFilesManager::fill_files() {
     } else {                                                                                    // multi-file mode torrent
         const long long piece_length = file_info["piece length"].AsNumber();
         total_size_GB_ = 0;
-//        files_.reserve(file_info["files_"].AsArray().size());
 
         long long cur_piece_begin = 0;
         size_t cur_piece_index = 0;
@@ -64,6 +63,7 @@ void bittorrent::TorrentFilesManager::fill_files() {
                 while (cur_piece_begin > piece_length) {
                     cur_piece_begin = cur_piece_begin - piece_length;
                     cur_piece_index++;
+                    pieces_by_files_[cur_piece_index].emplace_back(FileInfo{cur_file_path.string(), cur_piece_index, 0, bytes_size});
                 }
             }
 
@@ -74,24 +74,32 @@ void bittorrent::TorrentFilesManager::fill_files() {
 }
 
 bool bittorrent::TorrentFilesManager::PieceDone(uint32_t index) const {
+    std::shared_lock lock(manager_mut_);
     return bitset_.Test(index);
 }
 
-// TODO мб надо иначе
 bool bittorrent::TorrentFilesManager::PieceRequested(uint32_t index) const {
-    // TODO нужен мьютекс по верх, глянуть concurrent_map
+    std::shared_lock lock(manager_mut_);
     return active_pieces_.count(index);
 }
 
-void bittorrent::TorrentFilesManager::WritePieceToFile(size_t piece_num) {}
-
-void bittorrent::TorrentFilesManager::UploadBlock(const bittorrent::ReadRequest &) {
+void bittorrent::TorrentFilesManager::WritePieceToFile(size_t piece_num) {
 
 }
 
-// TODO хочу где-нибудь здесь conditional_variable! надо думать!
+void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest) {
+    std::unique_lock lock(manager_mut_);
+    // TODO удаляем блок у active_piece и отменить все операции с ним
+}
 
-void bittorrent::TorrentFilesManager::DownloadBlock(const bittorrent::WriteRequest &) {
+void bittorrent::TorrentFilesManager::UploadBlock(bittorrent::ReadRequest req) {
+    std::shared_lock lock(manager_mut_);
+
+}
+
+// TODO заполнить кусок -> вызвать notify для conditional -> закончить данную функцию
+void bittorrent::TorrentFilesManager::DownloadBlock(bittorrent::WriteRequest req) {
+    uint32_t blockIndex = req.begin / bittorrent_constants::most_request_size;
     // TODO если такого нет, то добавить в active_pieces
 //    auto &piece_handler = active_pieces_[piece_idx];
 //    {

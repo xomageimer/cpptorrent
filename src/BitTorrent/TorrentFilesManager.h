@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <fstream>
 #include <filesystem>
+#include <shared_mutex>
 #include <mutex>
 
 #include "Primitives/ManagerRequests.h"
@@ -31,9 +32,11 @@ namespace bittorrent {
 
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB_; }; // GigaBytes
 
-        void UploadBlock(const ReadRequest &);
+        void UploadBlock(ReadRequest);
 
-        void DownloadBlock(const WriteRequest &);
+        void CancelBlock(ReadRequest);
+
+        void DownloadBlock(WriteRequest);
 
         [[nodiscard]] bool PieceDone(uint32_t index) const;
 
@@ -48,15 +51,11 @@ namespace bittorrent {
 
         Torrent &torrent_;
 
-        std::mutex manager_m_;
+        mutable std::shared_mutex manager_mut_;
 
         std::condition_variable cv_;
 
-        struct PieceHandler {   // TODO нужно написать аналог FileInfo, и также хранить здесь дескриптор файла!
-            Piece piece;
-            std::mutex mut;
-        };
-        std::map<size_t, PieceHandler> active_pieces_;
+        std::map<size_t, Piece> active_pieces_;
 
         size_t piece_size_{};
 

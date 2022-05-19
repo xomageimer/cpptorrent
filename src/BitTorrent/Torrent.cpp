@@ -138,12 +138,15 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
 }
 
 void bittorrent::Torrent::DownloadPieceBlock(WriteRequest req) {
-
+    file_manager_->DownloadBlock(std::move(req));
 }
 
 void bittorrent::Torrent::UploadPieceBlock(ReadRequest req) {
-//    uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-//    file_manager_->SetPieceBlock(idx, blockIndex, std::move(block));
+    file_manager_->UploadBlock(std::move(req));
+}
+
+void bittorrent::Torrent::CancelBlockUpload(ReadRequest req) {
+
 }
 
 bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {

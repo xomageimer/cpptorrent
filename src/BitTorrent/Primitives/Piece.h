@@ -31,8 +31,7 @@ namespace bittorrent {
 
         size_t index;
     };
-
-//    void WritePiece(FileInfo fi);
+  //    void WritePiece(FileInfo fi);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_PIECE_H
