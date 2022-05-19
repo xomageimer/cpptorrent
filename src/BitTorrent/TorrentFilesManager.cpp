@@ -10,6 +10,16 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
     fill_files();
     bitset_.Resize(torrent_.GetPieceCount());
 
+    for (auto & [piece, files] : pieces_by_files_) {
+        std::cerr << "piece id " << piece << ":\n";
+        size_t i = 0;
+        for (auto & file : files) {
+            std::cerr << "\tfile #" << i++ << " : " << file.path.filename() << "\n";
+            std::cerr << "started from " << file.begin << " file position" << std::endl;
+        }
+        std::cerr << std::endl;
+    }
+
     LOG("Torrent pieces count: ", torrent_.GetPieceCount());
     LOG("Torrent total size: ", total_size_GB_, " GB");
     LOG("Last peace size: ", last_piece_size_, " bytes");
@@ -27,24 +37,24 @@ void bittorrent::TorrentFilesManager::fill_files() {
     if (file_info.TryAt("length")) {                                                            // single-file mode torrent
         auto bytes_size = file_info["length"].AsNumber();
         total_size_GB_ = BytesToGiga(bytes_size);
-        files_.emplace_back(FileInfo{file_info["name"].AsString(), 0, 0, bytes_size});
+        pieces_by_files_[0].emplace_back(FileInfo{file_info["name"].AsString(), 0, 0, bytes_size});
 
         last_piece_size_ = bytes_size % file_info["piece length"].AsNumber();
     } else {                                                                                    // multi-file mode torrent
         const long long piece_length = file_info["piece length"].AsNumber();
         total_size_GB_ = 0;
-        files_.reserve(file_info["files_"].AsArray().size());
+//        files_.reserve(file_info["files_"].AsArray().size());
 
         long long cur_piece_begin = 0;
         size_t cur_piece_index = 0;
-        for (auto &file : file_info["files_"].AsArray()) {
+        for (auto &file : file_info["files"].AsArray()) {
             auto cur_file_path = path_to_download_;
             for (auto const &path_el : file["path"].AsArray()) {
                 cur_file_path = cur_file_path / path_el.AsString();
             }
             auto bytes_size = file["length"].AsNumber();
 
-            files_.emplace_back(FileInfo{cur_file_path.string(), cur_piece_index, cur_piece_begin, bytes_size});
+            pieces_by_files_[cur_piece_index].emplace_back(FileInfo{cur_file_path.string(), cur_piece_index, cur_piece_begin, bytes_size});
 
             cur_piece_index = ((cur_piece_begin + bytes_size) < piece_length) ? cur_piece_index : cur_piece_index + 1;
             if ((cur_piece_begin + bytes_size) < piece_length) {

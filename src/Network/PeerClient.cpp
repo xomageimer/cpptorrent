@@ -74,6 +74,7 @@ void network::PeerClient::error_callback(boost::system::error_code ec) {
     Disconnect();
 }
 
+// TODO нужно делать keep_alive всем пирам, которые нам интересны!
 void network::PeerClient::drop_timeout() {
     Await(bittorrent_constants::waiting_time + bittorrent_constants::epsilon, [this] { Disconnect(); });
 }
@@ -129,7 +130,7 @@ void network::PeerClient::try_to_request_piece() {
 }
 
 void network::PeerClient::receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block) {
-//    GetTorrent().DownloadPieceBlock(index, begin, std::move(block));
+    //    GetTorrent().DownloadPieceBlock(index, begin, std::move(block));
 }
 
 void network::PeerClient::access() {
@@ -138,7 +139,7 @@ void network::PeerClient::access() {
     LOG(GetStrIP(), " was connected!");
 
     send_bitfield();
-    send_interested();
+    //    send_interested(); // TODO должно быть интересно, только если у него есть нужные pieces
 
     drop_timeout();
     do_read_header();
@@ -202,9 +203,10 @@ void network::PeerClient::send_handshake() {
         failed_attempt);
 }
 
-void network::PeerClient::send_msg(SendData data) {
+void network::PeerClient::send_msg(SendPeerData data) {
+    auto type = data.Type();
     Send(
-        std::move(data), [this](size_t xfr) { LOG(GetStrIP(), " : data successfully sent"); },
+        std::move(data), [this, type](size_t xfr) { LOG(GetStrIP(), " : data of type ", type, " successfully sent"); },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
 }
 
@@ -389,7 +391,9 @@ void network::PeerClient::handle_response() {
             }
             GetPeerBitfield().Set(i);
 
-            try_to_request_piece();
+            if (!IsClientAlreadyDone(i)) {
+                try_to_request_piece();
+            }
 
             break;
         }
@@ -434,8 +438,7 @@ void network::PeerClient::handle_response() {
             LOG(GetStrIP(), " : size of message:", BytesToHumanReadable(length));
 
             if (IsClientAlreadyDone(index)) {
-
-                send_piece(index, begin, length); // TODO должен быть не send, а что-то типо request! так как send сразу не будет!
+                GetTorrent().UploadPieceBlock({shared_from(this), index, begin, length});
             }
 
             break;
@@ -461,12 +464,13 @@ void network::PeerClient::handle_response() {
             }
 
             if (IsClientAlreadyDone(index)) {
-                // TODO мб это не имеет смысла!
+                // TODO нужно будет отменять все block реквесты связанные с этим piece!
                 LOG(GetStrIP(), " : received piece ", std::to_string(index), " which already done");
-                send_cancel(index, begin, payload_size);
+                //                send_cancel(index, begin, payload_size);
             } else {
                 // TODO заполнить кусок -> вызвать notify для conditional -> закончить данную функцию
-                receive_piece_block(index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size});
+                GetTorrent().DownloadPieceBlock(
+                    {shared_from(this), index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size}});
             }
 
             break;
@@ -505,4 +509,11 @@ void network::PeerClient::handle_response() {
             LOG(GetStrIP(), " : Unknown message of id ", (uint32_t)message_type, " received by peer. Ignoring.");
             break;
     }
+}
+bool network::PeerClient::IsClientRequested(uint32_t idx) const {
+    return GetTorrent().PieceRequested(idx);
+}
+
+bool network::PeerClient::IsClientAlreadyDone(uint32_t idx) const {
+    return GetTorrent().PieceDone(idx);
 }

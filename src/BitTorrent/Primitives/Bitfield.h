@@ -11,6 +11,7 @@
 #include <vector>
 
 namespace bittorrent {
+    // TODO добавить способ получать самые раритетные имеющиеся pieces
     struct Bitfield {
     public:
         explicit Bitfield() : Bitfield(0){};

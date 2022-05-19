@@ -137,11 +137,11 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
     master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 
-void bittorrent::Torrent::DownloadPieceBlock(const WriteRequest & req) {
+void bittorrent::Torrent::DownloadPieceBlock(WriteRequest req) {
 
 }
 
-void bittorrent::Torrent::UploadPieceBlock(const ReadRequest & req) {
+void bittorrent::Torrent::UploadPieceBlock(ReadRequest req) {
 //    uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
 //    file_manager_->SetPieceBlock(idx, blockIndex, std::move(block));
 }

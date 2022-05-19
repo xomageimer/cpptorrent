@@ -36,6 +36,10 @@ int main()
     auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
 
+    service_exit();
+
+    return 0;
+
     listener->AddTorrent(torrent);
 
     try

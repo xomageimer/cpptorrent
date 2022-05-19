@@ -66,7 +66,7 @@ namespace bittorrent {
 
         long double total_size_GB_;
 
-        std::vector<FileInfo> files_; // TODO наверное надо сделать map с ключами в виде piece_index, чтобы быстро записывать!
+        std::map<size_t, std::vector<FileInfo>> pieces_by_files_; // TODO наверное надо сделать map с ключами в виде piece_index, чтобы быстро записывать в файлы!
 
         bittorrent::Bitfield bitset_;
     };

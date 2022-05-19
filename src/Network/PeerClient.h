@@ -72,9 +72,9 @@ namespace network {
 
         bool IsRemoteInterested() const { return status_ & peer_interested; }
 
-        bool IsClientRequested(uint32_t idx) const { return GetTorrent().PieceRequested(idx); }
+        bool IsClientRequested(uint32_t idx) const;
 
-        bool IsClientAlreadyDone(uint32_t idx) const { return GetTorrent().PieceDone(idx); }
+        bool IsClientAlreadyDone(uint32_t idx) const;
 
         void Disconnect();
 
@@ -107,7 +107,7 @@ namespace network {
 
         void receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block);
 
-        void send_msg(SendData data);
+        void send_msg(SendPeerData data);
 
         void send_handshake();
 

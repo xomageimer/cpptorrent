@@ -66,6 +66,8 @@ void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
 
     peers_subscribers_.erase(unsub_ip);
 
+    // TODO если пиров не осталось или осталось очень мало, то можно попробовать сразу начать общение с трекерами
+
     LOG("peers remain: ", (int)peers_subscribers_.size());
 }
 

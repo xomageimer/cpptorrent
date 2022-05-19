@@ -40,9 +40,9 @@ namespace bittorrent {
 
         void StartCommunicatingPeers();
 
-        void DownloadPieceBlock(const WriteRequest & req);
+        void DownloadPieceBlock(WriteRequest req);
 
-        void UploadPieceBlock(const ReadRequest & req);
+        void UploadPieceBlock(ReadRequest req);
 
         void SayHave(size_t piece_num) { master_peer_->SendHaveToAll(piece_num); }
 

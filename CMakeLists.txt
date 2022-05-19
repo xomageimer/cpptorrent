@@ -20,17 +20,18 @@ add_library(bencode SHARED src/utils/bencode_lib.cpp src/utils/bencode_lib.h)
 add_library(helpers SHARED src/utils/constants.h
         src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/random_generator.cpp src/utils/random_generator.h
-        src/utils/logger.cpp src/utils/logger.h
+        src/utils/logger.cpp src/utils/logger.h)
 
-        src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
-        src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
-        src/BitTorrent/Primitives/ManagerRequests.h)
 add_library(bittorrent STATIC
         src/Network/Primitives/Socket.h
         src/Network/Primitives/Message.h src/Network/Primitives/Message.cpp
 
         src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
         src/Network/PeerClient.h src/Network/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
+
+        src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
+        src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
+        src/BitTorrent/Primitives/ManagerRequests.h
 
         src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp
         src/BitTorrent/TorrentFilesManager.cpp)

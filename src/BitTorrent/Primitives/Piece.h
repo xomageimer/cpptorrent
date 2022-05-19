@@ -6,38 +6,33 @@
 #include <vector>
 
 namespace bittorrent {
-    // TODO переделать pieces, убрать блоки!
     struct Block {
-        Block(uint8_t *data, size_t size) : m_data(data), m_size(size){};
-        Block(const Block &other) = delete;
-        Block &operator=(const Block &other) = delete;
-        Block(Block &&other) noexcept {
-            m_data = other.m_data;
-            other.m_data = nullptr;
-            m_size = other.m_size;
-        }
-        Block &operator=(Block &&other) noexcept {
-            if (this != &other) {
-                m_data = other.m_data;
-                other.m_data = nullptr;
-                m_size = other.m_size;
-            }
-            return *this;
-        }
+        explicit Block(uint8_t *data, size_t size) : data_(data, data + size){};
 
-        uint8_t *m_data = nullptr;
-        size_t m_size = 0;
+        Block(const Block &other) = delete;
+
+        Block &operator=(const Block &other) = delete;
+
+        Block(Block &&other) noexcept = default;
+
+        Block &operator=(Block &&other) noexcept = default;
+
+        std::vector<uint8_t> data_;
     };
 
     struct Piece {
+        explicit Piece(size_t idx, size_t bc) : index(idx), block_count(bc) { blocks.reserve(block_count); }
+
         std::vector<Block> blocks;
 
-        size_t current_block;
+        size_t current_block{0};
 
         size_t block_count;
 
         size_t index;
     };
+
+//    void WritePiece(FileInfo fi);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_PIECE_H

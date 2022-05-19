@@ -30,6 +30,7 @@ namespace network {
         explicit participant(Listener &listener, ba::ip::tcp::socket socket)
             : listener_(listener), socket_(std::move(socket)), timeout_(socket_.get_executor()) {}
 
+        // TODO избавиться от всех Get()...
         auto Get() { return shared_from_this(); }
 
         void Verify();

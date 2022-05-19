@@ -83,6 +83,13 @@ namespace network {
             Post([this, self = shared_from_this()] { cancel_operation(); });
         }
 
+        template <typename Derived>
+        inline std::shared_ptr<Derived>
+        shared_from(Derived* that)
+        {
+            return std::static_pointer_cast<Derived>(shared_from_this());
+        }
+
     protected:
         void stop_await() { timeout_.cancel(); }
 
