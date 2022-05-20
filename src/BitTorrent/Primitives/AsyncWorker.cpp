@@ -23,8 +23,9 @@ void AsyncWorker::run() {
         cv_.wait(lock, [&] { return (!stopped_ && !queue_.empty()) || quit_.load(); });
 
         if (!queue_.empty() && !stopped_) {
-            auto func = std::move(queue_.front());
-            queue_.pop();
+            auto [func, id] = std::move(queue_.front());
+            queue_.pop_front();
+            executing_callbacks_.erase(id);
             lock.unlock();
 
             func();
@@ -32,8 +33,26 @@ void AsyncWorker::run() {
     }
 }
 
-void AsyncWorker::Enqueue(AsyncWorker::CallBack &&func) {
+size_t AsyncWorker::Enqueue(AsyncWorker::CallBack func) {
     auto lock = std::unique_lock(mut_);
-    queue_.push(func);
+
+    auto id = random_generator::Random().GetNumber<size_t>();
+    while (executing_callbacks_.count(id))
+        id = random_generator::Random().GetNumber<size_t>();
+
+    queue_.emplace_back(std::move(func), id);
+    executing_callbacks_.emplace(id, std::prev(queue_.end()));
+
     cv_.notify_one();
+
+    return id;
+}
+
+void AsyncWorker::Erase(size_t callback_id) {
+    auto lock = std::unique_lock(mut_);
+
+    if (!executing_callbacks_.count(callback_id))
+        return;
+    queue_.erase(executing_callbacks_.at(callback_id));
+    executing_callbacks_.erase(callback_id);
 }

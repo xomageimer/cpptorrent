@@ -31,6 +31,11 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
     port = port_number;
 }
 
+bittorrent::MasterPeer::MasterPeer(bittorrent::Torrent &tor) : torrent_(tor) {
+    bitfield_.Resize(torrent_.GetPieceCount());
+    MakeHandshake();
+}
+
 void bittorrent::MasterPeer::InitiateJob(boost::asio::io_service &service, const std::vector<PeerImage> &peers) {
     bitfield_.Resize(torrent_.GetPieceCount());
     for (auto &peer : peers) {
@@ -91,8 +96,23 @@ bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
     return torrent_;
 }
 
-const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
-    return torrent_.GetOwnerBitfield();
+void bittorrent::MasterPeer::MarkUploadedPiece(size_t piece_id) {
+    std::lock_guard lock(mut_);
+    uploaded_pieces_.emplace(piece_id);
+}
+
+void bittorrent::MasterPeer::UnmarkUploadedPiece(size_t piece_id) {
+    std::lock_guard lock(mut_);
+    uploaded_pieces_.erase(piece_id);
+}
+
+bool bittorrent::MasterPeer::IsPieceUploaded(size_t piece_id) const {
+    std::lock_guard lock(mut_);
+    return uploaded_pieces_.count(piece_id) != 0;
+}
+
+bool bittorrent::MasterPeer::IsPieceDone(size_t piece_id) const {
+    return bitfield_.Test(piece_id);
 }
 
 bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {

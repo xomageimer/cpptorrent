@@ -1,6 +1,9 @@
 #include "TorrentFilesManager.h"
 #include "Torrent.h"
 
+#include "PeerClient.h"
+#include "Primitives/Message.h"
+
 #include "auxiliary.h"
 
 #include <algorithm>
@@ -9,7 +12,6 @@
 bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::filesystem::path path, size_t thread_count)
     : torrent_(torrent), a_worker_(thread_count), path_to_download_(std::move(path)) {
     fill_files();
-    bitset_.Resize(torrent_.GetPieceCount());
 
     //    LOG("____________________________________________\n");
     //    for (auto & [piece, files] : pieces_by_files_) {
@@ -72,73 +74,30 @@ void bittorrent::TorrentFilesManager::fill_files() {
     }
 }
 
-size_t bittorrent::TorrentFilesManager::GetPieceSize(size_t idx) {
-    if (idx == bitset_.Size() - 1) {
-        return last_piece_size_;
-    }
-    return piece_size_;
-}
-
-bool bittorrent::TorrentFilesManager::PieceDone(uint32_t index) const {
-    auto lock = std::shared_lock(manager_mut_);
-    return bitset_.Test(index);
-}
-
-bool bittorrent::TorrentFilesManager::PieceRequested(uint32_t index) const {
-    auto lock = std::shared_lock(manager_mut_);
-    return active_pieces_.count(index);
-}
-
 void bittorrent::TorrentFilesManager::WritePieceToFile(size_t piece_num) {}
 
 void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest req) {
     auto lock = std::unique_lock(manager_mut_);
-
-    if (!active_pieces_.count(req.piece_index)) return;
-
-    auto &piece_handler = active_pieces_.at(req.piece_index);
-    auto &cur_piece = piece_handler.piece;
-    auto &blocks_id = piece_handler.workers_id_;
-
-    auto block_id = std::tuple{req.remote_peer, req.begin, req.length};
-    if (blocks_id.count(block_id)) {
-        auto it = std::find_if(cur_piece.blocks.begin(), cur_piece.blocks.end(),
-            [&req](const Block &block) { return block.begin_ == req.begin && block.data_.size() == req.length; });
-        if (it != cur_piece.blocks.end()) cur_piece.blocks.erase(it);
+    if (active_requests_.count(req)) {
+        a_worker_.Erase(active_requests_.at(req));
+        active_requests_.erase(req);
+        req.remote_peer->UnbindUpload(req.piece_index);
     }
 }
 
-void bittorrent::TorrentFilesManager::UploadBlock(bittorrent::ReadRequest req) {
-    a_worker_.Enqueue([this] {
+size_t bittorrent::TorrentFilesManager::UploadBlock(bittorrent::ReadRequest req) {
+    auto it = active_requests_.emplace(req, a_worker_.Enqueue([this, req = std::move(req)]() {
+        active_requests_.erase(req);
+        req.remote_peer->UnbindUpload(req.piece_index);
 
+        // TODO make upload
+    }));
+    return it.second;
+}
+
+void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req) {
+    a_worker_.Enqueue([this, req = std::move(req)](){
+        // TODO прочекать валидность куска
+        // TODO записываем его в файл и удаляем из active_pieces
     });
-}
-
-void bittorrent::TorrentFilesManager::DownloadBlock(bittorrent::WriteRequest req) {
-    auto lock = std::unique_lock(manager_mut_);
-
-    if (!active_pieces_.count(req.piece_index)) {
-        active_pieces_.emplace(
-            req.piece_index, PieceHandler{Piece{GetPieceSize(req.piece_index),
-                                              static_cast<size_t>(std::ceil(static_cast<double>(GetPieceSize(req.piece_index)) /
-                                                                            static_cast<double>(bittorrent_constants::most_request_size)))},
-                                 {}});
-    }
-
-    auto &piece_handler = active_pieces_.at(req.piece_index);
-    auto &cur_piece = piece_handler.piece;
-    auto &blocks_id = piece_handler.workers_id_;
-
-    uint32_t blockIndex = req.begin / bittorrent_constants::most_request_size;
-    cur_piece.blocks.emplace_back(std::move(req.block));
-    blocks_id.emplace(req.remote_peer, req.begin, req.block.data_.size());
-
-    cur_piece.current_block++;
-    if (cur_piece.current_block == cur_piece.block_count) {
-        a_worker_.Enqueue([this, piece_id = req.piece_index] {
-            // TODO прочекать валидность куска
-            // TODO записываем его в файл и удаляем из active_pieces
-            bitset_.Set(piece_id);
-        });
-    }
 }

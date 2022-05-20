@@ -25,9 +25,13 @@ namespace bittorrent {
     struct Piece {
         explicit Piece(size_t idx, size_t bc) : index(idx), block_count(bc) { blocks.reserve(block_count); }
 
+        Piece(Piece &&) = default;
+
+        Piece& operator=(Piece &&) = default;
+
         std::vector<Block> blocks;
 
-        size_t current_block{0};
+        size_t current_blocks_num{0};
 
         size_t block_count;
 

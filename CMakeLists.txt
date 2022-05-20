@@ -7,10 +7,10 @@ set(Boost_USE_STATIC_LIBS ON)
 ADD_DEFINITIONS(-DBoost_USE_STATIC_LIBS=ON)
 
 if (WIN32)
-    set (BOOST_ROOT "C:/Users/xomaq/Desktop/boost_1_71_0/boost_1_71_0")
-    set (BOOST_LIBRARYDIR "C:/Users/xomaq/Desktop/boost_1_71_0/boost_1_71_0")
-    set (Boost_COMPILER mgw81)
-endif()
+    set(BOOST_ROOT "C:/Users/xomaq/Desktop/boost_1_71_0/boost_1_71_0")
+    set(BOOST_LIBRARYDIR "C:/Users/xomaq/Desktop/boost_1_71_0/boost_1_71_0")
+    set(Boost_COMPILER mgw81)
+endif ()
 
 find_package(Boost 1.71.0 COMPONENTS system regex thread REQUIRED)
 
@@ -20,7 +20,8 @@ add_library(bencode SHARED src/utils/bencode_lib.cpp src/utils/bencode_lib.h)
 add_library(helpers SHARED src/utils/constants.h
         src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/random_generator.cpp src/utils/random_generator.h
-        src/utils/logger.cpp src/utils/logger.h)
+        src/utils/logger.cpp src/utils/logger.h
+        src/utils/move_function.h)
 
 add_library(bittorrent STATIC
         src/Network/Primitives/Socket.h
@@ -40,9 +41,9 @@ add_library(bittorrent STATIC
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} helpers bencode)
 
-if(WIN32)
+if (WIN32)
     target_link_libraries(bittorrent PUBLIC -lws2_32 -lwsock32)
-endif()
+endif ()
 
 add_executable(cpptorrent src/main.cpp)
 

@@ -3,15 +3,20 @@
 
 #include <functional>
 #include <vector>
-#include <queue>
+#include <list>
+#include <map>
 #include <atomic>
 #include <thread>
 #include <condition_variable>
 #include <mutex>
 
+#include "move_function.h"
+
 struct AsyncWorker {
 public:
-    using CallBack = std::function<void()>;
+    using CallBack = move_function;
+    using Node = std::pair<CallBack, size_t>;
+    using Iter = std::list<Node>::iterator;
 
     explicit AsyncWorker(size_t thread_count = 1);
 
@@ -25,14 +30,17 @@ public:
         cv_.notify_all();
     }
 
-    void Enqueue(CallBack &&func);
+    size_t Enqueue(CallBack func);
+
+    void Erase(size_t callback_id);
 
     ~AsyncWorker();
 
 private:
     void run();
 
-    std::queue<CallBack> queue_;
+    std::list<Node> queue_;
+    std::map<size_t, Iter> executing_callbacks_;
 
     std::vector<std::thread> threads_;
 

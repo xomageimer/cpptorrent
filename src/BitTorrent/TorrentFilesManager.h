@@ -30,27 +30,22 @@ namespace bittorrent {
     struct TorrentFilesManager {
     public:
         using piece_index = size_t;
-        using block_worker_id = std::tuple<std::shared_ptr<network::PeerClient>, size_t, size_t>;
 
         explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path, size_t thread_count = 1);
 
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB_; }; // GigaBytes
 
-        size_t GetPieceSize(size_t idx);
+        [[nodiscard]] size_t GetPieceSize() const { return piece_size_; }
 
-        void UploadBlock(ReadRequest);
+        [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size_; }
+
+        size_t UploadBlock(ReadRequest);
 
         void CancelBlock(ReadRequest);
 
-        void DownloadBlock(WriteRequest);
+        void DownloadPiece(WriteRequest);
 
         void WritePieceToFile(size_t piece_num);
-
-        [[nodiscard]] bool PieceDone(uint32_t index) const;
-
-        [[nodiscard]] bool PieceRequested(uint32_t index) const;
-
-        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const { return bitset_; }
 
     private:
         void fill_files();
@@ -61,13 +56,7 @@ namespace bittorrent {
 
         mutable std::shared_mutex manager_mut_;
 
-        struct PieceHandler {
-            Piece piece;
-            std::set<block_worker_id> workers_id_;
-        };
-        std::map<piece_index, PieceHandler> active_pieces_;
-
-        size_t max_active_pieces_ = 13;
+        std::map<ReadRequest, size_t> active_requests_; // активные request'ы из a_worker_
 
         size_t piece_size_{};
 
@@ -78,8 +67,6 @@ namespace bittorrent {
         long double total_size_GB_;
 
         std::map<piece_index, std::vector<FileInfo>> pieces_by_files_;
-
-        bittorrent::Bitfield bitset_;
     };
 } // namespace bittorrent
 

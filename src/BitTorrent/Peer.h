@@ -63,7 +63,7 @@ namespace bittorrent {
     public:
         using IP = uint32_t;
 
-        explicit MasterPeer(bittorrent::Torrent &tor) : torrent_(tor) { MakeHandshake(); }
+        explicit MasterPeer(bittorrent::Torrent &tor);
 
         void InitiateJob(boost::asio::io_service &service, std::vector<PeerImage> const &peers);
 
@@ -72,6 +72,14 @@ namespace bittorrent {
         void Unsubscribe(IP unsub_ip);
 
         void SendHaveToAll(size_t piece_num);
+
+        void MarkUploadedPiece(size_t piece_id);
+
+        void UnmarkUploadedPiece(size_t piece_id);
+
+        bool IsPieceUploaded(size_t piece_id) const;
+
+        bool IsPieceDone(size_t piece_id) const;
 
         auto Get() { return shared_from_this(); }
 
@@ -84,8 +92,6 @@ namespace bittorrent {
         [[nodiscard]] size_t GetTotalPiecesCount() const;
 
         [[nodiscard]] const uint8_t *GetHandshake() const;
-
-        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const;
 
         [[nodiscard]] bencode::Node const &GetChunkHashes() const;
 
@@ -103,7 +109,9 @@ namespace bittorrent {
 
         std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
 
-        size_t available_unchoke_count_{35};
+        std::set<size_t> uploaded_pieces_; // запрошенные куски у нас!
+
+        size_t available_unchoke_count_ = bittorrent_constants::MAX_AVAILABLE_UNCHOKE_ONE_TIME;
     };
 } // namespace bittorrent
 

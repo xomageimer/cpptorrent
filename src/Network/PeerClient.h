@@ -41,6 +41,9 @@ namespace network {
 
     struct PeerClient : public TCPSocket {
     public:
+        using piece_index = size_t;
+        using block_key = std::pair<size_t, size_t>;
+
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
 
@@ -49,6 +52,8 @@ namespace network {
         ~PeerClient();
 
         void Process();
+
+        void TryToRequest();
 
         std::string GetStrIP() const;
 
@@ -64,6 +69,10 @@ namespace network {
 
         const bittorrent::Bitfield &GetOwnerBitfield() const { return master_peer_.GetBitfield(); }
 
+        void BindUpload(size_t id);
+
+        void UnbindUpload(size_t id);
+
         bool IsClientChoked() const { return status_ & am_choking; }
 
         bool IsRemoteChoked() const { return status_ & peer_choking; }
@@ -72,42 +81,13 @@ namespace network {
 
         bool IsRemoteInterested() const { return status_ & peer_interested; }
 
-        bool IsClientRequested(uint32_t idx) const;
+        bool PieceUploaded(uint32_t idx) const;
 
-        bool IsClientAlreadyDone(uint32_t idx) const;
+        bool PieceRequested(uint32_t idx) const;
 
-        void Disconnect();
+        bool PieceDone(uint32_t idx) const;
 
-    private:
-        bool check_handshake(const RecvPeerData &) const;
-
-        void verify_handshake();
-
-        void access();
-
-        void try_again_connect();
-
-        void drop_timeout();
-
-        void do_read_header();
-
-        void do_read_body();
-
-        void handle_response();
-
-        void error_callback(boost::system::error_code ec);
-
-        mutable std::string cash_ip_;
-
-        bool is_disconnected = false;
-
-        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
-
-        void try_to_request_piece();
-
-        void cancel_piece(uint32_t id);
-
-        void send_msg(SendPeerData data);
+        // send methods
 
         void send_handshake();
 
@@ -132,6 +112,41 @@ namespace network {
         void send_cancel(uint32_t pieceIdx, uint32_t offset, uint32_t length);
 
         void send_port(size_t port);
+
+        void Disconnect();
+
+    private:
+        bool check_handshake(const RecvPeerData &) const;
+
+        void verify_handshake();
+
+        void access();
+
+        void try_again_connect();
+
+        void drop_timeout();
+
+        void do_read_header();
+
+        void do_read_body();
+
+        void handle_response();
+
+        void error_callback(boost::system::error_code ec);
+
+        void send_msg(SendPeerData data);
+
+        void cancel_piece(uint32_t id);
+
+        mutable std::string cash_ip_;
+
+        bool is_disconnected = false;
+
+        size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
+
+        std::map<piece_index, bittorrent::Piece> active_pieces_;
+
+        const size_t max_active_pieces_ = bittorrent_constants::MAX_REQUESTED_PIECES_BY_PEER_ONE_TIME;
 
         friend class bittorrent::MasterPeer;
         bittorrent::MasterPeer &master_peer_;

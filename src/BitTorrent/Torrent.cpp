@@ -32,7 +32,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     auto hash_info_str = hash_to_s.str();
     meta_info_.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
 
-    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path);
+    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path); // сначала файлы, потом мастер пир
     master_peer_ = std::make_shared<MasterPeer>(*this);
 
     fill_trackers();
@@ -137,12 +137,12 @@ void bittorrent::Torrent::StartCommunicatingPeers() {
     master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 
-void bittorrent::Torrent::DownloadPieceBlock(WriteRequest req) {
-    file_manager_->DownloadBlock(std::move(req));
+void bittorrent::Torrent::DownloadPiece(WriteRequest req) {
+    file_manager_->DownloadPiece(std::move(req));
 }
 
-void bittorrent::Torrent::UploadPieceBlock(ReadRequest req) {
-    file_manager_->UploadBlock(std::move(req));
+size_t bittorrent::Torrent::UploadPieceBlock(ReadRequest req) {
+    return file_manager_->UploadBlock(std::move(req));
 }
 
 void bittorrent::Torrent::CancelBlockUpload(ReadRequest req) {

@@ -40,19 +40,19 @@ namespace bittorrent {
 
         void StartCommunicatingPeers();
 
-        void DownloadPieceBlock(WriteRequest req);
+        void DownloadPiece(WriteRequest req);
 
-        void UploadPieceBlock(ReadRequest req);
+        size_t UploadPieceBlock(ReadRequest req);
 
         void CancelBlockUpload(ReadRequest req);
 
-        void SayHave(size_t piece_num) { master_peer_->SendHaveToAll(piece_num); }
+        void PieceComplete(size_t piece_num) {
+            master_peer_->GetBitfield().Set(piece_num);
+        }
 
-        [[nodiscard]] const bittorrent::Bitfield &GetOwnerBitfield() const { return file_manager_->GetBitfield(); }
-
-        [[nodiscard]] bool PieceDone(uint32_t idx) const { return file_manager_->PieceDone(idx); };
-
-        [[nodiscard]] bool PieceRequested(uint32_t idx) const { return file_manager_->PieceRequested(idx); };
+        void SayHave(size_t piece_num) {
+            master_peer_->SendHaveToAll(piece_num);
+        }
 
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info_.info_hash; }
 
@@ -72,9 +72,9 @@ namespace bittorrent {
 
         [[nodiscard]] size_t GetPieceCount() const { return GetMeta()["info"]["pieces"].AsString().size() / 20; };
 
-        [[nodiscard]] size_t GetPieceSize(size_t id) const { return file_manager_->GetPieceSize(id); };
+        [[nodiscard]] size_t GetPieceSize() const { return file_manager_->GetPieceSize(); };
 
-        [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size_; }
+        [[nodiscard]] size_t GetLastPieceSize() const { return file_manager_->GetLastPieceSize(); }
 
         [[nodiscard]] bool HasTrackers() const { return !active_trackers_.empty(); }
 
@@ -101,8 +101,6 @@ namespace bittorrent {
         meta_info_file meta_info_;
 
         std::shared_ptr<bittorrent::MasterPeer> master_peer_;
-
-        size_t last_piece_size_{};
 
         std::shared_ptr<TorrentFilesManager> file_manager_;
     };
