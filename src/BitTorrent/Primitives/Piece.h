@@ -7,7 +7,7 @@
 
 namespace bittorrent {
     struct Block {
-        explicit Block(uint8_t *data, size_t size) : data_(data, data + size){};
+        explicit Block(uint8_t *data, size_t size, uint32_t beg) : data_(data, data + size), begin_(beg){};
 
         Block(const Block &other) = delete;
 
@@ -18,6 +18,8 @@ namespace bittorrent {
         Block &operator=(Block &&other) noexcept = default;
 
         std::vector<uint8_t> data_;
+
+        uint32_t begin_;
     };
 
     struct Piece {
@@ -31,7 +33,6 @@ namespace bittorrent {
 
         size_t index;
     };
-  //    void WritePiece(FileInfo fi);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_PIECE_H

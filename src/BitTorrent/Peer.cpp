@@ -96,14 +96,18 @@ const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
 }
 
 bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {
+    std::lock_guard lock(mut_);
+
     if (!peers_subscribers_.count(peer_ip)) {
         return false;
     }
-    return available_unchoke_count_.load() == 0;
+    return available_unchoke_count_ == 0;
 }
 
 void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
-    for (auto & [id, peer] : peers_subscribers_){
+    std::lock_guard lock(mut_);
+
+    for (auto &[id, peer] : peers_subscribers_) {
         peer->send_have(piece_num);
     }
 }

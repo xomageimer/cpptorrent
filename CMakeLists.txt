@@ -32,6 +32,7 @@ add_library(bittorrent STATIC
         src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
         src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
         src/BitTorrent/Primitives/ManagerRequests.h
+        src/BitTorrent/Primitives/AsyncWorker.h src/BitTorrent/Primitives/AsyncWorker.cpp
 
         src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp
         src/BitTorrent/TorrentFilesManager.cpp)

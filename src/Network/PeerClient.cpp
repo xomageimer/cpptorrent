@@ -125,12 +125,10 @@ void network::PeerClient::try_to_request_piece() {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
     if (GetOwnerBitfield().Popcount() == TotalPiecesCount()) {
+        send_not_interested();
         return;
     }
-}
-
-void network::PeerClient::receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block) {
-    //    GetTorrent().DownloadPieceBlock(index, begin, std::move(block));
+    // TODO если есть нужные, то вызываем send_interested();
 }
 
 bool network::PeerClient::IsClientRequested(uint32_t idx) const {
@@ -141,7 +139,13 @@ bool network::PeerClient::IsClientAlreadyDone(uint32_t idx) const {
     return GetTorrent().PieceDone(idx);
 }
 
-void network::PeerClient::cancel_piece(uint32_t id) {}
+void network::PeerClient::cancel_piece(uint32_t id) {
+    size_t begin = 0;
+    size_t length = GetTorrent().GetPieceSize(id);
+    for (; length > bittorrent_constants::most_request_size; length -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size)
+        send_cancel(id, begin, bittorrent_constants::most_request_size);
+    send_cancel(id, begin, length);
+}
 
 void network::PeerClient::access() {
     GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
@@ -480,7 +484,7 @@ void network::PeerClient::handle_response() {
                 cancel_piece(index);
             } else {
                 GetTorrent().DownloadPieceBlock(
-                    {shared_from(this), index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size}});
+                    {shared_from(this), index, begin, Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size, begin}});
             }
 
             break;

@@ -146,7 +146,7 @@ void bittorrent::Torrent::UploadPieceBlock(ReadRequest req) {
 }
 
 void bittorrent::Torrent::CancelBlockUpload(ReadRequest req) {
-
+    file_manager_->CancelBlock(std::move(req));
 }
 
 bittorrent::Query bittorrent::Torrent::GetDefaultTrackerQuery() const {

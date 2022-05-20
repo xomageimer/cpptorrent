@@ -3,12 +3,15 @@
 
 #include <condition_variable>
 #include <vector>
+#include <set>
 #include <unordered_map>
 #include <fstream>
 #include <filesystem>
+#include <thread>
 #include <shared_mutex>
 #include <mutex>
 
+#include "Primitives/AsyncWorker.h"
 #include "Primitives/ManagerRequests.h"
 #include "Primitives/Bitfield.h"
 #include "Primitives/Piece.h"
@@ -26,17 +29,22 @@ namespace bittorrent {
 
     struct TorrentFilesManager {
     public:
-        explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path);
+        using piece_index = size_t;
+        using block_worker_id = std::tuple<std::shared_ptr<network::PeerClient>, size_t, size_t>;
 
-        void WritePieceToFile(size_t piece_num);
+        explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path, size_t thread_count = 1);
 
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB_; }; // GigaBytes
+
+        size_t GetPieceSize(size_t idx);
 
         void UploadBlock(ReadRequest);
 
         void CancelBlock(ReadRequest);
 
         void DownloadBlock(WriteRequest);
+
+        void WritePieceToFile(size_t piece_num);
 
         [[nodiscard]] bool PieceDone(uint32_t index) const;
 
@@ -45,17 +53,21 @@ namespace bittorrent {
         [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const { return bitset_; }
 
     private:
-        void thread(); // TODO вызывать этот метод из конструктора!
-
         void fill_files();
 
         Torrent &torrent_;
 
+        AsyncWorker a_worker_;
+
         mutable std::shared_mutex manager_mut_;
 
-        std::condition_variable cv_;
+        struct PieceHandler {
+            Piece piece;
+            std::set<block_worker_id> workers_id_;
+        };
+        std::map<piece_index, PieceHandler> active_pieces_;
 
-        std::map<size_t, Piece> active_pieces_;
+        size_t max_active_pieces_ = 13;
 
         size_t piece_size_{};
 
@@ -65,7 +77,7 @@ namespace bittorrent {
 
         long double total_size_GB_;
 
-        std::map<size_t, std::vector<FileInfo>> pieces_by_files_; // TODO наверное надо сделать map с ключами в виде piece_index, чтобы быстро записывать в файлы!
+        std::map<piece_index, std::vector<FileInfo>> pieces_by_files_;
 
         bittorrent::Bitfield bitset_;
     };

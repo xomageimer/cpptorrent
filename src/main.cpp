@@ -16,7 +16,7 @@ int main()
     LOG("Start");
     auto start = std::chrono::steady_clock::now();
     // TODO сделать количество потоков иначе!
-    std::vector<std::thread> threads(std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() - 1 : 1);
+    std::vector<std::thread> threads(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() - 2 : 1);
     boost::asio::io_service service;
     boost::asio::io_service::work worker(service);
 

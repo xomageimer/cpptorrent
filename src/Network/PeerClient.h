@@ -105,8 +105,6 @@ namespace network {
 
         void try_to_request_piece();
 
-        void receive_piece_block(uint32_t index, uint32_t begin, bittorrent::Block block);
-
         void cancel_piece(uint32_t id);
 
         void send_msg(SendPeerData data);

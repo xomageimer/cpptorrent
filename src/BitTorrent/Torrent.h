@@ -72,7 +72,7 @@ namespace bittorrent {
 
         [[nodiscard]] size_t GetPieceCount() const { return GetMeta()["info"]["pieces"].AsString().size() / 20; };
 
-        [[nodiscard]] size_t GetPieceSize() const { return GetMeta()["info"]["piece length"].AsNumber(); };
+        [[nodiscard]] size_t GetPieceSize(size_t id) const { return file_manager_->GetPieceSize(id); };
 
         [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size_; }
 
