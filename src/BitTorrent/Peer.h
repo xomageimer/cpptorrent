@@ -4,6 +4,7 @@
 #include <cctype>
 #include <unordered_map>
 #include <string>
+#include <shared_mutex>
 
 #include <boost/asio.hpp>
 #define BOOST_THREAD_PROVIDES_FUTURE
@@ -44,6 +45,8 @@ namespace bittorrent {
         [[nodiscard]] size_t GetIP() const { return ip; }
 
         [[nodiscard]] bittorrent::Bitfield &GetBitfield() { return bitfield_; }
+
+        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const { return bitfield_; }
 
     protected:
         uint8_t id[20];
@@ -97,6 +100,10 @@ namespace bittorrent {
 
         bool CanUnchokePeer(size_t peer_ip) const;
 
+        [[nodiscard]] bittorrent::Bitfield &GetBitfield();
+
+        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const;
+
     private:
         void MakeHandshake();
 
@@ -105,7 +112,8 @@ namespace bittorrent {
         friend class bittorrent::Torrent;
         bittorrent::Torrent &torrent_;
 
-        mutable std::mutex mut_;
+        mutable std::shared_mutex mut_;
+        mutable std::shared_mutex bitfield_mut_;
 
         std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
 

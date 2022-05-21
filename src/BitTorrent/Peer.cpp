@@ -56,7 +56,7 @@ size_t bittorrent::MasterPeer::GetApplicationPort() const {
 }
 
 void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient> &new_sub) {
-    std::lock_guard lock(mut_);
+    std::unique_lock lock(mut_);
 
     LOG(new_sub->GetStrIP(), " was subscribed!");
 
@@ -65,7 +65,7 @@ void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient
 }
 
 void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
-    std::lock_guard lock(mut_);
+    std::unique_lock lock(mut_);
 
     LOG(peers_subscribers_.at(unsub_ip)->GetStrIP(), " was unsubscribed!");
 
@@ -97,17 +97,17 @@ bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
 }
 
 void bittorrent::MasterPeer::MarkUploadedPiece(size_t piece_id) {
-    std::lock_guard lock(mut_);
+    std::unique_lock lock(mut_);
     uploaded_pieces_.emplace(piece_id);
 }
 
 void bittorrent::MasterPeer::UnmarkUploadedPiece(size_t piece_id) {
-    std::lock_guard lock(mut_);
+    std::unique_lock lock(mut_);
     uploaded_pieces_.erase(piece_id);
 }
 
 bool bittorrent::MasterPeer::IsPieceUploaded(size_t piece_id) const {
-    std::lock_guard lock(mut_);
+    std::shared_lock lock(mut_);
     return uploaded_pieces_.count(piece_id) != 0;
 }
 
@@ -116,7 +116,7 @@ bool bittorrent::MasterPeer::IsPieceDone(size_t piece_id) const {
 }
 
 bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {
-    std::lock_guard lock(mut_);
+    std::shared_lock lock(mut_);
 
     if (!peers_subscribers_.count(peer_ip)) {
         return false;
@@ -125,9 +125,19 @@ bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {
 }
 
 void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
-    std::lock_guard lock(mut_);
+    std::unique_lock lock(mut_);
 
     for (auto &[id, peer] : peers_subscribers_) {
         peer->send_have(piece_num);
     }
+}
+
+bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() {
+    std::unique_lock lock(bitfield_mut_);
+    return Peer::GetBitfield();
+}
+
+const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
+    std::shared_lock lock(bitfield_mut_);
+    return Peer::GetBitfield();
 }

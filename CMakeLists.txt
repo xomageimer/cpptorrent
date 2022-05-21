@@ -21,6 +21,7 @@ add_library(helpers SHARED src/utils/constants.h
         src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/random_generator.cpp src/utils/random_generator.h
         src/utils/logger.cpp src/utils/logger.h
+        src/utils/AsyncWorker.h src/utils/AsyncWorker.cpp
         src/utils/move_function.h)
 
 add_library(bittorrent STATIC
@@ -33,7 +34,7 @@ add_library(bittorrent STATIC
         src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
         src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
         src/BitTorrent/Primitives/ManagerRequests.h
-        src/BitTorrent/Primitives/AsyncWorker.h src/BitTorrent/Primitives/AsyncWorker.cpp
+        src/BitTorrent/Primitives/BittorrentStrategy.h src/BitTorrent/Primitives/BittorrentStrategy.cpp
 
         src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp
         src/BitTorrent/TorrentFilesManager.cpp)

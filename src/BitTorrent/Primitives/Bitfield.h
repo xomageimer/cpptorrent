@@ -46,9 +46,13 @@ namespace bittorrent {
 
         [[nodiscard]] std::vector<uint8_t> GetCast() const;
 
+        friend Bitfield GetMismatchedBitfield(const Bitfield & main_bitfield, const Bitfield & secondary_bitfield);
+
     private:
         boost::dynamic_bitset<uint8_t> bits_;
     };
+
+    Bitfield GetMismatchedBitfield(const Bitfield & main_bitfield, const Bitfield & secondary_bitfield);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_BITFIELD_H

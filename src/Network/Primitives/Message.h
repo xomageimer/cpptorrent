@@ -140,6 +140,18 @@ namespace bittorrent {
         cancel = 8,
         port = 9
     };
+    static const std::map<PEER_MESSAGE_TYPE, std::string> type_by_id_ {
+        {choke, "choke"},
+        {unchoke, "unchoke"},
+        {interested, "interested"},
+        {not_interested, "not_interested"},
+        {have, "have"},
+        {bitfield, "bitfield"},
+        {request, "request"},
+        {piece_block, "piece_block"},
+        {cancel, "cancel"},
+        {port, "port"},
+    };
 
     static const inline size_t header_length = 4;
 

@@ -117,12 +117,13 @@ void network::PeerClient::do_read_body() {
             msg_to_read_.SetBuffer(&data[0], msg_to_read_.BodySize());
 
             handle_response();
+            do_read_header();
         },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
 }
 
 void network::PeerClient::TryToRequest() {
-    if (!IsClientInterested()) return;
+    if (!IsRemoteChoked()) return;
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
@@ -130,16 +131,29 @@ void network::PeerClient::TryToRequest() {
         send_not_interested();
         return;
     }
-    // TODO если есть нужные, то вызываем send_interested();
-    if (active_pieces_.empty()) send_interested();
 
-    //    if (!active_pieces_.count(req.piece_index)) {
-    //        active_pieces_.emplace(
-    //            req.piece_index, PieceHandler{Piece{GetPieceSize(req.piece_index),
-    //                                              static_cast<size_t>(std::ceil(static_cast<double>(GetPieceSize(req.piece_index)) /
-    //                                                                            static_cast<double>(bittorrent_constants::most_request_size)))},
-    //                                 {}});
-    //    }
+    for (auto &active_piece : active_pieces_) { // отключаем уже активные куски, чтобы алгоритм не отдал их вновь
+        GetPeerData().GetBitfield().Clear(active_piece.first);
+    }
+    auto chosen_piece_index = GetTorrent().DetermineNextPiece(GetPeerData());
+    for (auto &active_piece : active_pieces_) { // включаем обратно уже активные куски, после работы алгоритма
+        GetPeerData().GetBitfield().Set(active_piece.first);
+    }
+
+    if (chosen_piece_index && active_pieces_.size() < max_active_pieces_) {
+        send_interested();
+    } else {
+        return;
+    }
+
+    size_t piece_size =
+        (*chosen_piece_index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
+    auto it = active_pieces_.emplace(*chosen_piece_index,
+        bittorrent::Piece{piece_size, static_cast<size_t>(std::ceil(static_cast<double>(piece_size) /
+                                                                    static_cast<double>(bittorrent_constants::most_request_size)))});
+
+    auto first_block_size = std::min(piece_size, bittorrent_constants::most_request_size);
+    send_request(*chosen_piece_index, it.first->second.cur_pos, first_block_size);
 }
 
 bool network::PeerClient::PieceDone(uint32_t idx) const {
@@ -172,8 +186,6 @@ void network::PeerClient::cancel_piece(uint32_t id) {
 }
 
 void network::PeerClient::access() {
-    GetPeerBitfield().Resize(master_peer_.GetTotalPiecesCount());
-
     LOG(GetStrIP(), " was connected!");
 
     send_bitfield();
@@ -245,7 +257,8 @@ void network::PeerClient::send_msg(SendPeerData data) {
     data.EncodeHeader();
     auto type = data.Type();
     Send(
-        std::move(data), [this, type](size_t xfr) { LOG(GetStrIP(), " : data of type ", type, " successfully sent"); },
+        std::move(data),
+        [this, type](size_t xfr) { LOG(GetStrIP(), " : data of type ", bittorrent::type_by_id_.at(type), " successfully sent"); },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
 }
 
@@ -375,7 +388,7 @@ void network::PeerClient::handle_response() {
     switch (message_type) {
         case choke:
             LOG(GetStrIP(), " : choke-message");
-            if (payload_size != 0) {
+            if (payload_size != 1) {
                 LOG(GetStrIP(), " : invalid choke-message size");
                 Disconnect();
                 return;
@@ -385,7 +398,7 @@ void network::PeerClient::handle_response() {
             break;
         case unchoke:
             LOG(GetStrIP(), " : unchoke-message");
-            if (payload_size != 0) {
+            if (payload_size != 1) {
                 LOG(GetStrIP(), " : invalid unchoke-message size");
                 Disconnect();
                 return;
@@ -397,7 +410,7 @@ void network::PeerClient::handle_response() {
             break;
         case interested:
             LOG(GetStrIP(), " : interested-message");
-            if (payload_size != 0) {
+            if (payload_size != 1) {
                 LOG(GetStrIP(), " : invalid interested-message size");
                 Disconnect();
                 return;
@@ -413,14 +426,14 @@ void network::PeerClient::handle_response() {
             break;
         case not_interested:
             LOG(GetStrIP(), " : not_interested-message");
-            if (payload_size != 0) {
+            if (payload_size != 1) {
                 LOG(GetStrIP(), " : invalid not_interested-message size");
                 Disconnect();
                 return;
             }
             status_ &= ~peer_interested;
 
-            if (IsRemoteChoked()) {
+            if (!IsClientChoked()) {
                 send_choke();
                 // TODO что-то сделать если задушили пир
             }
@@ -521,11 +534,18 @@ void network::PeerClient::handle_response() {
 
                 uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
                 cur_piece.blocks[blockIndex] = std::move(Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size, begin});
+                cur_piece.cur_pos += payload_size;
 
                 cur_piece.current_blocks_num++;
                 if (cur_piece.current_blocks_num == cur_piece.block_count) {
                     GetTorrent().DownloadPiece({shared_from(this), index, std::move(cur_piece)});
                     active_pieces_.erase(index);
+                } else {
+                    auto first_block_size = std::min(
+                        (cur_piece.index == TotalPiecesCount() - 1 ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize())
+                            - cur_piece.cur_pos,
+                        bittorrent_constants::most_request_size);
+                    send_request(cur_piece.index, cur_piece.cur_pos, first_block_size);
                 }
             }
 
@@ -550,7 +570,7 @@ void network::PeerClient::handle_response() {
 
             break;
         case port:
-            if (payload_size != 2) {
+            if (payload_size != 3) {
                 LOG(GetStrIP(), " : invalid port-message size");
                 Disconnect();
                 return;

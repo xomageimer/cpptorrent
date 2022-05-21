@@ -11,9 +11,8 @@
 #include <shared_mutex>
 #include <mutex>
 
-#include "Primitives/AsyncWorker.h"
+#include "AsyncWorker.h"
 #include "Primitives/ManagerRequests.h"
-#include "Primitives/Bitfield.h"
 #include "Primitives/Piece.h"
 
 // TODO структура отвечает за правильную обработку файлов торрента
@@ -39,13 +38,17 @@ namespace bittorrent {
 
         [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size_; }
 
+        bool AreCompleted() const;
+
+        void SetPiece(size_t piece_index);
+
         size_t UploadBlock(ReadRequest);
 
         void CancelBlock(ReadRequest);
 
         void DownloadPiece(WriteRequest);
 
-        void WritePieceToFile(size_t piece_num);
+        void WritePieceToFile(Piece piece);
 
     private:
         void fill_files();
@@ -54,7 +57,7 @@ namespace bittorrent {
 
         AsyncWorker a_worker_;
 
-        mutable std::shared_mutex manager_mut_;
+        mutable std::mutex manager_mut_;
 
         std::map<ReadRequest, size_t> active_requests_; // активные request'ы из a_worker_
 
@@ -67,6 +70,8 @@ namespace bittorrent {
         long double total_size_GB_;
 
         std::map<piece_index, std::vector<FileInfo>> pieces_by_files_;
+
+        std::atomic<size_t> ready_pieces_num_ = 0;
     };
 } // namespace bittorrent
 

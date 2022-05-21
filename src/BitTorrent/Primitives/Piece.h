@@ -36,6 +36,8 @@ namespace bittorrent {
         size_t block_count;
 
         size_t index;
+
+        size_t cur_pos {0};
     };
 } // namespace bittorrent
 

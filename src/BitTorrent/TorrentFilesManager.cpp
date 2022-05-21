@@ -74,10 +74,12 @@ void bittorrent::TorrentFilesManager::fill_files() {
     }
 }
 
-void bittorrent::TorrentFilesManager::WritePieceToFile(size_t piece_num) {}
+void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
+    // TODO записываем его в файл и удаляем из active_pieces
+}
 
 void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest req) {
-    auto lock = std::unique_lock(manager_mut_);
+    auto lock = std::lock_guard(manager_mut_);
     if (active_requests_.count(req)) {
         a_worker_.Erase(active_requests_.at(req));
         active_requests_.erase(req);
@@ -86,18 +88,26 @@ void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest req) {
 }
 
 size_t bittorrent::TorrentFilesManager::UploadBlock(bittorrent::ReadRequest req) {
-    auto it = active_requests_.emplace(req, a_worker_.Enqueue([this, req = std::move(req)]() {
+    auto lock = std::lock_guard(manager_mut_);
+    auto it = active_requests_.emplace(req, a_worker_.Enqueue([this, req = std::move(req)]() mutable {
         active_requests_.erase(req);
         req.remote_peer->UnbindUpload(req.piece_index);
 
         // TODO make upload
     }));
-    return it.second;
+    return it.first->second;
 }
 
 void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req) {
-    a_worker_.Enqueue([this, req = std::move(req)](){
+    a_worker_.Enqueue([this, req = std::move(req)]() mutable {
         // TODO прочекать валидность куска
-        // TODO записываем его в файл и удаляем из active_pieces
+        WritePieceToFile(std::move(req.piece));
+        SetPiece(req.piece_index);
     });
+}
+
+void bittorrent::TorrentFilesManager::SetPiece(size_t piece_index) {
+    ready_pieces_num_++;
+    torrent_.SayHave(piece_index);
+    torrent_.OnPieceDownloaded(ready_pieces_num_.load());
 }

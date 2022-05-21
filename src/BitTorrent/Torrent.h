@@ -12,6 +12,7 @@
 #include "Peer.h"
 #include "Tracker.h"
 
+#include "Primitives/BittorrentStrategy.h"
 #include "Primitives/Piece.h"
 #include "Primitives/ManagerRequests.h"
 
@@ -31,10 +32,17 @@ namespace bittorrent {
         Best
     };
 
+    // TODO add pattern strategy, который будет задавать класс с релизованными алгоритмами, в дефолтном классе все алгоритмы должны быть
+    // дефолтными!
     struct Torrent {
     public:
         explicit Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path,
-            std::filesystem::path const &path_to_download, size_t listener_port);
+            std::filesystem::path const &path_to_download, size_t listener_port,
+            std::shared_ptr<BittorrentStrategy> strategy = std::make_shared<BittorrentStrategy>());
+
+        Torrent(const Torrent &) = delete;
+
+        Torrent &operator=(const Torrent &) = delete;
 
         bool TryConnect(bittorrent::Launch policy = bittorrent::Launch::Best, bittorrent::Event event = bittorrent::Event::Empty);
 
@@ -46,13 +54,11 @@ namespace bittorrent {
 
         void CancelBlockUpload(ReadRequest req);
 
-        void PieceComplete(size_t piece_num) {
-            master_peer_->GetBitfield().Set(piece_num);
-        }
+        void SayHave(size_t piece_num);
 
-        void SayHave(size_t piece_num) {
-            master_peer_->SendHaveToAll(piece_num);
-        }
+        std::optional<size_t> DetermineNextPiece(const Peer &peer);
+
+        void OnPieceDownloaded(size_t already_downloaded_pieces_count);
 
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info_.info_hash; }
 
@@ -80,6 +86,8 @@ namespace bittorrent {
 
         [[nodiscard]] boost::asio::io_service &GetService() const;
 
+        [[nodiscard]] std::shared_ptr<BittorrentStrategy> GetStrategy() { return strategy_; };
+
     private:
         bool fill_trackers();
 
@@ -99,6 +107,8 @@ namespace bittorrent {
         size_t port_;
 
         meta_info_file meta_info_;
+
+        std::shared_ptr<BittorrentStrategy> strategy_;
 
         std::shared_ptr<bittorrent::MasterPeer> master_peer_;
 
