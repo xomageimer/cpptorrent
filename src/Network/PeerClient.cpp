@@ -122,7 +122,7 @@ void network::PeerClient::do_read_body() {
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
 }
 
-void network::PeerClient::TryToRequest() {
+void network::PeerClient::TryToRequestPiece() {
     if (IsRemoteChoked() || (active_pieces_.size() == max_active_pieces_)) return;
     if (!IsClientInterested()) send_interested();
 
@@ -152,8 +152,13 @@ void network::PeerClient::TryToRequest() {
         bittorrent::Piece{chosen_piece_index.value(), static_cast<size_t>(std::ceil(static_cast<double>(piece_size) /
                                                                     static_cast<double>(bittorrent_constants::most_request_size)))});
 
-    auto first_block_size = std::min(piece_size, bittorrent_constants::most_request_size);
-    send_request(it.first->second.index, it.first->second.cur_pos, first_block_size);
+//    auto first_block_size = std::min(piece_size, bittorrent_constants::most_request_size);
+    size_t begin = 0;
+    for (; piece_size > bittorrent_constants::most_request_size; piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size)
+        send_request(it.first->second.index, begin, bittorrent_constants::most_request_size);
+    send_request(it.first->second.index, begin, piece_size);
+//    send_request(it.first->second.index, it.first->second.cur_pos, first_block_size);
+//    TryToRequestPiece();
 }
 
 bool network::PeerClient::PieceDone(uint32_t idx) const {

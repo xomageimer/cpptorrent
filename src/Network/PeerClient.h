@@ -59,7 +59,7 @@ namespace network {
 
         void Disconnect();
 
-        void TryToRequest();
+        void TryToRequestPiece();
 
         std::string GetStrIP() const;
 
