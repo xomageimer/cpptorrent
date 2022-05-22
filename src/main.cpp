@@ -14,6 +14,12 @@ int main()
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
     LOG("Start");
+
+//    uint8_t arr[] = {"\004\000\000\001H"};
+//    std::cout << BigToNative<uint32_t>(ArrayToValue<uint32_t>(arr));
+//    return 0;
+
+
     auto start = std::chrono::steady_clock::now();
     // TODO сделать количество потоков иначе!
     std::vector<std::thread> threads(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() - 2 : 1);

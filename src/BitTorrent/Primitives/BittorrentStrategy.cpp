@@ -35,6 +35,7 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count,
 }
 
 void bittorrent::BittorrentStrategy::OnUnchoked(std::shared_ptr<network::PeerClient> peer) {
+    if (peer->IsClientChoked()) peer->send_unchoke();
     peer->TryToRequest();
 }
 
@@ -62,8 +63,7 @@ void bittorrent::BittorrentStrategy::OnHave(std::shared_ptr<network::PeerClient>
 void bittorrent::BittorrentStrategy::OnBitfield(std::shared_ptr<network::PeerClient> peer) {
     if (GetMismatchedBitfield(peer->GetOwnerBitfield(), peer->GetPeerBitfield()).Popcount()) {
         peer->send_interested();
-        peer->TryToRequest();
-    }
+    } else peer->TryToRequest();
 }
 
 void bittorrent::BittorrentStrategy::OnRequest(std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, uint32_t length) {

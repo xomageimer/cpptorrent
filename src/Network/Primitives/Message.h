@@ -15,6 +15,8 @@
 #include "constants.h"
 #include "auxiliary.h"
 
+#include "logger.h"
+
 namespace bittorrent {
     enum ByteOrder {
         BigEndian,
@@ -82,9 +84,9 @@ namespace bittorrent {
             return const_cast<ReceivingMessage &>(*this).template operator>>(value);
         }
 
+        mutable size_t inp_pos_ = 0;
     protected:
         std::basic_string_view<uint8_t> arr_;
-        mutable size_t inp_pos_ = 0;
     };
 
     struct SendingMessage : public Message {
@@ -161,7 +163,7 @@ namespace bittorrent {
     public:
         using bittorrent::ReceivingMessage::ReceivingMessage;
 
-        explicit ReceivingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : ReceivingMessage(nullptr, 0, bo) { inp_pos_ = 1; }
+        explicit ReceivingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : ReceivingMessage(nullptr, 0, bo) { }
 
         [[nodiscard]] const auto *Body() const { return arr_.data(); }
 
@@ -171,7 +173,7 @@ namespace bittorrent {
 
         bool DecodeHeader(uint32_t size) const;
 
-        void SetBuffer(const uint8_t *data, size_t size) { arr_ = std::basic_string_view<uint8_t>{data, size}; }
+        void SetBuffer(const uint8_t *data, size_t size) { arr_ = std::basic_string_view<uint8_t>{data, size}; inp_pos_ = 1; }
 
     private:
         mutable size_t body_size_ = 0;

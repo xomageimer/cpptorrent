@@ -70,6 +70,7 @@ void network::PeerClient::Process() {
 }
 
 void network::PeerClient::error_callback(boost::system::error_code ec) {
+    SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
     LOG(GetStrIP(), " get error : ", ec.message());
     Disconnect();
 }
@@ -80,8 +81,7 @@ void network::PeerClient::drop_timeout() {
 }
 
 void network::PeerClient::do_read_header() {
-    if (is_disconnected)
-        return;
+    if (is_disconnected) return;
 
     LOG(GetStrIP(), " : ", "trying to read message");
 
@@ -110,14 +110,13 @@ void network::PeerClient::do_read_header() {
 }
 
 void network::PeerClient::do_read_body() {
-    if (is_disconnected)
-        return;
+    if (is_disconnected) return;
 
     LOG(GetStrIP(), " : trying to read payload of message");
 
     Read(
         msg_to_read_.BodySize(),
-        [this](const RecvData &data) mutable {
+        [this](const RecvPeerData &data) mutable {
             LOG(GetStrIP(), " : correct message");
 
             msg_to_read_.SetBuffer(&data[0], msg_to_read_.BodySize());
@@ -129,7 +128,8 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequest() {
-    if (!IsRemoteChoked()) return;
+    if (IsRemoteChoked()) return;
+    if (!IsClientInterested()) send_interested();
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
@@ -145,12 +145,6 @@ void network::PeerClient::TryToRequest() {
     for (auto &active_piece : active_pieces_) { // включаем обратно уже активные куски, после работы алгоритма
         GetPeerData().GetBitfield().Set(active_piece.first);
     }
-
-//    if (chosen_piece_index && active_pieces_.size() < max_active_pieces_) {
-//        send_interested();
-//    } else {
-//        return;
-//    }
 
     size_t piece_size =
         (*chosen_piece_index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
@@ -262,8 +256,7 @@ void network::PeerClient::send_handshake() {
 }
 
 void network::PeerClient::send_msg(SendPeerData data) {
-    if (is_disconnected)
-        return;
+    if (is_disconnected) return;
 
     data.EncodeHeader();
     auto type = data.Type();
@@ -459,7 +452,8 @@ void network::PeerClient::handle_response() {
             uint32_t i;
             payload >> i;
             if (i >= TotalPiecesCount()) {
-                LOG(GetStrIP(), " : bad index from have message, get ", i, " index bigger than ", TotalPiecesCount(), " (count of total pieces). Ignoring.");
+                LOG(GetStrIP(), " : bad index from have message, get ", i, " index bigger than ", TotalPiecesCount(),
+                    " (count of total pieces). Ignoring.");
                 return;
             }
             LOG(GetStrIP(), " correct index from have message: ", i);
@@ -483,8 +477,7 @@ void network::PeerClient::handle_response() {
                 for (size_t x = 0; x < 8; ++x) {
                     if (payload.Body()[i] & (1 << (7 - x))) {
                         size_t idx = i * 8 + x;
-                        if (idx < TotalPiecesCount())
-                            GetPeerBitfield().Set(idx);
+                        if (idx < TotalPiecesCount()) GetPeerBitfield().Set(idx);
                     }
                 }
             }
@@ -533,8 +526,7 @@ void network::PeerClient::handle_response() {
 
             payload_size -= 9;
 
-            Strategy()->OnPieceBlock(shared_from(this), index, begin,
-                reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size);
+            Strategy()->OnPieceBlock(shared_from(this), index, begin, reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size);
 
             break;
         }
