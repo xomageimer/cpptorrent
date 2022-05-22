@@ -121,7 +121,7 @@ bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {
     if (!peers_subscribers_.count(peer_ip)) {
         return false;
     }
-    return available_unchoke_count_ == 0;
+    return available_unchoke_count_ != 0;
 }
 
 void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
