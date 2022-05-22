@@ -165,7 +165,7 @@ namespace bittorrent {
 
         explicit ReceivingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : ReceivingMessage(nullptr, 0, bo) { }
 
-        [[nodiscard]] const auto *Body() const { return arr_.data(); }
+        [[nodiscard]] const uint8_t *Body() const { return arr_.data(); }
 
         [[nodiscard]] size_t BodySize() const { return body_size_; };
 

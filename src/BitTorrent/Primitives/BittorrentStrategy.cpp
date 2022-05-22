@@ -75,7 +75,7 @@ void bittorrent::BittorrentStrategy::OnRequest(std::shared_ptr<network::PeerClie
 }
 
 void bittorrent::BittorrentStrategy::OnPieceBlock(
-    std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, uint8_t *data, uint32_t size) {
+    std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, const uint8_t *data, uint32_t size) {
     if (size > bittorrent_constants::most_request_size) {
        LOG(peer->GetStrIP(), " : ", "more than allowed to get, current message size is ", size,
                      ", but the maximum size can be ", bittorrent_constants::most_request_size);
@@ -95,7 +95,8 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
         auto &cur_piece = peer->active_pieces_.at(index);
 
         uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-        cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
+        Block block{data, size, begin};
+        cur_piece.blocks[blockIndex] = std::move(block);
         cur_piece.cur_pos += size;
 
         cur_piece.current_blocks_num++;

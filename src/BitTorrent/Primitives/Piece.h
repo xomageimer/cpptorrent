@@ -7,7 +7,9 @@
 
 namespace bittorrent {
     struct Block {
-        explicit Block(uint8_t *data, size_t size, uint32_t beg) : data_(data, data + size), begin_(beg){};
+        Block() = default;
+
+        explicit Block(const uint8_t *data, size_t size, uint32_t beg) : data_(data, data + size), begin_(beg){};
 
         Block(const Block &other) = delete;
 
@@ -23,7 +25,7 @@ namespace bittorrent {
     };
 
     struct Piece {
-        explicit Piece(size_t idx, size_t bc) : index(idx), block_count(bc) { blocks.reserve(block_count); }
+        explicit Piece(size_t idx, size_t bc) : index(idx), block_count(bc) { blocks.resize(block_count); }
 
         Piece(Piece &&) = default;
 

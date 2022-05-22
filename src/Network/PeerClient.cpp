@@ -527,7 +527,7 @@ void network::PeerClient::handle_response() {
 
             payload_size -= 9;
 
-            Strategy()->OnPieceBlock(shared_from(this), index, begin, reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size);
+            Strategy()->OnPieceBlock(shared_from(this), index, begin, &payload.Body()[9], payload_size);
 
             break;
         }

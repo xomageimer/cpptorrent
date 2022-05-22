@@ -39,7 +39,7 @@ namespace bittorrent {
 
         virtual void OnRequest([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t, uint32_t, uint32_t);
 
-        virtual void OnPieceBlock([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t, uint32_t, uint8_t *, uint32_t);
+        virtual void OnPieceBlock([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t, uint32_t, const uint8_t *, uint32_t);
 
         virtual void OnCancel([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t, uint32_t, uint32_t);
 
