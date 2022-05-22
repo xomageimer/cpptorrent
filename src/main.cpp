@@ -33,7 +33,7 @@ int main()
         }
     };
 
-    auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Death_Strandin.torrent",
+    auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / "Elden Ring.torrent",
         std::filesystem::current_path(), listener->GetPort()); // TODO config from console
 
     listener->AddTorrent(torrent);

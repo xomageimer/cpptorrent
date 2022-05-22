@@ -146,11 +146,11 @@ void network::PeerClient::TryToRequest() {
         GetPeerData().GetBitfield().Set(active_piece.first);
     }
 
-    if (chosen_piece_index && active_pieces_.size() < max_active_pieces_) {
-        send_interested();
-    } else {
-        return;
-    }
+//    if (chosen_piece_index && active_pieces_.size() < max_active_pieces_) {
+//        send_interested();
+//    } else {
+//        return;
+//    }
 
     size_t piece_size =
         (*chosen_piece_index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
@@ -459,11 +459,10 @@ void network::PeerClient::handle_response() {
             uint32_t i;
             payload >> i;
             if (i >= TotalPiecesCount()) {
-                LOG(GetStrIP(), " : error from have message ", i, " index bigger than ", TotalPiecesCount(), " (count of total pieces)");
-
-                Disconnect();
+                LOG(GetStrIP(), " : bad index from have message, get ", i, " index bigger than ", TotalPiecesCount(), " (count of total pieces). Ignoring.");
                 return;
             }
+            LOG(GetStrIP(), " correct index from have message: ", i);
             GetPeerBitfield().Set(i);
 
             Strategy()->OnHave(shared_from(this), i);
