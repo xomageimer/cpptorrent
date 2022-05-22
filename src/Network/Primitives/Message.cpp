@@ -25,12 +25,8 @@ std::string bittorrent::ReceivingMessage::GetString() const {
     return std::move(str);
 }
 
-bool bittorrent::ReceivingPeerMessage::DecodeHeader(uint32_t size) const {
+void bittorrent::ReceivingPeerMessage::DecodeHeader(uint32_t size) const {
     body_size_ = size;
-    if (body_size_ > bittorrent_constants::most_request_size) {
-        return false;
-    }
-    return true;
 }
 
 void bittorrent::SendingMessage::CopyFrom(const Message &msg_buf) {
@@ -49,16 +45,8 @@ void bittorrent::SendingMessage::Clear() {
 }
 
 void bittorrent::SendingPeerMessage::EncodeHeader() {
-    auto body_size = Size();
-    char header[header_length + 1]{};
-
-    size_t encode_body_length = 0;
-    if (order_ == BigEndian) {
-        encode_body_length = NativeToBig(body_size);
-    } else if (order_ == LittleEndian) {
-        encode_body_length = NativeToLittle(body_size);
-    }
-
-    std::sprintf(header, "4%d", encode_body_length);
-    std::memcpy(&data_[0], reinterpret_cast<uint8_t *>(header), header_length);
+    uint32_t body_size = Size() - header_length;
+    uint32_t encode_body_length = 0;
+    encode_body_length = NativeToBig(body_size);
+    ValueToArray(encode_body_length, &data_[0]);
 }

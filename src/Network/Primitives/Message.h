@@ -171,7 +171,7 @@ namespace bittorrent {
 
         [[nodiscard]] PEER_MESSAGE_TYPE Type() const { return PEER_MESSAGE_TYPE{GetBufferData()[0]}; }
 
-        bool DecodeHeader(uint32_t size) const;
+        void DecodeHeader(uint32_t size) const;
 
         void SetBuffer(const uint8_t *data, size_t size) { arr_ = std::basic_string_view<uint8_t>{data, size}; inp_pos_ = 1; }
 

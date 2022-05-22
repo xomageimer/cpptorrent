@@ -93,12 +93,13 @@ void network::PeerClient::do_read_header() {
             uint32_t header;
             data >> header;
 
-            if (!msg_to_read_.DecodeHeader(header)) {
-                LOG(GetStrIP(), " : ", "more than allowed to get, current message size is ", msg_to_read_.BodySize(),
-                    ", but the maximum size can be ", bittorrent_constants::most_request_size);
-                Disconnect();
-                return;
-            }
+            msg_to_read_.DecodeHeader(header);
+//            if (!msg_to_read_.DecodeHeader(header)) {
+//                LOG(GetStrIP(), " : ", "more than allowed to get, current message size is ", msg_to_read_.BodySize(),
+//                    ", but the maximum size can be ", bittorrent_constants::most_request_size);
+//                Disconnect();
+//                return;
+//            }
 
             if (!msg_to_read_.BodySize()) {
                 LOG(GetStrIP(), " : ", "Keep-alive message");

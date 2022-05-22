@@ -10,7 +10,7 @@ void network::participant::Verify() {
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred /*length*/) {
             timeout_.cancel();
             if (!ec && bytes_transferred >= bittorrent_constants::handshake_length) {
-                std::string info_hash(reinterpret_cast<const char *>(&buff[28], 20));
+                std::string info_hash(reinterpret_cast<const char *>(&buff[28], 20)); // TODO пофиксить!
                 if (listener_.torrents.count(info_hash)) {
                     auto local_master_peer = listener_.torrents[info_hash]->GetRootPeer();
 

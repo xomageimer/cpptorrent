@@ -15,8 +15,17 @@ int main()
 #endif
     LOG("Start");
 
-//    uint8_t arr[] = {"\004\000\000\001H"};
-//    std::cout << BigToNative<uint32_t>(ArrayToValue<uint32_t>(arr));
+//    uint8_t arr[] {0, 0, 0, 13, 6, 0, 0, 2, 65, 0, 0, 0, 0, 0, 0, 64, 0};
+//    RecvPeerData msg {};
+//    msg.DecodeHeader(17);
+//    msg.SetBuffer(&arr[4], msg.BodySize());
+//
+//    std::cout << "size: " << msg.BodySize() << std::endl;
+//    std::cout << "type: " << bittorrent::type_by_id_.at(msg.Type()) << std::endl;
+//    uint32_t idx, beg, leng;
+//    msg >> idx >> beg >> leng;
+//    std::cout << "index: " << idx << ", beg: " << beg << ", leng: " << leng << std::endl;
+//
 //    return 0;
 
 
