@@ -80,6 +80,9 @@ void network::PeerClient::drop_timeout() {
 }
 
 void network::PeerClient::do_read_header() {
+    if (is_disconnected)
+        return;
+
     LOG(GetStrIP(), " : ", "trying to read message");
 
     Read(
@@ -107,6 +110,9 @@ void network::PeerClient::do_read_header() {
 }
 
 void network::PeerClient::do_read_body() {
+    if (is_disconnected)
+        return;
+
     LOG(GetStrIP(), " : trying to read payload of message");
 
     Read(
@@ -186,6 +192,8 @@ void network::PeerClient::cancel_piece(uint32_t id) {
 }
 
 void network::PeerClient::access() {
+    GetPeerBitfield() = std::move(bittorrent::Bitfield(GetOwnerBitfield().Size()));
+
     LOG(GetStrIP(), " was connected!");
 
     send_bitfield();
@@ -254,6 +262,9 @@ void network::PeerClient::send_handshake() {
 }
 
 void network::PeerClient::send_msg(SendPeerData data) {
+    if (is_disconnected)
+        return;
+
     data.EncodeHeader();
     auto type = data.Type();
     Send(
@@ -379,6 +390,10 @@ void network::PeerClient::send_port(size_t port) {
     send_msg(std::move(msg));
 }
 
+auto network::PeerClient::Strategy() {
+    return GetTorrent().GetStrategy();
+}
+
 void network::PeerClient::handle_response() {
     auto message_type = msg_to_read_.Type();
     size_t payload_size = msg_to_read_.BodySize();
@@ -395,6 +410,8 @@ void network::PeerClient::handle_response() {
             }
             status_ |= peer_choking;
 
+            Strategy()->OnChoked(shared_from(this));
+
             break;
         case unchoke:
             LOG(GetStrIP(), " : unchoke-message");
@@ -405,7 +422,7 @@ void network::PeerClient::handle_response() {
             }
             status_ &= ~peer_choking;
 
-            TryToRequest();
+            Strategy()->OnUnchoked(shared_from(this));
 
             break;
         case interested:
@@ -417,11 +434,7 @@ void network::PeerClient::handle_response() {
             }
             status_ |= peer_interested;
 
-            if (IsClientChoked() && master_peer_.CanUnchokePeer(GetPeerData().GetIP())) send_unchoke();
-
-            if (!IsRemoteChoked()) {
-                TryToRequest();
-            }
+            Strategy()->OnInterested(shared_from(this));
 
             break;
         case not_interested:
@@ -433,10 +446,7 @@ void network::PeerClient::handle_response() {
             }
             status_ &= ~peer_interested;
 
-            if (!IsClientChoked()) {
-                send_choke();
-                // TODO что-то сделать если задушили пир
-            }
+            Strategy()->OnNotInterested(shared_from(this));
 
             break;
         case have: {
@@ -449,14 +459,14 @@ void network::PeerClient::handle_response() {
             uint32_t i;
             payload >> i;
             if (i >= TotalPiecesCount()) {
+                LOG(GetStrIP(), " : error from have message ", i, " index bigger than ", TotalPiecesCount(), " (count of total pieces)");
+
                 Disconnect();
-                break;
+                return;
             }
             GetPeerBitfield().Set(i);
 
-            if (!PieceDone(i)) {
-                TryToRequest();
-            }
+            Strategy()->OnHave(shared_from(this), i);
 
             break;
         }
@@ -470,9 +480,17 @@ void network::PeerClient::handle_response() {
                 Disconnect();
                 return;
             }
-            GetPeerBitfield() = std::move(Bitfield(&payload.Body()[1], payload_size - 1));
+            for (size_t i = 1; i < payload_size - 1; ++i) {
+                for (size_t x = 0; x < 8; ++x) {
+                    if (payload.Body()[i] & (1 << (7 - x))) {
+                        size_t idx = i * 8 + x;
+                        if (idx < TotalPiecesCount())
+                            GetPeerBitfield().Set(idx);
+                    }
+                }
+            }
 
-            TryToRequest();
+            Strategy()->OnBitfield(shared_from(this));
 
             break;
         case request: {
@@ -498,11 +516,7 @@ void network::PeerClient::handle_response() {
             payload >> begin;
             payload >> length;
 
-            LOG(GetStrIP(), " : size of message:", BytesToHumanReadable(length));
-
-            if (PieceDone(index)) {
-                BindUpload(GetTorrent().UploadPieceBlock({shared_from(this), index, begin, length}));
-            }
+            Strategy()->OnRequest(shared_from(this), index, begin, length);
 
             break;
         }
@@ -520,34 +534,8 @@ void network::PeerClient::handle_response() {
 
             payload_size -= 9;
 
-            if (!PieceRequested(index)) {
-                LOG(GetStrIP(), " : received piece ", std::to_string(index), " which didn't asked");
-                return;
-            }
-
-            if (PieceDone(index)) {
-                LOG(GetStrIP(), " : received piece ", std::to_string(index), " which already done");
-                cancel_piece(index);
-                active_pieces_.erase(index);
-            } else {
-                auto &cur_piece = active_pieces_.at(index);
-
-                uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-                cur_piece.blocks[blockIndex] = std::move(Block{reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size, begin});
-                cur_piece.cur_pos += payload_size;
-
-                cur_piece.current_blocks_num++;
-                if (cur_piece.current_blocks_num == cur_piece.block_count) {
-                    GetTorrent().DownloadPiece({shared_from(this), index, std::move(cur_piece)});
-                    active_pieces_.erase(index);
-                } else {
-                    auto first_block_size = std::min(
-                        (cur_piece.index == TotalPiecesCount() - 1 ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize())
-                            - cur_piece.cur_pos,
-                        bittorrent_constants::most_request_size);
-                    send_request(cur_piece.index, cur_piece.cur_pos, first_block_size);
-                }
-            }
+            Strategy()->OnPieceBlock(shared_from(this), index, begin,
+                reinterpret_cast<uint8_t *>(payload.Body()[9]), payload_size);
 
             break;
         }
@@ -564,9 +552,7 @@ void network::PeerClient::handle_response() {
             payload >> begin;
             payload >> length;
 
-            if (PieceUploaded(index)) {
-                GetTorrent().CancelBlockUpload({shared_from(this), index, begin, length});
-            }
+            Strategy()->OnCancel(shared_from(this), index, begin, length);
 
             break;
         case port:
@@ -578,7 +564,7 @@ void network::PeerClient::handle_response() {
             uint16_t port;
             payload >> port;
 
-            // TODO хз че тут надо
+            Strategy()->OnPort(shared_from(this), port);
 
             break;
         default:

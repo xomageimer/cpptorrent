@@ -44,6 +44,10 @@ namespace network {
     public:
         using piece_index = size_t;
 
+        friend class bittorrent::BittorrentStrategy;
+
+        friend class bittorrent::MasterPeer;
+
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
 
@@ -90,6 +94,8 @@ namespace network {
         bool PieceRequested(uint32_t idx) const;
 
         bool PieceDone(uint32_t idx) const;
+
+        auto Strategy();
 
     private:
         bool check_handshake(const RecvPeerData &) const;

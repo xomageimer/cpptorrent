@@ -89,7 +89,7 @@ const uint8_t *bittorrent::MasterPeer::GetHandshake() const {
 }
 
 size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
-    return torrent_.GetPieceCount();
+    return GetBitfield().Size();
 }
 
 bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
