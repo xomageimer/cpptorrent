@@ -83,27 +83,33 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
     }
 
     if (!peer->PieceRequested(index)) {
-        LOG(peer->GetStrIP(), " : received piece ", std::to_string(index), " which didn't asked");
+        LOG(peer->GetStrIP(), " : received piece ", index, " which didn't asked");
         return;
     }
 
     if (peer->PieceDone(index)) {
-        LOG(peer->GetStrIP(), " : received piece ", std::to_string(index), " which already done");
+        LOG(peer->GetStrIP(), " : received piece ", index, " which already done");
         peer->cancel_piece(index);
         peer->active_pieces_.erase(index);
     } else {
+        LOG(peer->GetStrIP(), " : received piece ", index, " was asked early");
+
         auto &cur_piece = peer->active_pieces_.at(index);
 
+        LOG(peer->GetStrIP(), " : his index in map: ", cur_piece.index);
+
         uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-        Block block{data, size, begin};
-        cur_piece.blocks[blockIndex] = std::move(block);
+        cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
         cur_piece.cur_pos += size;
 
         cur_piece.current_blocks_num++;
         if (cur_piece.current_blocks_num == cur_piece.block_count) {
+            LOG (cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
             peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
             peer->active_pieces_.erase(index);
+            peer->TryToRequest();
         } else {
+            LOG (cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ", peer->GetStrIP());
             auto first_block_size =
                 std::min((cur_piece.index == peer->TotalPiecesCount() - 1 ? peer->GetTorrent().GetLastPieceSize() : peer->GetTorrent().GetPieceSize()) -
                              cur_piece.cur_pos,
