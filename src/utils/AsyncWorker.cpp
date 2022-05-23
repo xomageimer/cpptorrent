@@ -17,7 +17,7 @@ AsyncWorker::~AsyncWorker() {
 }
 
 void AsyncWorker::run() {
-    while (quit_.load()) {
+    while (!quit_.load()) {
         auto lock = std::unique_lock(mut_);
 
         cv_.wait(lock, [&] { return (!stopped_ && !queue_.empty()) || quit_.load(); });

@@ -10,18 +10,20 @@
 #include <utility>
 
 bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::filesystem::path path, size_t thread_count)
-    : torrent_(torrent), a_worker_(thread_count), path_to_download_(std::move(path)) {
+    : torrent_(torrent), a_worker_(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1), path_to_download_(std::move(path)) {
     fill_files();
 
     //    LOG("____________________________________________\n");
-    //    for (auto & [piece, files] : pieces_by_files_) {
-    //        LOG("piece id " , piece , ":");
+    //    for (auto &[piece, files] : pieces_by_files_) {
+    //        LOG("piece id ", piece, ":");
     //        size_t i = 0;
-    //        for (auto & file : files) {
-    //            LOG("\tfile #", i++ , " : " , file.path.filename());
-    //            LOG("\tstarted from " , file.begin , " piece position");
+    //        for (auto &file : files) {
+    //            LOG("\tfile #", i++, " : ", file.path.filename(), "\n\tstarted from ", file.piece_begin,
+    //                " piece position"
+    //                "\n\tin ",
+    //                file.file_begin, " file position");
     //        }
-    //        LOG ("\n");
+    //        LOG("\n");
     //    }
     //    LOG("____________________________________________");
 
@@ -33,13 +35,16 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
 }
 
 void bittorrent::TorrentFilesManager::fill_files() {
-    auto file_info = torrent_.GetMeta()["info"];
+    auto & file_info = torrent_.GetMeta()["info"];
     piece_size_ = file_info["piece length"].AsNumber();
     if (file_info.TryAt("length")) { // single-file mode torrent
         auto bytes_size = file_info["length"].AsNumber();
         total_size_GB_ = BytesToGiga(bytes_size);
-        pieces_by_files_[0].emplace_back(FileInfo{file_info["name"].AsString(), 0, 0, bytes_size});
-
+        long long file_beg = 0;
+        for (size_t i = 0; i < torrent_.GetPieceCount(); i++) {
+            pieces_by_files_[i].emplace_back(FileInfo{file_info["name"].AsString(), i, file_beg, bytes_size});
+            file_beg += piece_size_;
+        }
         last_piece_size_ = bytes_size % file_info["piece length"].AsNumber();
     } else { // multi-file mode torrent
         const long long piece_length = file_info["piece length"].AsNumber();
@@ -53,18 +58,23 @@ void bittorrent::TorrentFilesManager::fill_files() {
                 cur_file_path = cur_file_path / path_el.AsString();
             }
             auto bytes_size = file["length"].AsNumber();
+            long long file_beg = 0;
 
-            pieces_by_files_[cur_piece_index].emplace_back(FileInfo{cur_file_path.string(), cur_piece_index, cur_piece_begin, bytes_size});
+            pieces_by_files_[cur_piece_index].emplace_back(
+                FileInfo{cur_file_path.string(), cur_piece_index, cur_piece_begin, file_beg, bytes_size});
 
             cur_piece_index = ((cur_piece_begin + bytes_size) < piece_length) ? cur_piece_index : cur_piece_index + 1;
             if ((cur_piece_begin + bytes_size) < piece_length) {
                 cur_piece_begin = cur_piece_begin + bytes_size;
             } else {
+                file_beg = piece_length - cur_piece_begin;
                 cur_piece_begin = bytes_size - (piece_length - cur_piece_begin);
                 while (cur_piece_begin > piece_length) {
                     cur_piece_begin = cur_piece_begin - piece_length;
                     cur_piece_index++;
-                    pieces_by_files_[cur_piece_index].emplace_back(FileInfo{cur_file_path.string(), cur_piece_index, 0, bytes_size});
+                    pieces_by_files_[cur_piece_index].emplace_back(
+                        FileInfo{cur_file_path.string(), cur_piece_index, 0, file_beg, bytes_size});
+                    file_beg += piece_length;
                 }
             }
 
@@ -75,7 +85,20 @@ void bittorrent::TorrentFilesManager::fill_files() {
 }
 
 void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
-    // TODO записываем его в файл и удаляем из active_pieces
+    auto &files = pieces_by_files_.at(piece.index);
+    for (auto &file : files) {
+        std::unique_lock lock(files_mut_);
+        std::ofstream file_stream(file.path.string(), std::ios_base::in | std::ios_base::out | std::ios_base::ate);
+        file_stream.seekp(file.file_begin, std::ios::beg);
+        for (auto &block : piece.blocks) {
+            file_stream.write(reinterpret_cast<const char*>(block.data_.data()), block.data_.size());
+        }
+    }
+}
+
+bool bittorrent::TorrentFilesManager::ArePieceValid(const WriteRequest & req) {
+    auto & pieces_sha1 = torrent_.GetMeta()["info"]["pieces"];
+    return GetSHA1FromPiece(req.piece) == std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20);
 }
 
 void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest req) {
@@ -100,10 +123,17 @@ size_t bittorrent::TorrentFilesManager::UploadBlock(bittorrent::ReadRequest req)
 
 void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req) {
     a_worker_.Enqueue([this, req = std::move(req)]() mutable {
-        // TODO прочекать валидность куска
-        WritePieceToFile(std::move(req.piece));
+        std::cerr << "Start download : " << req.piece_index << std::endl;
+        std::sort(req.piece.blocks.begin(), req.piece.blocks.end(), [](auto & block1, auto & block2) {
+            return block1.begin_ < block2.begin_;
+        });
+        if (ArePieceValid(req)) {
+            WritePieceToFile(std::move(req.piece));
+            SetPiece(req.piece_index);
+        } else {
+            std::cerr << req.piece_index << " : SHA1 DONT CORRECT" << std::endl;
+        }
         req.remote_peer->UnbindRequest(req.piece_index);
-        SetPiece(req.piece_index);
     });
 }
 

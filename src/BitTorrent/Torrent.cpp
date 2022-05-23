@@ -116,6 +116,7 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
         for (auto &tracker : active_trackers_) {
             tracker->Stop();
         }
+        file_manager_->Process();
 
         return true;
     } catch (boost::exception &excp) {

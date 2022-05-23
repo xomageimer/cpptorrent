@@ -22,7 +22,8 @@ namespace bittorrent {
     struct FileInfo {
         std::filesystem::path path;
         size_t piece_index;
-        long long begin;
+        long long piece_begin;
+        long long file_begin;
         long long size;
     };
 
@@ -32,13 +33,13 @@ namespace bittorrent {
 
         explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path, size_t thread_count = 1);
 
+        void Process() { a_worker_.Start(); }
+
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB_; }; // GigaBytes
 
         [[nodiscard]] size_t GetPieceSize() const { return piece_size_; }
 
         [[nodiscard]] size_t GetLastPieceSize() const { return last_piece_size_; }
-
-        bool AreCompleted() const;
 
         void SetPiece(size_t piece_index);
 
@@ -49,6 +50,8 @@ namespace bittorrent {
         void DownloadPiece(WriteRequest);
 
         void WritePieceToFile(Piece piece);
+
+        bool ArePieceValid(const WriteRequest & req);
 
     private:
         void fill_files();
@@ -68,6 +71,8 @@ namespace bittorrent {
         const std::filesystem::path path_to_download_;
 
         long double total_size_GB_;
+
+        mutable std::mutex files_mut_;
 
         std::map<piece_index, std::vector<FileInfo>> pieces_by_files_;
 

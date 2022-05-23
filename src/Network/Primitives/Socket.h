@@ -94,7 +94,7 @@ namespace network {
         void stop_await() { timeout_.cancel(); }
 
         void do_resolve(std::string const &host, std::string const &port, ConnectCallback connect_callback, ErrorCallback error_callback) {
-            resolver_.async_resolve(host, port, [=, this, self = shared_from_this()](error_code ec, endpoint_iter_type endpoints) {
+            resolver_.async_resolve(host, port, [=, self = shared_from_this()](error_code ec, endpoint_iter_type endpoints) {
                 if (!ec) {
                     endpoint_iter_ = std::move(endpoints);
                     if constexpr (is_datagram) {
@@ -112,7 +112,7 @@ namespace network {
 
         void do_connect(endpoint_iter_type endpoints, ConnectCallback connect_callback, ErrorCallback error_callback) {
             async_connect( //
-                socket_, std::move(endpoints), [=, this, self = shared_from_this()](error_code ec, endpoint_iter_type) {
+                socket_, std::move(endpoints), [=, self = shared_from_this()](error_code ec, endpoint_iter_type) {
                     stop_await();
                     if (!ec) {
                         connect_callback();
@@ -159,7 +159,7 @@ namespace network {
         }
 
         void Read(size_t size, ReadCallback read_callback, ErrorCallback error_callback) {
-            Post([=, this, self = shared_from_this()] {
+            Post([=, self = shared_from_this()] {
                 async_read(socket_, asio::buffer(read_streambuff_.prepare(size)),
                     [this, self, read_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
@@ -176,7 +176,7 @@ namespace network {
         }
 
         void ReadUntil(std::string until_str, ReadCallback read_callback, ErrorCallback error_callback) {
-            Post([=, this, self = shared_from_this()] {
+            Post([=, self = shared_from_this()] {
                 async_read_until(
                     socket_, read_streambuff_, until_str, [self, this, read_callback, error_callback](error_code ec, size_t xfr) {
                         stop_await();
@@ -192,7 +192,7 @@ namespace network {
         }
 
         void ReadToEof(ReadCallback read_callback, ReadCallback eof_callback, ErrorCallback error_callback) {
-            Post([=, this, self = shared_from_this()] {
+            Post([=, self = shared_from_this()] {
                 async_read(
                     socket_, read_streambuff_, [this, self, read_callback, eof_callback, error_callback](error_code ec, size_t length) {
                         stop_await();
@@ -216,7 +216,7 @@ namespace network {
 
         void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
             queue_send_buff_.push(std::move(msg));
-            Post([=, this, self = shared_from_this()] {
+            Post([=, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
                 socket_.async_send_to(asio::buffer(queue_send_buff_.front().GetBufferData()), *endpoint_ptr,
                     [this, endpoint_ptr, self, write_callback, error_callback](error_code ec, size_t xfr) {
@@ -231,7 +231,7 @@ namespace network {
         }
 
         void Read(size_t max_size, ReadCallback read_callback, ErrorCallback error_callback) {
-            Post([=, this, self = shared_from_this()] {
+            Post([=, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
                 socket_.async_receive_from(boost::asio::buffer(read_streambuff_.prepare(max_size)), *endpoint_ptr,
                     [this, endpoint_ptr, self, read_callback, error_callback](error_code ec, size_t xfr) {

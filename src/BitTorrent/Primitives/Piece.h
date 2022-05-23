@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace bittorrent {
@@ -41,6 +42,8 @@ namespace bittorrent {
 
         size_t cur_pos {0};
     };
+
+    std::string GetSHA1FromPiece(const Piece &p_arg);
 } // namespace bittorrent
 
 #endif // CPPTORRENT_PIECE_H
