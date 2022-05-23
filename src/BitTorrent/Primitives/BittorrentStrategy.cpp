@@ -35,7 +35,6 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count,
 }
 
 void bittorrent::BittorrentStrategy::OnUnchoked(std::shared_ptr<network::PeerClient> peer) {
-    if (peer->IsClientChoked()) peer->send_unchoke();
     peer->TryToRequestPiece();
 }
 

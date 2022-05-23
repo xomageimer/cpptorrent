@@ -76,13 +76,17 @@ namespace bittorrent {
 
         void SendHaveToAll(size_t piece_num);
 
+        void MarkRequestedPiece(size_t piece_id);
+
+        void UnmarkRequestedPiece(size_t piece_id);
+
+        bool IsPieceRequested(size_t piece_id) const;
+
         void MarkUploadedPiece(size_t piece_id);
 
         void UnmarkUploadedPiece(size_t piece_id);
 
         bool IsPieceUploaded(size_t piece_id) const;
-
-        bool IsPieceRequested(size_t piece_id) const;
 
         bool IsPieceDone(size_t piece_id) const;
 

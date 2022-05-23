@@ -81,6 +81,10 @@ namespace network {
 
         void UnbindUpload(size_t id);
 
+        void BindRequest(size_t id);
+
+        void UnbindRequest(size_t id);
+
         bool IsClientChoked() const { return status_ & am_choking; }
 
         bool IsRemoteChoked() const { return status_ & peer_choking; }

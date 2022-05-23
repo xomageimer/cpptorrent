@@ -96,6 +96,21 @@ bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
     return torrent_;
 }
 
+void bittorrent::MasterPeer::MarkRequestedPiece(size_t piece_id) {
+    std::unique_lock lock(mut_);
+    requested_pieces_.emplace(piece_id);
+}
+
+void bittorrent::MasterPeer::UnmarkRequestedPiece(size_t piece_id) {
+    std::unique_lock lock(mut_);
+    requested_pieces_.erase(piece_id);
+}
+
+bool bittorrent::MasterPeer::IsPieceRequested(size_t piece_id) const {
+    std::shared_lock lock(mut_);
+    return requested_pieces_.count(piece_id) != 0;
+}
+
 void bittorrent::MasterPeer::MarkUploadedPiece(size_t piece_id) {
     std::unique_lock lock(mut_);
     uploaded_pieces_.emplace(piece_id);
@@ -105,6 +120,7 @@ void bittorrent::MasterPeer::UnmarkUploadedPiece(size_t piece_id) {
     std::unique_lock lock(mut_);
     uploaded_pieces_.erase(piece_id);
 }
+
 
 bool bittorrent::MasterPeer::IsPieceUploaded(size_t piece_id) const {
     std::shared_lock lock(mut_);
@@ -140,7 +156,4 @@ bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() {
 const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
     std::shared_lock lock(bitfield_mut_);
     return Peer::GetBitfield();
-}
-bool bittorrent::MasterPeer::IsPieceRequested(size_t piece_id) const {
-    return false;
 }

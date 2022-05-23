@@ -102,6 +102,7 @@ void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req
     a_worker_.Enqueue([this, req = std::move(req)]() mutable {
         // TODO прочекать валидность куска
         WritePieceToFile(std::move(req.piece));
+        req.remote_peer->UnbindRequest(req.piece_index);
         SetPiece(req.piece_index);
     });
 }

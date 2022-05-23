@@ -123,8 +123,8 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequestPiece() {
-    if (IsRemoteChoked() || (active_piece_.has_value())) return;
     if (!IsClientInterested()) send_interested();
+    if (IsRemoteChoked() || (active_piece_.has_value())) return;
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
@@ -139,6 +139,7 @@ void network::PeerClient::TryToRequestPiece() {
         send_not_interested();
         return;
     }
+    BindRequest(chosen_piece_index.value());
 
     LOG(GetStrIP(), " choose piece at number ", chosen_piece_index.value());
 
@@ -172,6 +173,14 @@ void network::PeerClient::BindUpload(size_t id) {
 
 void network::PeerClient::UnbindUpload(size_t id) {
     master_peer_.UnmarkUploadedPiece(id);
+}
+
+void network::PeerClient::BindRequest(size_t id) {
+    master_peer_.MarkRequestedPiece(id);
+}
+
+void network::PeerClient::UnbindRequest(size_t id) {
+    master_peer_.UnmarkRequestedPiece(id);
 }
 
 void network::PeerClient::cancel_piece(uint32_t id) {
