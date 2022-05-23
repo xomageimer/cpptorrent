@@ -17,7 +17,6 @@ namespace bittorrent_constants {
 
     const size_t byte_size = 8;
     [[maybe_unused]] const size_t most_request_size = std::pow(2, 14);
-    const int MAX_REQUESTED_PIECES_BY_PEER_ONE_TIME = 3;
     const int MAX_AVAILABLE_UNCHOKE_ONE_TIME = 35;
 
     const boost::posix_time::milliseconds epsilon{boost::posix_time::milliseconds(15)};

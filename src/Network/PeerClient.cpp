@@ -8,11 +8,11 @@
 
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-    : TCPSocket(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)) {}
+    : TCPSocket(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), active_piece_(std::nullopt) {}
 
 network::PeerClient::PeerClient(
     const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
-    : TCPSocket(std::move(socket)), master_peer_(*master_peer) {
+    : TCPSocket(std::move(socket)), master_peer_(*master_peer), active_piece_(std::nullopt) {
 
     asio::ip::tcp::endpoint remote_ep = socket_.remote_endpoint();
     uint32_t ip_int = IpToInt(remote_ep.address().to_string());
@@ -123,7 +123,7 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequestPiece() {
-    if (IsRemoteChoked() || (active_pieces_.size() == max_active_pieces_)) return;
+    if (IsRemoteChoked() || (active_piece_.has_value())) return;
     if (!IsClientInterested()) send_interested();
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
@@ -133,32 +133,25 @@ void network::PeerClient::TryToRequestPiece() {
         return;
     }
 
-    for (auto &active_piece : active_pieces_) { // отключаем уже активные куски, чтобы алгоритм не отдал их вновь
-        GetPeerData().GetBitfield().Clear(active_piece.first);
-    }
     auto chosen_piece_index = GetTorrent().DetermineNextPiece(GetPeerData());
-    for (auto &active_piece : active_pieces_) { // включаем обратно уже активные куски, после работы алгоритма
-        GetPeerData().GetBitfield().Set(active_piece.first);
+
+    if (!chosen_piece_index) {
+        send_not_interested();
+        return;
     }
 
-    if (!chosen_piece_index)
-        return;
+    LOG(GetStrIP(), " choose piece at number ", chosen_piece_index.value());
 
-    LOG (GetStrIP(), " choose piece at number ", chosen_piece_index.value());
-
-    size_t piece_size =
-        (chosen_piece_index.value() == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
-    auto it = active_pieces_.emplace(chosen_piece_index.value(),
-        bittorrent::Piece{chosen_piece_index.value(), static_cast<size_t>(std::ceil(static_cast<double>(piece_size) /
-                                                                    static_cast<double>(bittorrent_constants::most_request_size)))});
-
-//    auto first_block_size = std::min(piece_size, bittorrent_constants::most_request_size);
+    size_t piece_size = (chosen_piece_index.value() == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
+                                                                                               : GetTorrent().GetPieceSize();
+    active_piece_.emplace(bittorrent::Piece{chosen_piece_index.value(),
+        static_cast<size_t>(std::ceil(static_cast<double>(piece_size) / static_cast<double>(bittorrent_constants::most_request_size)))});
     size_t begin = 0;
-    for (; piece_size > bittorrent_constants::most_request_size; piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size)
-        send_request(it.first->second.index, begin, bittorrent_constants::most_request_size);
-    send_request(it.first->second.index, begin, piece_size);
-//    send_request(it.first->second.index, it.first->second.cur_pos, first_block_size);
-//    TryToRequestPiece();
+    for (; piece_size > bittorrent_constants::most_request_size;
+         piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size) {
+        send_request(active_piece_.value().index, begin, bittorrent_constants::most_request_size);
+    }
+    send_request(active_piece_.value().index, begin, piece_size);
 }
 
 bool network::PeerClient::PieceDone(uint32_t idx) const {
@@ -166,7 +159,7 @@ bool network::PeerClient::PieceDone(uint32_t idx) const {
 }
 
 bool network::PeerClient::PieceRequested(uint32_t idx) const {
-    return active_pieces_.count(idx);
+    return master_peer_.IsPieceRequested(idx);
 }
 
 bool network::PeerClient::PieceUploaded(uint32_t idx) const {
@@ -348,10 +341,8 @@ void network::PeerClient::send_bitfield() {
 }
 
 void network::PeerClient::send_request(uint32_t piece_request_index, uint32_t begin, uint32_t length) {
-    LOG(GetStrIP(), " : ", __FUNCTION__);
+    LOG(GetStrIP(), " : ", __FUNCTION__, " index: ", piece_request_index, ", begin: ", begin, ", length: ", length);
     using namespace bittorrent;
-
-    LOG("requested " , piece_request_index , " piece from " , GetStrIP() , " at pos " , begin, "\nnow have " , active_pieces_.size() , " active pieces");
 
     SendPeerData msg;
     msg << request << piece_request_index << begin << length;
@@ -378,7 +369,8 @@ void network::PeerClient::send_cancel(uint32_t pieceIdx, uint32_t offset, uint32
     msg << cancel << pieceIdx << offset << length;
 
     send_msg(std::move(msg));
-    active_pieces_.at(pieceIdx).current_blocks_num--;
+    if (active_piece_.has_value())
+        active_piece_.value().current_blocks_num--;
 }
 
 void network::PeerClient::send_port(size_t port) {

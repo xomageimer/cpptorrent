@@ -150,9 +150,7 @@ namespace network {
 
         size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
-        std::map<piece_index, bittorrent::Piece> active_pieces_;
-
-        const size_t max_active_pieces_ = bittorrent_constants::MAX_REQUESTED_PIECES_BY_PEER_ONE_TIME;
+        std::optional<bittorrent::Piece> active_piece_;
 
         bittorrent::MasterPeer &master_peer_;
 

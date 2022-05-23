@@ -141,3 +141,6 @@ const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
     std::shared_lock lock(bitfield_mut_);
     return Peer::GetBitfield();
 }
+bool bittorrent::MasterPeer::IsPieceRequested(size_t piece_id) const {
+    return false;
+}

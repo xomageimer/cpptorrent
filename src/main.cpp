@@ -14,6 +14,19 @@ int main()
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
     LOG("Start");
+
+//    uint8_t arr[] {0,0,0,13,6,0,0,2,172,0,0,0,0,0,0,64,0};
+//    RecvPeerData msg;
+//    msg.DecodeHeader(ArrayToValue<uint32_t>(arr));
+//    msg.SetBuffer(&arr[4], msg.BodySize());
+//
+//    uint32_t index, beg, size;
+//    msg >> index >> beg >> size;
+//
+//    std::cout << bittorrent::type_by_id_.at(msg.Type()) << " " << index << " " << beg << " " << size;
+//
+//    return 0;
+
     auto start = std::chrono::steady_clock::now();
     // TODO сделать количество потоков иначе!
     std::vector<std::thread> threads(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() - 2 : 1);

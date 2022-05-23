@@ -183,7 +183,7 @@ namespace bittorrent {
     public:
         using bittorrent::SendingMessage::SendingMessage;
 
-        explicit SendingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : SendingMessage(bo) { data_.resize(header_length, 0); }
+        explicit SendingPeerMessage(ByteOrder bo = ByteOrder::BigEndian) : SendingMessage(bo) { data_.resize(header_length, 0); out_pos_ = header_length; }
 
         [[nodiscard]] auto *Body() { return data_.data() + header_length; }
 

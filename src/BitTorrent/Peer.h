@@ -82,6 +82,8 @@ namespace bittorrent {
 
         bool IsPieceUploaded(size_t piece_id) const;
 
+        bool IsPieceRequested(size_t piece_id) const;
+
         bool IsPieceDone(size_t piece_id) const;
 
         auto Get() { return shared_from_this(); }
@@ -117,7 +119,8 @@ namespace bittorrent {
 
         std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
 
-        std::set<size_t> uploaded_pieces_; // запрошенные куски у нас!
+        std::set<size_t> uploaded_pieces_; // запрошенные куски ОТ нас!
+        std::set<size_t> requested_pieces_; // запрошенные куски ДЛЯ нас!
 
         size_t available_unchoke_count_ = bittorrent_constants::MAX_AVAILABLE_UNCHOKE_ONE_TIME;
     };
