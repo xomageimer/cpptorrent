@@ -98,7 +98,9 @@ void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
 
 bool bittorrent::TorrentFilesManager::ArePieceValid(const WriteRequest & req) {
     auto & pieces_sha1 = torrent_.GetMeta()["info"]["pieces"];
-    return GetSHA1FromPiece(req.piece) == std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20);
+    auto downloaded_sha1 = GetSHA1FromPiece(req.piece);
+    std::cerr << req.piece_index << " : " << downloaded_sha1 << " ~ " << std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20);
+    return downloaded_sha1 == std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20);
 }
 
 void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest req) {
@@ -127,6 +129,12 @@ void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req
         std::sort(req.piece.blocks.begin(), req.piece.blocks.end(), [](auto & block1, auto & block2) {
             return block1.begin_ < block2.begin_;
         });
+
+        size_t i = 0;
+        for (auto & block : req.piece.blocks)
+            std::cerr << i++ << " block begin from " << block.begin_ << "; ";
+        std::cerr << std::endl;
+
         if (ArePieceValid(req)) {
             WritePieceToFile(std::move(req.piece));
             SetPiece(req.piece_index);

@@ -15,6 +15,24 @@ int main()
 #endif
     LOG("Start");
 
+//    uint8_t arr[] {0,0,0,0,6,0,0,2,44,0,0,64,0,0,0,64,0};
+//
+//    for (auto el : arr) {
+//        std::cout << (int)el << " ";
+//    }
+//    std::cout << std::endl;
+//
+//    RecvPeerData msg_rec;
+//    msg_rec.DecodeHeader(std::size(arr) - 4);
+//    msg_rec.SetBuffer(&arr[4], msg_rec.BodySize());
+//
+//    std::cout << bittorrent::type_by_id_.at(msg_rec.Type()) << " : " << std::endl;
+//    uint32_t index, begin;
+//    msg_rec >> index >> begin;
+//    std::cout << index << " " << begin << std::endl;
+//
+//    return 0;
+
     auto start = std::chrono::steady_clock::now();
     // TODO сделать количество потоков иначе!
     std::vector<std::thread> threads(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1);

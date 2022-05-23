@@ -123,8 +123,9 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequestPiece() {
+    if ((active_piece_.has_value())) return;
     if (!IsClientInterested()) send_interested();
-    if (IsRemoteChoked() || (active_piece_.has_value())) return;
+    if (IsRemoteChoked()) return;
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
@@ -147,7 +148,7 @@ void network::PeerClient::TryToRequestPiece() {
                                                                                                : GetTorrent().GetPieceSize();
     active_piece_.emplace(bittorrent::Piece{chosen_piece_index.value(),
         static_cast<size_t>(std::ceil(static_cast<double>(piece_size) / static_cast<double>(bittorrent_constants::most_request_size)))});
-    size_t begin = 0;
+    uint32_t begin = 0;
     for (; piece_size > bittorrent_constants::most_request_size;
          piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size) {
         send_request(active_piece_.value().index, begin, bittorrent_constants::most_request_size);
@@ -351,10 +352,10 @@ void network::PeerClient::send_bitfield() {
 
 void network::PeerClient::send_request(uint32_t piece_request_index, uint32_t begin, uint32_t length) {
     LOG(GetStrIP(), " : ", __FUNCTION__, " index: ", piece_request_index, ", begin: ", begin, ", length: ", length);
-    using namespace bittorrent;
 
     SendPeerData msg;
-    msg << request << piece_request_index << begin << length;
+    msg << (uint8_t)bittorrent::request;
+    msg << piece_request_index << begin << length;
 
     send_msg(std::move(msg));
 }
@@ -378,8 +379,7 @@ void network::PeerClient::send_cancel(uint32_t pieceIdx, uint32_t offset, uint32
     msg << cancel << pieceIdx << offset << length;
 
     send_msg(std::move(msg));
-    if (active_piece_.has_value())
-        active_piece_.value().current_blocks_num--;
+    if (active_piece_.has_value()) active_piece_.value().current_blocks_num--;
 }
 
 void network::PeerClient::send_port(size_t port) {
@@ -471,7 +471,7 @@ void network::PeerClient::handle_response() {
 
             break;
         }
-        case bitfield:
+        case bitfield: {
             LOG(GetStrIP(), " : bitfield-message");
             if (payload_size < 1) {
                 LOG(GetStrIP(), " : bitfield-message empty, all bits are zero");
@@ -493,6 +493,7 @@ void network::PeerClient::handle_response() {
             Strategy()->OnBitfield(shared_from(this));
 
             break;
+        }
         case request: {
             LOG(GetStrIP(), " : request-message");
             if (payload_size != 13) {
@@ -538,7 +539,7 @@ void network::PeerClient::handle_response() {
 
             break;
         }
-        case cancel:
+        case cancel: {
             LOG(GetStrIP(), " : cancel");
             if (payload_size != 13) {
                 LOG(GetStrIP(), " : invalid cancel message");
@@ -554,7 +555,8 @@ void network::PeerClient::handle_response() {
             Strategy()->OnCancel(shared_from(this), index, begin, length);
 
             break;
-        case port:
+        }
+        case port: {
             if (payload_size != 3) {
                 LOG(GetStrIP(), " : invalid port-message size");
                 Disconnect();
@@ -566,6 +568,7 @@ void network::PeerClient::handle_response() {
             Strategy()->OnPort(shared_from(this), port);
 
             break;
+        }
         default:
             LOG(GetStrIP(), " : Unknown message of id ", (uint32_t)message_type, " received by peer. Ignoring.");
             break;

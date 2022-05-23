@@ -6,7 +6,9 @@
 #include "Message.h"
 #include "NetExceptions.h"
 
-#include <queue>
+#include <sstream>
+
+#include <list>
 #include <memory>
 #include <string>
 #include <utility>
@@ -83,10 +85,7 @@ namespace network {
             Post([this, self = shared_from_this()] { cancel_operation(); });
         }
 
-        template <typename Derived>
-        inline std::shared_ptr<Derived>
-        shared_from(Derived* that)
-        {
+        template <typename Derived> inline std::shared_ptr<Derived> shared_from(Derived *that) {
             return std::static_pointer_cast<Derived>(shared_from_this());
         }
 
@@ -136,7 +135,7 @@ namespace network {
         asio::deadline_timer timeout_;
 
         boost::asio::streambuf read_streambuff_;
-        std::queue<SendAnyData> queue_send_buff_;
+        std::list<SendAnyData> queue_send_buff_;
     };
 
     using StrandEx = asio::executor;
@@ -145,10 +144,10 @@ namespace network {
         using base_type::base_type;
 
         void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
-            queue_send_buff_.push(std::move(msg));
+            auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             Post([=, self = shared_from_this()] {
-                async_write(socket_, asio::buffer(queue_send_buff_.front().GetBufferData()), [=](error_code ec, size_t xfr) {
-                    queue_send_buff_.pop();
+                async_write(socket_, asio::buffer(it->GetBufferData()), [=](error_code ec, size_t xfr) {
+                    queue_send_buff_.erase(it);
                     if (!ec) {
                         write_callback(xfr);
                     } else {
@@ -215,12 +214,12 @@ namespace network {
         using base_type::base_type;
 
         void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
-            queue_send_buff_.push(std::move(msg));
+            auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             Post([=, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
-                socket_.async_send_to(asio::buffer(queue_send_buff_.front().GetBufferData()), *endpoint_ptr,
-                    [this, endpoint_ptr, self, write_callback, error_callback](error_code ec, size_t xfr) {
-                        queue_send_buff_.pop();
+                socket_.async_send_to(asio::buffer(it->GetBufferData()), *endpoint_ptr,
+                    [=](error_code ec, size_t xfr) {
+                        queue_send_buff_.erase(it);
                         if (!ec) {
                             write_callback(xfr);
                         } else {
