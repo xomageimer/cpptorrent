@@ -30,6 +30,7 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count,
                   << std::endl;
         return;
     }
+    std::cerr << pieces_already_downloaded << " pieces of " << total_piece_count << " downloaded " << std::endl;
     LOG(pieces_already_downloaded, " out of ", total_piece_count, " pieces downloaded after ",
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count(), " seconds from starting");
 }

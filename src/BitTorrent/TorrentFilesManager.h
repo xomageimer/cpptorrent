@@ -72,9 +72,9 @@ namespace bittorrent {
 
         long double total_size_GB_;
 
-        mutable std::mutex files_mut_;
-
         std::map<piece_index, std::vector<FileInfo>> pieces_by_files_;
+
+        std::map<std::filesystem::path, std::mutex> files_muts_;
 
         std::atomic<size_t> ready_pieces_num_ = 0;
     };
