@@ -27,12 +27,15 @@ using ReceiveData = bittorrent::ReceivingMessage;
 namespace network {
     struct TrackerRequester {
     public:
-        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker)
-            : tracker_(*tracker) {}
+        explicit TrackerRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
+            const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
+            : tracker_(*tracker), tracker_reconnect_timeout_(executor) {}
 
         TrackerRequester(TrackerRequester const &) = delete;
 
         TrackerRequester(TrackerRequester &&) = delete;
+
+        bool IsReady() const;
 
         virtual void Connect(const bittorrent::Query &query) = 0;
 
@@ -52,6 +55,11 @@ namespace network {
 
         bittorrent::Tracker &tracker_;
 
+        boost::asio::deadline_timer tracker_reconnect_timeout_;
+        bool can_reconnect_ = true;
+
+        void wait_reconnect();
+
         virtual void SetResponse(ReceiveData) = 0;
 
         void SetException(const std::string &err) {
@@ -68,7 +76,7 @@ namespace network {
     public:
         explicit httpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-            : TrackerRequester(tracker), TCPSocket(executor) {}
+            : TrackerRequester(tracker, executor), TCPSocket(executor) {}
 
         void Connect(const bittorrent::Query &query) override;
 
@@ -95,7 +103,7 @@ namespace network {
     public:
         explicit udpRequester(const std::shared_ptr<bittorrent::Tracker> &tracker,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-            : TrackerRequester(tracker), UDPSocket(executor) {}
+            : TrackerRequester(tracker, executor), UDPSocket(executor) {}
 
         void Connect(const bittorrent::Query &query) override;
 
@@ -146,7 +154,7 @@ namespace network {
             uint64_t connection_id{};
         } c_resp_;
 
-        uint8_t announce_req_[bittorrent_constants::middle_buff_size + 1] {};
+        uint8_t announce_req_[bittorrent_constants::middle_buff_size + 1]{};
         // TODO add scrape
     };
 } // namespace network

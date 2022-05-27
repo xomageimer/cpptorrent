@@ -32,8 +32,6 @@ namespace bittorrent {
         Best
     };
 
-    // TODO add pattern strategy, который будет задавать класс с релизованными алгоритмами, в дефолтном классе все алгоритмы должны быть
-    // дефолтными!
     struct Torrent {
     public:
         explicit Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path,
@@ -46,7 +44,7 @@ namespace bittorrent {
 
         bool TryConnect(bittorrent::Launch policy = bittorrent::Launch::Best, bittorrent::Event event = bittorrent::Event::Empty);
 
-        void StartCommunicatingPeers();
+        void ProcessMeetingPeers();
 
         void DownloadPiece(WriteRequest req);
 
@@ -59,6 +57,8 @@ namespace bittorrent {
         std::optional<size_t> DetermineNextPiece(const Peer &peer);
 
         void OnPieceDownloaded(size_t already_downloaded_pieces_count);
+
+        [[nodiscard]] bool CouldReconnect() const;
 
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info_.info_hash; }
 

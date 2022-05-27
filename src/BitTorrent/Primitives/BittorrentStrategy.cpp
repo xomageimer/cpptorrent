@@ -1,22 +1,23 @@
 #include "BittorrentStrategy.h"
 
 #include "Torrent.h"
-#include "PeerClient.h"
+#include "BitTorrent/PeerClient.h"
 #include "random_generator.h"
 
 bittorrent::BittorrentStrategy::BittorrentStrategy() {
     start_ = std::chrono::steady_clock::now();
 }
 
-std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(const Peer &peer_owner, const Peer &peer_neigh) {
+std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(const MasterPeer &peer_owner, const Peer &peer_neigh) {
     auto available_bitfield = GetMismatchedBitfield(peer_owner.GetBitfield(), peer_neigh.GetBitfield());
 
     if (!available_bitfield.Popcount()) return std::nullopt;
 
     std::vector<uint32_t> pieces_ids;
     for (size_t i = 0; i < available_bitfield.Size(); i++) {
-        if (available_bitfield.Test(i)) pieces_ids.push_back(i);
+        if (available_bitfield.Test(i) && !peer_owner.IsPieceRequested(i)) pieces_ids.push_back(i);
     }
+    if (pieces_ids.empty()) return std::nullopt;
     return pieces_ids[random_generator::Random().GetNumberBetween<size_t>(0, pieces_ids.size() - 1)];
 }
 
@@ -101,7 +102,6 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
 
         uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
         cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
-        cur_piece.cur_pos += size;
 
         cur_piece.current_blocks_num++;
         LOG (cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ", peer->GetStrIP());

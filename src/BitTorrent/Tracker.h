@@ -74,7 +74,7 @@ namespace bittorrent {
     };
 
     struct Response {
-        std::chrono::seconds interval;
+        boost::posix_time::seconds interval;
 
         std::string tracker_id{};
 
@@ -88,7 +88,7 @@ namespace bittorrent {
 
         std::optional<std::chrono::seconds> min_interval;
 
-        Response() : interval(std::chrono::seconds(bittorrent_constants::tracker_again_request_time_secs)) {}
+        Response() : interval(bittorrent_constants::tracker_again_request_time_secs) {}
     };
 
     struct Url {
@@ -101,6 +101,8 @@ namespace bittorrent {
         Tracker(std::string tracker_url_arg, bittorrent::Torrent &torrent_arg);
 
         boost::future<Response> Request(const bittorrent::Query &query);
+
+        bool CouldConnect() const;
 
         auto Get() { return shared_from_this(); }
 

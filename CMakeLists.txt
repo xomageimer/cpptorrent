@@ -28,8 +28,8 @@ add_library(bittorrent STATIC
         src/Network/Primitives/Socket.h
         src/Network/Primitives/Message.h src/Network/Primitives/Message.cpp
 
-        src/Network/TrackerRequester.h src/Network/TrackerRequester.cpp
-        src/Network/PeerClient.h src/Network/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
+        src/Network/BitTorrent/TrackerRequester.h src/Network/BitTorrent/TrackerRequester.cpp
+        src/Network/BitTorrent/PeerClient.h src/Network/BitTorrent/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
 
         src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
         src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
@@ -46,7 +46,7 @@ if (WIN32)
     target_link_libraries(bittorrent PUBLIC -lws2_32 -lwsock32)
 endif ()
 
-add_executable(cpptorrent src/main.cpp)
+add_executable(cpptorrent src/main_bittorrent.cpp)
 
 include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils dependence/BigInteger-master/src/header)
 target_link_libraries(cpptorrent PUBLIC bittorrent bencode helpers)

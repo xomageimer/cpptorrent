@@ -112,6 +112,10 @@ namespace network {
 
         void drop_timeout();
 
+        boost::asio::deadline_timer keep_alive_timeout_;
+
+        void remind_about_self();
+
         void do_read_header();
 
         void do_read_body();

@@ -9,6 +9,19 @@
 #include "auxiliary.h"
 #include "random_generator.h"
 
+void network::TrackerRequester::wait_reconnect() {
+    can_reconnect_ = false;
+    tracker_reconnect_timeout_.cancel();
+    tracker_reconnect_timeout_.expires_from_now(bittorrent_constants::tracker_again_request_time_secs);
+    tracker_reconnect_timeout_.async_wait([this](boost::system::error_code ec) {
+        if (!ec) can_reconnect_ = true;
+    });
+}
+
+bool network::TrackerRequester::IsReady() const {
+    return can_reconnect_;
+}
+
 // HTTP
 void network::httpRequester::SetResponse(ReceiveData data) {
     if (is_set) return;
@@ -33,7 +46,7 @@ void network::httpRequester::SetResponse(ReceiveData data) {
     bittorrent::Response resp;
 
     if (bencode_resp.count("tracker_id")) resp.tracker_id = bencode_resp.at("tracker_id").AsString();
-    if (bencode_resp.count("interval")) resp.interval = std::chrono::seconds(bencode_resp.at("interval").AsNumber());
+    if (bencode_resp.count("interval")) resp.interval = boost::posix_time::seconds(bencode_resp.at("interval").AsNumber());
     if (bencode_resp.count("complete")) resp.complete = bencode_resp.at("complete").AsNumber();
     if (bencode_resp.count("incomplete")) resp.incomplete = bencode_resp.at("incomplete").AsNumber();
 
@@ -93,22 +106,24 @@ void network::httpRequester::SetResponse(ReceiveData data) {
 }
 
 void network::httpRequester::Connect(const bittorrent::Query &query) {
+    if (!can_reconnect_) return;
+
     LOG(tracker_.GetUrl().Host, " : ", "Make http request ");
 
     std::ostringstream msg_is;
     auto my_hash = UrlEncode(tracker_.GetInfoHash());
     msg_is << "GET /" << tracker_.GetUrl().Path.value_or("") << "?"
 
-            << "info_hash=" << UrlEncode(tracker_.GetInfoHash())
-            << "&peer_id=" << UrlEncode(std::string(reinterpret_cast<const char *>(tracker_.GetMasterPeerId()), 20))
-            << "&port=" << tracker_.GetPort() << "&uploaded=" << query.uploaded << "&downloaded=" << query.downloaded
-            << "&left=" << query.left << "&compact=" << query.compact
-            << ((query.event != bittorrent::Event::Empty) ? std::string("&event=") + bittorrent::events_str.at(query.event) : "")
+           << "info_hash=" << UrlEncode(tracker_.GetInfoHash())
+           << "&peer_id=" << UrlEncode(std::string(reinterpret_cast<const char *>(tracker_.GetMasterPeerId()), 20))
+           << "&port=" << tracker_.GetPort() << "&uploaded=" << query.uploaded << "&downloaded=" << query.downloaded
+           << "&left=" << query.left << "&compact=" << query.compact
+           << ((query.event != bittorrent::Event::Empty) ? std::string("&event=") + bittorrent::events_str.at(query.event) : "")
 
-            << " HTTP/1.0\r\n"
-            << "Host: " << tracker_.GetUrl().Host << "\r\n"
-            << "Accept: */*\r\n"
-            << "Connection: close\r\n\r\n";
+           << " HTTP/1.0\r\n"
+           << "Host: " << tracker_.GetUrl().Host << "\r\n"
+           << "Accept: */*\r\n"
+           << "Connection: close\r\n\r\n";
 
     auto str = msg_is.str();
     msg_.CopyFrom(reinterpret_cast<const uint8_t *>(str.data()), str.size());
@@ -117,6 +132,8 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
         tracker_.GetUrl().Host, tracker_.GetUrl().Port, [this]() mutable { do_request(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
+
+    wait_reconnect();
 }
 
 void network::httpRequester::do_request() {
@@ -132,7 +149,7 @@ void network::httpRequester::do_read_response_status() {
 
     ReadUntil(
         "\r\n",
-        [this](const ReceiveData & data) {
+        [this](const ReceiveData &data) {
             std::string http_version;
             http_version = data.GetString();
 
@@ -161,7 +178,7 @@ void network::httpRequester::do_read_response_header() {
 
     ReadUntil(
         "\r\n\r\n",
-        [this](const ReceiveData & data) {
+        [this](const ReceiveData &data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response header");
 
             msg_.Clear();
@@ -176,12 +193,12 @@ void network::httpRequester::do_read_response_body() {
     LOG(tracker_.GetUrl().Host, " : ", __FUNCTION__);
 
     ReadToEof(
-        [this](const ReceiveData & data) {
+        [this](const ReceiveData &data) {
             LOG(tracker_.GetUrl().Host, " : ", " read response body");
             msg_.CopyFrom(data);
             do_read_response_body();
         },
-        [this](const ReceiveData & data) {
+        [this](const ReceiveData &data) {
             msg_.CopyFrom(data);
             SetResponse(std::move(msg_.MakeReading()));
         },
@@ -197,7 +214,7 @@ void network::udpRequester::SetResponse(ReceiveData data) {
 
     bittorrent::Response resp;
 
-    resp.interval = std::chrono::seconds(BigToNative(ArrayToValue<uint32_t>(&data[8])));
+    resp.interval = boost::posix_time::seconds(BigToNative(ArrayToValue<uint32_t>(&data[8])));
 
     for (size_t i = 20; data[i] != (uint8_t)'\0'; i += 6) {
         uint8_t peer[6];
@@ -222,6 +239,8 @@ void network::udpRequester::SetResponse(ReceiveData data) {
 }
 
 void network::udpRequester::Connect(const bittorrent::Query &query) {
+    if (!can_reconnect_) return;
+
     LOG(tracker_.GetUrl().Host, " : ", "Make udp request");
 
     query_ = query;
@@ -232,12 +251,11 @@ void network::udpRequester::Connect(const bittorrent::Query &query) {
     LOG(tracker_.GetUrl().Host, " : ", "trying to connect");
 
     UDPSocket::Connect(
-        tracker_.GetUrl().Host, tracker_.GetUrl().Port,
-        [this] {
-            do_try_connect();
-        },
+        tracker_.GetUrl().Host, tracker_.GetUrl().Port, [this] { do_try_connect(); },
         [this](boost::system::error_code ec) { SetException("Unable to resolve host: " + ec.message()); });
     Await(connect_waiting_);
+
+    wait_reconnect();
 }
 
 void network::udpRequester::do_try_connect() {
@@ -290,7 +308,7 @@ void network::udpRequester::do_connect_response() {
     boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
     Read(
         bittorrent_constants::short_buff_size,
-        [this, time_before](const ReceiveData & data) {
+        [this, time_before](const ReceiveData &data) {
             if (data.Size() < 16) {
                 LOG(tracker_.GetUrl().Host, " : ", "get low size: ", data.Size());
                 do_try_connect_delay(boost::posix_time::microsec_clock::local_time() - time_before);
@@ -356,8 +374,7 @@ void network::udpRequester::do_try_announce_delay(boost::posix_time::time_durati
 
     auto new_dur = announce_waiting_ - dur;
     if (!new_dur.is_negative()) {
-        Await(boost::posix_time::milliseconds(new_dur.total_milliseconds()),
-            [this] { do_try_announce(); });
+        Await(boost::posix_time::milliseconds(new_dur.total_milliseconds()), [this] { do_try_announce(); });
     } else {
         do_try_announce();
     }
@@ -369,7 +386,7 @@ void network::udpRequester::do_announce_response() {
     boost::posix_time::ptime time_before = boost::posix_time::microsec_clock::local_time();
     Read(
         bittorrent_constants::MTU,
-        [this, time_before](const ReceiveData & data) {
+        [this, time_before](const ReceiveData &data) {
             if (data.Size() < 8) {
                 do_try_announce_delay(boost::posix_time::microsec_clock::local_time() - time_before);
             } else {
@@ -381,10 +398,9 @@ void network::udpRequester::do_announce_response() {
 
                 LOG(tracker_.GetUrl().Host, " : ", "\nbytes_transferred: ", std::dec, data.Size(),
                     "\nval == c_resp.transaction_id.value(): ", (val == BigToNative(c_resp_.transaction_id)),
-                    "\nresponse[0] != 0: ", (action != 0), "\nresponse[0] = ", std::hex,
-                    val, std::dec);
+                    "\nresponse[0] != 0: ", (action != 0), "\nresponse[0] = ", std::hex, val, std::dec);
 
-                if (data.Size() >= 20 && val ==  BigToNative(c_resp_.transaction_id) && action == 1) {
+                if (data.Size() >= 20 && val == BigToNative(c_resp_.transaction_id) && action == 1) {
                     SendData msg;
                     msg.CopyFrom(data);
                     msg << '\0';

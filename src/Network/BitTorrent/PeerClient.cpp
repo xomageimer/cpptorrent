@@ -8,11 +8,13 @@
 
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-    : TCPSocket(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)), active_piece_(std::nullopt) {}
+    : TCPSocket(executor), keep_alive_timeout_(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)),
+      active_piece_(std::nullopt) {}
 
 network::PeerClient::PeerClient(
     const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
-    : TCPSocket(std::move(socket)), master_peer_(*master_peer), active_piece_(std::nullopt) {
+    : TCPSocket(std::move(socket)), keep_alive_timeout_(TCPSocket::socket_.get_executor()), master_peer_(*master_peer),
+      active_piece_(std::nullopt) {
 
     asio::ip::tcp::endpoint remote_ep = socket_.remote_endpoint();
     uint32_t ip_int = IpToInt(remote_ep.address().to_string());
@@ -70,14 +72,26 @@ void network::PeerClient::Process() {
 }
 
 void network::PeerClient::error_callback(boost::system::error_code ec) {
-    SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
     LOG(GetStrIP(), " get error : ", ec.message());
     Disconnect();
 }
 
-// TODO нужно делать keep_alive всем пирам, которые нам интересны!
 void network::PeerClient::drop_timeout() {
     Await(bittorrent_constants::waiting_time + bittorrent_constants::epsilon, [this] { Disconnect(); });
+}
+
+void network::PeerClient::remind_about_self() {
+    keep_alive_timeout_.cancel();
+    keep_alive_timeout_.expires_from_now(bittorrent_constants::keep_alive_time);
+    keep_alive_timeout_.async_wait([this, self = shared_from(this)](boost::system::error_code ec) {
+        if (!ec && (IsClientInterested() || !IsRemoteChoked())) {
+            send_keep_alive();
+            if (IsClientInterested()) {
+                LOG(GetStrIP(), " : still interested");
+                TryToRequestPiece();
+            }
+        }
+    });
 }
 
 void network::PeerClient::do_read_header() {
@@ -202,6 +216,7 @@ void network::PeerClient::access() {
     // send_interested(); // TODO должно быть интересно и unchoked, только если у него есть нужные pieces
 
     drop_timeout();
+    remind_about_self();
     do_read_header();
 }
 
@@ -270,7 +285,10 @@ void network::PeerClient::send_msg(SendPeerData data) {
     auto type = data.Type();
     Send(
         std::move(data),
-        [this, type](size_t xfr) { LOG(GetStrIP(), " : data of type ", bittorrent::type_by_id_.at(type), " successfully sent"); },
+        [this, type](size_t xfr) {
+            LOG(GetStrIP(), " : data of type ", bittorrent::type_by_id_.at(type), " successfully sent");
+            remind_about_self();
+        },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
 }
 
@@ -327,7 +345,7 @@ void network::PeerClient::send_not_interested() {
 }
 
 void network::PeerClient::send_have(uint32_t idx) {
-    LOG(GetStrIP(), " : ", __FUNCTION__);
+    LOG(GetStrIP(), " : ", __FUNCTION__, " ", idx, " piece");
     using namespace bittorrent;
 
     SendPeerData msg;
@@ -477,14 +495,15 @@ void network::PeerClient::handle_response() {
                 LOG(GetStrIP(), " : bitfield-message empty, all bits are zero");
                 return;
             }
-            if (payload_size - 1 >= TotalPiecesCount()) {
+            auto size = TotalPiecesCount() / bittorrent_constants::byte_size;
+            if (payload_size - 1 > std::ceil(TotalPiecesCount() / bittorrent_constants::byte_size)) {
                 Disconnect();
                 return;
             }
-            for (size_t i = 1; i < payload_size - 1; ++i) {
+            for (size_t i = 1; i < payload_size; ++i) {
                 for (size_t x = 0; x < 8; ++x) {
                     if (payload.Body()[i] & (1 << (7 - x))) {
-                        size_t idx = i * 8 + x;
+                        size_t idx = (i - 1) * 8 + x;
                         if (idx < TotalPiecesCount()) GetPeerBitfield().Set(idx);
                     }
                 }

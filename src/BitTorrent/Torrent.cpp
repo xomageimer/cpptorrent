@@ -42,6 +42,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
 
 bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Event event) {
     if (!HasTrackers()) return false;
+
     bittorrent::Query query = GetDefaultTrackerQuery();
     query.event = event;
 
@@ -127,12 +128,20 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
     }
 }
 
-void bittorrent::Torrent::StartCommunicatingPeers() {
+bool bittorrent::Torrent::CouldReconnect() const {
+    for (auto & tracker : active_trackers_){
+        if (tracker && tracker->CouldConnect())
+            return true;
+    }
+    return false;
+}
+
+void bittorrent::Torrent::ProcessMeetingPeers() {
     if (!GetPeersSize()) return;
 
     LOG("Get ", GetResponse().peers.size(), " peers");
 
-    std::cout << GetResponse().peers.size() << std::endl;
+    std::cout << GetResponse().peers.size() << " potential peers" << std::endl;
     master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 
@@ -208,4 +217,3 @@ void bittorrent::Torrent::SayHave(size_t piece_num)  {
     master_peer_->GetBitfield().Set(piece_num);
     master_peer_->SendHaveToAll(piece_num);
 }
-

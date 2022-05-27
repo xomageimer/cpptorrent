@@ -1,7 +1,7 @@
 #include "TorrentFilesManager.h"
 #include "Torrent.h"
 
-#include "PeerClient.h"
+#include "BitTorrent/PeerClient.h"
 #include "Primitives/Message.h"
 
 #include "auxiliary.h"
@@ -13,25 +13,25 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
     : torrent_(torrent), a_worker_(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1), path_to_download_(std::move(path)) {
     fill_files();
 
-    //    LOG("____________________________________________\n");
-    //    for (auto &[piece, files] : pieces_by_files_) {
-    //        LOG("piece id ", piece, ":");
-    //        size_t i = 0;
-    //        for (auto &file : files) {
-    //            LOG("\tfile #", i++, " : ", file.path.filename(), "\n\tstarted from ", file.piece_begin,
-    //                " piece position"
-    //                "\n\tin ",
-    //                file.file_begin, " file position");
-    //        }
-    //        LOG("\n");
-    //    }
-    //    LOG("____________________________________________");
+        LOG("____________________________________________\n");
+        for (auto &[piece, files] : pieces_by_files_) {
+            LOG("piece id ", piece, ":");
+            size_t i = 0;
+            for (auto &file : files) {
+                LOG("\tfile #", i++, " : ", file.path.filename(), "\n\tstarted from ", file.piece_begin,
+                    " piece position"
+                    "\n\tin ",
+                    file.file_begin, " file position");
+            }
+            LOG("\n");
+        }
+        LOG("____________________________________________");
 
-//    for (size_t i = 0; i < torrent_.GetPieceCount(); i++){
-//        for (auto & file : pieces_by_files_[i]) {
-//            std::cout << i << " piece " << " started in file " << file.path.filename().string() << " from: " << file.file_begin << std::endl;
-//        }
-//    }
+    for (size_t i = 0; i < torrent_.GetPieceCount(); i++){
+        for (auto & file : pieces_by_files_[i]) {
+            std::cout << file.path.root_directory().string() << "\\" << file.path.filename().string() << " : " << file.size << std::endl;
+        }
+    }
 
     a_worker_.Start();
 
@@ -96,26 +96,30 @@ void bittorrent::TorrentFilesManager::fill_files() {
 
 void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
     auto &files = pieces_by_files_.at(piece.index);
+
+    size_t cur_piece_pos = 0;
     for (auto &file : files) {
         std::unique_lock lock(files_muts_[file.path]);
         if (!std::filesystem::exists(file.path.parent_path())) {
             std::filesystem::create_directories(file.path.parent_path());
         }
-        std::ofstream file_stream(file.path.string(), std::ios_base::in | std::ios_base::out | std::ios_base::ate);
+        std::ofstream file_stream(file.path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out | std::ios_base::ate);
         if (!file_stream.is_open()) {
             file_stream.open(file.path.string(), std::ios_base::out | std::ios_base::trunc);
         }
         file_stream.seekp(file.file_begin, std::ios::beg);
         for (auto &block : piece.blocks) {
-            file_stream.write(reinterpret_cast<const char*>(block.data_.data()), block.data_.size());
+            std::ostream_iterator<uint8_t> output_iterator(file_stream);
+            auto block_end =
+//            std::copy(block.data_.begin() + file.piece_begin, , output_iterator);
         }
+//        std::cerr << piece.index << " download to " << file.path.string() << std::endl;
     }
 }
 
 bool bittorrent::TorrentFilesManager::ArePieceValid(const WriteRequest & req) {
     auto & pieces_sha1 = torrent_.GetMeta()["info"]["pieces"];
     auto downloaded_sha1 = GetSHA1FromPiece(req.piece);
-//    std::cerr << req.piece_index << " : " << downloaded_sha1 << " ~ " << std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20) << std::endl;
     return downloaded_sha1 == std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20);
 }
 
@@ -149,7 +153,6 @@ void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req
         if (ArePieceValid(req)) {
             WritePieceToFile(std::move(req.piece));
             SetPiece(req.piece_index);
-//            std::cerr << req.piece_index << " piece downloaded" << std::endl;
         } else {
             std::cerr << req.piece_index << " : SHA1 DONT CORRECT" << std::endl;
         }

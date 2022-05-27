@@ -1,7 +1,7 @@
 #include "Tracker.h"
 
 #include "Torrent.h"
-#include "TrackerRequester.h"
+#include "BitTorrent/TrackerRequester.h"
 #include "auxiliary.h"
 
 namespace ba = boost::asio;
@@ -54,7 +54,9 @@ boost::future<bittorrent::Response> bittorrent::Tracker::Request(const bittorren
 }
 
 void bittorrent::Tracker::MakeRequester() {
-    auto str_tolower = [](std::string s) {
+    if (request) return;
+
+    static auto str_tolower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
         return s;
     };
@@ -64,6 +66,11 @@ void bittorrent::Tracker::MakeRequester() {
         request = std::make_shared<network::httpRequester>(Get(), make_strand(torrent.GetService()));
 }
 
-void bittorrent::Tracker::Stop()  {
+void bittorrent::Tracker::Stop() {
     torrent.GetService().post([this] { request->Disconnect(); });
+}
+
+bool bittorrent::Tracker::CouldConnect() const {
+    if (request) return false;
+    return request->IsReady();
 }

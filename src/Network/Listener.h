@@ -17,7 +17,7 @@
 
 #include "Primitives/Socket.h"
 #include "NetExceptions.h"
-#include "PeerClient.h"
+#include "BitTorrent/PeerClient.h"
 
 #include "Torrent.h"
 #include "logger.h"

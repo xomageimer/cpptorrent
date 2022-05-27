@@ -2,7 +2,7 @@
 #include "Torrent.h"
 
 #include "Listener.h"
-#include "PeerClient.h"
+#include "BitTorrent/PeerClient.h"
 
 #include "auxiliary.h"
 #include "random_generator.h"
@@ -121,7 +121,6 @@ void bittorrent::MasterPeer::UnmarkUploadedPiece(size_t piece_id) {
     uploaded_pieces_.erase(piece_id);
 }
 
-
 bool bittorrent::MasterPeer::IsPieceUploaded(size_t piece_id) const {
     std::shared_lock lock(mut_);
     return uploaded_pieces_.count(piece_id) != 0;
@@ -141,7 +140,7 @@ bool bittorrent::MasterPeer::CanUnchokePeer(size_t peer_ip) const {
 }
 
 void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
-    std::unique_lock lock(mut_);
+    std::shared_lock lock(mut_);
 
     for (auto &[id, peer] : peers_subscribers_) {
         peer->send_have(piece_num);

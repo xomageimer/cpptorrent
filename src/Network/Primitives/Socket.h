@@ -60,6 +60,7 @@ namespace network {
 
         void Await(boost::posix_time::time_duration ms) {
             Post([this, self = shared_from_this(), ms] {
+                stop_await();
                 timeout_.expires_from_now(ms);
                 timeout_.template async_wait([this, self](error_code ec) {
                     if (!ec) {
@@ -71,6 +72,7 @@ namespace network {
 
         template <typename Handler> void Await(boost::posix_time::time_duration ms, Handler f) {
             Post([this, self = shared_from_this(), ms, f] {
+                stop_await();
                 timeout_.expires_from_now(ms);
                 timeout_.template async_wait([this, self, f = std::move(f)](error_code ec) {
                     if (!ec) {
@@ -146,7 +148,7 @@ namespace network {
         void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
             auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             Post([=, self = shared_from_this()] {
-                async_write(socket_, asio::buffer(it->GetBufferData()), [=](error_code ec, size_t xfr) {
+                async_write(socket_, asio::buffer(it->GetBufferData()), [=, self = self](error_code ec, size_t xfr) {
                     queue_send_buff_.erase(it);
                     if (!ec) {
                         write_callback(xfr);
@@ -218,7 +220,7 @@ namespace network {
             Post([=, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
                 socket_.async_send_to(asio::buffer(it->GetBufferData()), *endpoint_ptr,
-                    [=](error_code ec, size_t xfr) {
+                    [=, self = self](error_code ec, size_t xfr) {
                         queue_send_buff_.erase(it);
                         if (!ec) {
                             write_callback(xfr);
