@@ -23,9 +23,10 @@ namespace bittorrent_constants {
     const boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};
     const boost::posix_time::milliseconds announce_waiting_time{boost::posix_time::milliseconds(1000)};
     const boost::posix_time::seconds tracker_again_request_time_secs{900};
+    const boost::posix_time::seconds piece_waiting_time{15};
     const boost::posix_time::minutes waiting_time{boost::posix_time::minutes(2)};
     const boost::posix_time::minutes keep_alive_time {boost::posix_time::minutes(1)};
-    const std::chrono::seconds sleep_time {std::chrono::seconds(30)};
+    const std::chrono::minutes sleep_time {std::chrono::minutes(3)};
 
     const int MAX_CONNECT_ATTEMPTS = 4;
     const int MAX_ANNOUNCE_ATTEMPTS = 3;

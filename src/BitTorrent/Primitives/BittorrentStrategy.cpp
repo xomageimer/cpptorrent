@@ -104,11 +104,13 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
         cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
 
         cur_piece.current_blocks_num++;
+        peer->wait_piece();
         LOG (cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ", peer->GetStrIP());
         if (cur_piece.current_blocks_num == cur_piece.block_count) {
             LOG (cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
             peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
 
+            peer->piece_wait_timeout_.cancel();
             peer->active_piece_.reset();
             peer->TryToRequestPiece();
         }

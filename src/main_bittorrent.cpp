@@ -33,7 +33,7 @@ int main() {
         }
     };
 
-    std::string torrent_name = "Elden Ring.torrent";
+    std::string torrent_name = "Death_Strandin.torrent";
 
     std::string directory_name = "Noname";
     auto pos = torrent_name.find_last_of('.');
@@ -41,7 +41,7 @@ int main() {
     std::filesystem::create_directories(directory_name);
 
     auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / torrent_name,
-        std::filesystem::current_path() / directory_name, listener->GetPort()); // TODO config from console
+        std::filesystem::path("E:\\cpptorrent_tests") / directory_name, listener->GetPort()); // TODO config from console
 
 //    service_exit();
 //    return 0;

@@ -8,12 +8,12 @@
 
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-    : TCPSocket(executor), keep_alive_timeout_(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)),
+    : TCPSocket(executor), keep_alive_timeout_(executor), piece_wait_timeout_(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)),
       active_piece_(std::nullopt) {}
 
 network::PeerClient::PeerClient(
     const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
-    : TCPSocket(std::move(socket)), keep_alive_timeout_(TCPSocket::socket_.get_executor()), master_peer_(*master_peer),
+    : TCPSocket(std::move(socket)), keep_alive_timeout_(TCPSocket::socket_.get_executor()), piece_wait_timeout_(TCPSocket::socket_.get_executor()), master_peer_(*master_peer),
       active_piece_(std::nullopt) {
 
     asio::ip::tcp::endpoint remote_ep = socket_.remote_endpoint();
@@ -94,6 +94,20 @@ void network::PeerClient::remind_about_self() {
     });
 }
 
+void network::PeerClient::wait_piece() {
+    piece_wait_timeout_.cancel();
+    piece_wait_timeout_.expires_from_now(bittorrent_constants::piece_waiting_time);
+    piece_wait_timeout_.async_wait([this, self = shared_from(this)](boost::system::error_code ec) {
+        if (!ec && active_piece_) {
+            if (!IsRemoteChoked()) {
+                cancel_piece(active_piece_.value().index);
+            }
+            UnbindRequest(active_piece_.value().index);
+            active_piece_.reset();
+        }
+    });
+}
+
 void network::PeerClient::do_read_header() {
     if (is_disconnected) return;
 
@@ -138,8 +152,8 @@ void network::PeerClient::do_read_body() {
 
 void network::PeerClient::TryToRequestPiece() {
     if ((active_piece_.has_value())) return;
-    if (!IsClientInterested()) send_interested();
     if (IsRemoteChoked()) return;
+    if (!IsClientInterested()) send_interested();
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
@@ -168,6 +182,7 @@ void network::PeerClient::TryToRequestPiece() {
         send_request(active_piece_.value().index, begin, bittorrent_constants::most_request_size);
     }
     send_request(active_piece_.value().index, begin, piece_size);
+    wait_piece();
 }
 
 bool network::PeerClient::PieceDone(uint32_t idx) const {
@@ -495,8 +510,8 @@ void network::PeerClient::handle_response() {
                 LOG(GetStrIP(), " : bitfield-message empty, all bits are zero");
                 return;
             }
-            auto size = TotalPiecesCount() / bittorrent_constants::byte_size;
-            if (payload_size - 1 > std::ceil(TotalPiecesCount() / bittorrent_constants::byte_size)) {
+            auto size = std::ceil((double)TotalPiecesCount() / (double)bittorrent_constants::byte_size);
+            if (payload_size - 1 > size) {
                 Disconnect();
                 return;
             }
