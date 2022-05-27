@@ -30,6 +30,17 @@ namespace bittorrent {
 
         Piece(Piece &&) = default;
 
+        uint8_t & operator[](size_t idx) { size_t mid_size = blocks.begin()->data_.size(); return blocks[idx / mid_size].data_[idx % mid_size]; }
+
+        size_t size() const {
+            size_t size = 0;
+            for (auto & block : blocks)
+            {
+                size += block.data_.size();
+            }
+            return size;
+        }
+
         Piece& operator=(Piece &&) = default;
 
         std::vector<Block> blocks;

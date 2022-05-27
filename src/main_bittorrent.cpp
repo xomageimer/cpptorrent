@@ -43,9 +43,8 @@ int main() {
     auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / torrent_name,
         std::filesystem::current_path() / directory_name, listener->GetPort()); // TODO config from console
 
-    service_exit();
-
-    return 0;
+//    service_exit();
+//    return 0;
 
     listener->AddTorrent(torrent);
 
