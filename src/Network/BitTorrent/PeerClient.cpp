@@ -156,7 +156,7 @@ void network::PeerClient::do_read_body() {
 void network::PeerClient::TryToRequestPiece() {
     ADD_DURATION(try_to_request_time);
 
-    if ((active_piece_.has_value())) return;
+    if (active_piece_.has_value()) return;
     if (IsRemoteChoked()) return;
     if (!IsClientInterested()) send_interested();
 

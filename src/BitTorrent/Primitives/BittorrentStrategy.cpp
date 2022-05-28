@@ -44,7 +44,8 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count,
 
 void bittorrent::BittorrentStrategy::OnChoked(std::shared_ptr<network::PeerClient> peer) {
     if (peer->active_piece_.has_value()){
-        peer->cancel_piece(peer->active_piece_->index);
+        peer->UnbindRequest(peer->active_piece_.value().index);
+        peer->active_piece_.reset();
     }
 }
 
