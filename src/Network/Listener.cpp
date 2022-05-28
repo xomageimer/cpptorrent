@@ -8,13 +8,16 @@ void network::participant::Verify() {
 
     ba::async_read(socket_, ba::buffer(buff, bittorrent_constants::handshake_length),
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred /*length*/) {
+            LOG ("Listener : ", "get message");
             timeout_.cancel();
             if (!ec && bytes_transferred >= bittorrent_constants::handshake_length) {
-                std::string info_hash(reinterpret_cast<const char *>(&buff[28], 20)); // TODO пофиксить!
+                std::string info_hash(reinterpret_cast<const char *>(&buff[28]), 20);
+                LOG ("Listener : ", "check handshake message == ", listener_.torrents.count(info_hash));
                 if (listener_.torrents.count(info_hash)) {
                     auto local_master_peer = listener_.torrents[info_hash]->GetRootPeer();
 
                     auto new_peer = std::make_shared<network::PeerClient>(local_master_peer, std::move(socket_), buff);
+                    LOG("Listener : ", "get ", new_peer->GetStrIP());
                     local_master_peer->Subscribe(new_peer);
                 }
             }

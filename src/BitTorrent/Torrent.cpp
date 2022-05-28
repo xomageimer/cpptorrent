@@ -149,7 +149,7 @@ void bittorrent::Torrent::ProcessMeetingPeers() {
 
     LOG("Get ", GetResponse().peers.size(), " peers");
 
-    std::cout << GetResponse().peers.size() << " potential peers" << std::endl;
+//    std::cout << GetResponse().peers.size() << " potential peers" << std::endl;
     master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 
@@ -214,7 +214,9 @@ bool bittorrent::Torrent::fill_trackers() {
 }
 
 std::optional<size_t> bittorrent::Torrent::DetermineNextPiece(const Peer & peer) {
-    return strategy_->ChoosePiece(*master_peer_, peer);
+    ADD_DURATION(determine_timer);
+    auto val = strategy_->ChoosePiece(*master_peer_, peer);
+    return std::move(val);
 }
 
 void bittorrent::Torrent::OnPieceDownloaded(size_t already_downloaded_pieces_count) {

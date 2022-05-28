@@ -49,6 +49,8 @@ namespace bittorrent {
 
     protected:
         std::chrono::steady_clock::time_point start_;
+
+        std::mutex out_mutex;
     };
 } // namespace bittorrent
 

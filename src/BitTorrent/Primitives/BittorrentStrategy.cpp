@@ -26,14 +26,17 @@ std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &pe
 
 // TODO тут можно реализовать EndGame
 void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count, size_t pieces_already_downloaded, Torrent &torrent) {
-    std::cerr << pieces_already_downloaded << " pieces of " << total_piece_count << " downloaded " << std::endl;
+    std::lock_guard<std::mutex> lock(out_mutex);
+    auto percent = (double)pieces_already_downloaded / ((double)total_piece_count / 100.f);
+    std::cerr << '\r' << std::setfill(' ') << std::setw(4);
+    std::cout << std::fixed << std::setprecision(2) << percent << "%" << " downloaded";
     LOG(pieces_already_downloaded, " out of ", total_piece_count, " pieces downloaded after ",
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count(), " seconds from starting");
 
     if (total_piece_count == pieces_already_downloaded) {
         LOG("File(s) successfully downloaded in ",
             std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count(), " seconds");
-        std::cerr << "File(s) downloaded in "
+        std::cerr << std::endl << "File(s) downloaded in "
                   << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count() << " seconds"
                   << std::endl;
     }

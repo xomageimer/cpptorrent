@@ -19,6 +19,8 @@
 #include "bencode_lib.h"
 #include "random_generator.h"
 
+#include "profile.h"
+
 // Объект с которым работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
 
 namespace bittorrent {
@@ -113,6 +115,8 @@ namespace bittorrent {
         std::shared_ptr<bittorrent::MasterPeer> master_peer_;
 
         std::shared_ptr<TorrentFilesManager> file_manager_;
+
+        TotalDuration determine_timer {"determine next piece func"};
     };
 } // namespace bittorrent
 

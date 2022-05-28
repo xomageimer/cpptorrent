@@ -9,6 +9,7 @@ AsyncWorker::AsyncWorker(size_t thread_count) : threads_(thread_count) {
 }
 
 AsyncWorker::~AsyncWorker() {
+    executing_callbacks_.clear();
     quit_.store(true);
     cv_.notify_all();
     for (auto &thread : threads_) {

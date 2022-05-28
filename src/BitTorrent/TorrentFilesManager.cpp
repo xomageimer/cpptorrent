@@ -10,7 +10,7 @@
 #include <utility>
 
 bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::filesystem::path path, size_t thread_count)
-    : torrent_(torrent), a_worker_(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1),
+    : torrent_(torrent), a_worker_(/* std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : */ 1),
       path_to_download_(std::move(path)) {
     fill_files();
 
@@ -96,6 +96,8 @@ void bittorrent::TorrentFilesManager::fill_files() {
 }
 
 void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
+    ADD_DURATION(write_to_disk);
+
     auto &files = pieces_by_files_.at(piece.index);
 
     for (auto &file : files) {
@@ -106,6 +108,7 @@ void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
         std::ofstream file_stream(file.path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out | std::ios_base::ate);
         if (!file_stream.is_open()) {
             file_stream.open(file.path.string(), std::ios::binary | std::ios_base::out | std::ios_base::trunc);
+            file_stream.seekp(file.size, std::ios::beg);
         }
 
         file_stream.seekp(file.file_begin, std::ios::beg);
@@ -117,6 +120,8 @@ void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
 }
 
 bittorrent::Block bittorrent::TorrentFilesManager::ReadPieceBlockFromFile(size_t idx, size_t block_beg, size_t length) {
+    ADD_DURATION(read_from_disk);
+
     auto &piece_files = pieces_by_files_.at(idx);
     auto it = std::upper_bound(piece_files.begin(), piece_files.end(), block_beg, [](size_t block_req, const auto & file){
         return block_req < file.piece_begin;

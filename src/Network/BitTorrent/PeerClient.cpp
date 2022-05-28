@@ -99,6 +99,7 @@ void network::PeerClient::wait_piece() {
     piece_wait_timeout_.expires_from_now(bittorrent_constants::piece_waiting_time);
     piece_wait_timeout_.async_wait([this, self = shared_from(this)](boost::system::error_code ec) {
         if (!ec && active_piece_) {
+            LOG ("piece wait timeout");
             if (!IsRemoteChoked()) {
                 cancel_piece(active_piece_.value().index);
             }
@@ -300,7 +301,7 @@ void network::PeerClient::send_msg(SendPeerData data) {
     Send(
         std::move(data),
         [this, type](size_t xfr) {
-            LOG(GetStrIP(), " : data of type ", bittorrent::type_by_id_.at(type), " successfully sent");
+            LOG(GetStrIP(), " : data of type ", xfr > bittorrent::header_length ? bittorrent::type_by_id_.at(type) : " keep-alive ", " successfully sent");
             remind_about_self();
         },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
