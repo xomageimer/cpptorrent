@@ -27,7 +27,7 @@ namespace bittorrent {
 
         virtual void OnPieceDownloaded(size_t total_piece_count, size_t pieces_already_downloaded, [[maybe_unused]] Torrent &torrent);
 
-        virtual void OnChoked([[maybe_unused]] std::shared_ptr<network::PeerClient>) { return; } // do_nothing
+        virtual void OnChoked([[maybe_unused]] std::shared_ptr<network::PeerClient>); // do_nothing
 
         virtual void OnUnchoked([[maybe_unused]] std::shared_ptr<network::PeerClient>);
 

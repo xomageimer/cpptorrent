@@ -45,6 +45,7 @@ namespace network {
         ba::deadline_timer timeout_;
     };
 
+    // TODO с DHT нужно будет сделать шаблонный листенер с разными participant!
     struct Listener {
     public:
         explicit Listener(const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);

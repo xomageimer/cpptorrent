@@ -6,6 +6,9 @@
 
 #include <utility>
 
+TotalDuration try_to_request_time{"TryToRequest method"};
+TotalDuration handle_response_time{"HandleResponse method"};
+
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
     : TCPSocket(executor), keep_alive_timeout_(executor), piece_wait_timeout_(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)),
@@ -99,12 +102,11 @@ void network::PeerClient::wait_piece() {
     piece_wait_timeout_.expires_from_now(bittorrent_constants::piece_waiting_time);
     piece_wait_timeout_.async_wait([this, self = shared_from(this)](boost::system::error_code ec) {
         if (!ec && active_piece_) {
-            LOG ("piece wait timeout");
+            LOG (GetStrIP(), " : piece wait timeout");
+            UnbindRequest(active_piece_.value().index);
             if (!IsRemoteChoked()) {
                 cancel_piece(active_piece_.value().index);
             }
-            UnbindRequest(active_piece_.value().index);
-            active_piece_.reset();
         }
     });
 }
@@ -152,6 +154,8 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequestPiece() {
+    ADD_DURATION(try_to_request_time);
+
     if ((active_piece_.has_value())) return;
     if (IsRemoteChoked()) return;
     if (!IsClientInterested()) send_interested();
@@ -220,6 +224,7 @@ void network::PeerClient::cancel_piece(uint32_t id) {
          length -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size)
         send_cancel(id, begin, bittorrent_constants::most_request_size);
     send_cancel(id, begin, length);
+    active_piece_.reset();
 }
 
 void network::PeerClient::access() {
@@ -429,6 +434,8 @@ auto network::PeerClient::Strategy() {
 }
 
 void network::PeerClient::handle_response() {
+    ADD_DURATION(handle_response_time);
+
     auto message_type = msg_to_read_.Type();
     size_t payload_size = msg_to_read_.BodySize();
     auto &payload = msg_to_read_;

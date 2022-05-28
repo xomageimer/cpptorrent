@@ -42,6 +42,12 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count,
     }
 }
 
+void bittorrent::BittorrentStrategy::OnChoked(std::shared_ptr<network::PeerClient> peer) {
+    if (peer->active_piece_.has_value()){
+        peer->cancel_piece(peer->active_piece_->index);
+    }
+}
+
 void bittorrent::BittorrentStrategy::OnUnchoked(std::shared_ptr<network::PeerClient> peer) {
     peer->TryToRequestPiece();
 }
@@ -117,7 +123,6 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
         LOG(peer->GetStrIP(), " : received piece ", index, " which already done");
         if (peer->active_piece_.has_value() && peer->active_piece_.value().index == index) {
             peer->cancel_piece(index);
-            peer->active_piece_.reset();
         }
     } else {
         LOG(peer->GetStrIP(), " : received piece ", index, " was asked early");

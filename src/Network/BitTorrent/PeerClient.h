@@ -24,6 +24,7 @@
 #include "auxiliary.h"
 #include "constants.h"
 #include "logger.h"
+#include "profile.h"
 
 namespace ba = boost::asio;
 
@@ -31,6 +32,9 @@ using SendData = bittorrent::SendingMessage;
 using RecvData = bittorrent::ReceivingMessage;
 using RecvPeerData = bittorrent::ReceivingPeerMessage;
 using SendPeerData = bittorrent::SendingPeerMessage;
+
+extern TotalDuration try_to_request_time;
+extern TotalDuration handle_response_time;
 
 namespace network {
     enum STATE : uint8_t {
