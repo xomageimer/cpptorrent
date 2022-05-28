@@ -21,7 +21,9 @@ namespace bittorrent {
     struct BittorrentStrategy {
         BittorrentStrategy();
 
-        virtual std::optional<size_t> ChoosePiece(const MasterPeer &peer_owner, const Peer &peer_neigh);
+        virtual std::optional<size_t> ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh);
+
+        void OnBlockReadyToSend(std::shared_ptr<network::PeerClient> peer, uint32_t pieceIdx, uint32_t offset, Block block);
 
         virtual void OnPieceDownloaded(size_t total_piece_count, size_t pieces_already_downloaded, [[maybe_unused]] Torrent &torrent);
 

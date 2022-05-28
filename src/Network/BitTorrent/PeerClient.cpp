@@ -168,7 +168,6 @@ void network::PeerClient::TryToRequestPiece() {
         send_not_interested();
         return;
     }
-    BindRequest(chosen_piece_index.value());
 
     LOG(GetStrIP(), " choose piece at number ", chosen_piece_index.value());
 

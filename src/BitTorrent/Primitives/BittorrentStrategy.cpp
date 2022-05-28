@@ -8,7 +8,7 @@ bittorrent::BittorrentStrategy::BittorrentStrategy() {
     start_ = std::chrono::steady_clock::now();
 }
 
-std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(const MasterPeer &peer_owner, const Peer &peer_neigh) {
+std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh) {
     auto available_bitfield = GetMismatchedBitfield(peer_owner.GetBitfield(), peer_neigh.GetBitfield());
 
     if (!available_bitfield.Popcount()) return std::nullopt;
@@ -18,7 +18,10 @@ std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(const MasterPe
         if (available_bitfield.Test(i) && !peer_owner.IsPieceRequested(i)) pieces_ids.push_back(i);
     }
     if (pieces_ids.empty()) return std::nullopt;
-    return pieces_ids[random_generator::Random().GetNumberBetween<size_t>(0, pieces_ids.size() - 1)];
+
+    auto chosen_piece = pieces_ids[random_generator::Random().GetNumberBetween<size_t>(0, pieces_ids.size() - 1)];
+    peer_owner.MarkRequestedPiece(chosen_piece);
+    return chosen_piece;
 }
 
 // TODO тут можно реализовать EndGame
@@ -121,4 +124,9 @@ void bittorrent::BittorrentStrategy::OnCancel(std::shared_ptr<network::PeerClien
     if (peer->PieceUploaded(index)) {
         peer->GetTorrent().CancelBlockUpload({peer, index, begin, length});
     }
+}
+
+void bittorrent::BittorrentStrategy::OnBlockReadyToSend(std::shared_ptr<network::PeerClient> peer, uint32_t pieceIdx, uint32_t offset, bittorrent::Block block) {
+    LOG (peer->GetStrIP(), " make piece : ", pieceIdx, ", which block started from ", offset, "; ready to send");
+    peer->send_block(pieceIdx, offset, block.data_.data(), block.data_.size());
 }

@@ -14,25 +14,26 @@ bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::file
       path_to_download_(std::move(path)) {
     fill_files();
 
-//    LOG("____________________________________________\n");
-//    for (auto &[piece, files] : pieces_by_files_) {
-//        LOG("piece id ", piece, ":");
-//        size_t i = 0;
-//        for (auto &file : files) {
-//            LOG("\tfile #", i++, " : ", file.path.filename(), "\n\tstarted from ", file.piece_begin,
-//                " piece position"
-//                "\n\tin ",
-//                file.file_begin, " file position");
+    //    LOG("____________________________________________\n");
+    //    for (auto &[piece, files] : pieces_by_files_) {
+    //        LOG("piece id ", piece, ":");
+    //        size_t i = 0;
+    //        for (auto &file : files) {
+    //            LOG("\tfile #", i++, " : ", file.path.filename(), "\n\tstarted from ", file.piece_begin,
+    //                " piece position"
+    //                "\n\tin ",
+    //                file.file_begin, " file position");
+    //        }
+    //        LOG("\n");
+    //    }
+    //    LOG("____________________________________________");
+    //
+//        for (size_t i = 0; i < torrent_.GetPieceCount(); i++) {
+//            std::cout << "piece id " << i << ":" << std::endl;
+//            for (auto &file : pieces_by_files_[i]) {
+//                std::cout << file.piece_begin << std::endl;
+//            }
 //        }
-//        LOG("\n");
-//    }
-//    LOG("____________________________________________");
-//
-//    for (size_t i = 0; i < torrent_.GetPieceCount(); i++) {
-//        for (auto &file : pieces_by_files_[i]) {
-//            std::cout << file.path.root_directory().string() << "\\" << file.path.filename().string() << " : " << file.size << std::endl;
-//        }
-//    }
 
     a_worker_.Start();
 
@@ -112,8 +113,35 @@ void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
         for (size_t i = file.piece_begin; i < cur_size + file.piece_begin; i++) {
             file_stream.write(reinterpret_cast<const char *>(&piece[i]), 1);
         }
-       // std::cerr << piece.index << " download to " << file.path.string() << std::endl;
     }
+}
+
+bittorrent::Block bittorrent::TorrentFilesManager::ReadPieceBlockFromFile(size_t idx, size_t block_beg, size_t length) {
+    auto &piece_files = pieces_by_files_.at(idx);
+    auto it = std::upper_bound(piece_files.begin(), piece_files.end(), block_beg, [](size_t block_req, const auto & file){
+        return block_req < file.piece_begin;
+    });
+    it = std::prev(it);
+    block_beg -= it->piece_begin;
+
+    Block block;
+    block.begin_ = block_beg;
+    block.data_.reserve(length);
+    for (; it != piece_files.end() && length; it++) {
+        std::ifstream file_stream(it->path.string(),
+            std::ios::binary | std::ios_base::in | std::ios_base::out | std::ios_base::ate);
+        if (!file_stream.is_open())
+            throw std::logic_error("can't open file when read piece block from file!");
+
+        file_stream.seekg(it->file_begin + block_beg, std::ios::beg);
+        auto size = std::min(it->size - it->file_begin - block_beg, length);
+        for (size_t j = 0; j < size; j++){
+            file_stream.read(reinterpret_cast<char *>(block.data_.push_back(0), &block.data_.back()), 1);
+        }
+        length -= size;
+        block_beg = 0;
+    }
+    return std::move(block);
 }
 
 bool bittorrent::TorrentFilesManager::ArePieceValid(const WriteRequest &req) {
@@ -134,10 +162,14 @@ void bittorrent::TorrentFilesManager::CancelBlock(ReadRequest req) {
 size_t bittorrent::TorrentFilesManager::UploadBlock(bittorrent::ReadRequest req) {
     auto lock = std::lock_guard(manager_mut_);
     auto it = active_requests_.emplace(req, a_worker_.Enqueue([this, req = std::move(req)]() mutable {
-        active_requests_.erase(req);
+        {
+            std::lock_guard<std::mutex> lock(manager_mut_);
+            if (active_requests_.count(req)) return;
+            active_requests_.erase(req);
+        }
+        auto block = std::move(ReadPieceBlockFromFile(req.piece_index, req.begin, req.length));
+        torrent_.GetStrategy()->OnBlockReadyToSend(req.remote_peer, req.piece_index, req.begin, std::move(block));
         req.remote_peer->UnbindUpload(req.piece_index);
-
-        // TODO make upload
     }));
     return it.first->second;
 }
@@ -161,5 +193,5 @@ void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req
 void bittorrent::TorrentFilesManager::SetPiece(size_t piece_index) {
     ready_pieces_num_++;
     torrent_.SayHave(piece_index);
-    torrent_.OnPieceDownloaded(ready_pieces_num_.load());
+    torrent_.OnPieceDownloaded(ready_pieces_num_.load()); // TODO сделать всё в таком же стиле!
 }

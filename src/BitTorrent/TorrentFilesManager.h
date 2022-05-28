@@ -51,6 +51,8 @@ namespace bittorrent {
 
         void WritePieceToFile(Piece piece);
 
+        Block ReadPieceBlockFromFile(size_t idx, size_t block_beg, size_t length);
+
         bool ArePieceValid(const WriteRequest & req);
 
     private:

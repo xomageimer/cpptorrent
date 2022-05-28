@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(Boost_USE_STATIC_LIBS ON)
 ADD_DEFINITIONS(-DBoost_USE_STATIC_LIBS=ON)
 
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
 if (WIN32)
     set(BOOST_ROOT "C:/Users/xomaq/Desktop/boost_1_71_0/boost_1_71_0")
     set(BOOST_LIBRARYDIR "C:/Users/xomaq/Desktop/boost_1_71_0/boost_1_71_0")

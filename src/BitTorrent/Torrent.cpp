@@ -34,7 +34,15 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     auto hash_info_str = hash_to_s.str();
     meta_info_.info_hash = GetSHA1(std::string(hash_info_str.begin(), hash_info_str.end()));
 
-    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path); // сначала файлы, потом мастер пир
+    std::string backup_name = "Noname";
+    auto pos = torrent_file_path.filename().string().find_last_of('.');
+    if (pos != std::string::npos) backup_name = torrent_file_path.filename().string().substr(0, pos);
+    auto name_value = GetMeta()["info"].TryAt("name");
+
+    auto directory_name = name_value.has_value() ? name_value.value().get().AsString() : backup_name;
+    std::filesystem::create_directories(download_path / directory_name);
+
+    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name); // сначала файлы, потом мастер пир
     master_peer_ = std::make_shared<MasterPeer>(*this);
 
     fill_trackers();

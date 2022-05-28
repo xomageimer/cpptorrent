@@ -8,11 +8,16 @@ using namespace std;
 // TODO добавить менеджера кт будет взаимодействовать с данными из какого-нибудь файлика с информацией о том какие файлы есть у нас для \
 //  раздачи (сидироваения) и какие мы докачиваем!
 
-int main() {
+int main(int argc, char *argv[]) {
 #ifdef OS_WIN
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 #endif
     LOG("Start");
+
+    if (argc < 2) {
+        std::cerr << "Usage: cpptorrent <input_path> [<output_path>]\n";
+        return 1;
+    }
 
     auto start = std::chrono::steady_clock::now();
     // TODO сделать количество потоков иначе!
@@ -33,21 +38,20 @@ int main() {
         }
     };
 
-    std::string torrent_name = "Death_Strandin.torrent";
+    std::string torrent_dir = argv[1];
+    std::string output_dir = argv[2];
 
-    std::string directory_name = "Noname";
-    auto pos = torrent_name.find_last_of('.');
-    if (pos != std::string::npos) directory_name = torrent_name.substr(0, pos);
-    std::filesystem::create_directories(directory_name);
+    auto torrent = std::make_shared<bittorrent::Torrent>(
+        service, torrent_dir, output_dir, listener->GetPort()); // TODO config from console
 
-    auto torrent = std::make_shared<bittorrent::Torrent>(service, std::filesystem::current_path() / torrent_name,
-        std::filesystem::path("E:\\cpptorrent_tests") / directory_name, listener->GetPort()); // TODO config from console
-
-//    service_exit();
-//    return 0;
+    //    service_exit();
+    //    return 0;
 
     listener->AddTorrent(torrent);
 
+    std::thread main_thread;
+    std::condition_variable cv;
+    std::atomic_bool working = true;
     try {
         std::cerr << "Total piece count " << torrent->GetPieceCount() << std::endl;
         if (!torrent->TryConnect(bittorrent::Launch::Best,
@@ -59,16 +63,17 @@ int main() {
         std::cout << "make connect: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count()
                   << "sec " << std::endl;
 
-        std::mutex cur_thread;
-        std::condition_variable cv;
-        while (true) {
-            unique_lock<mutex> lock(cur_thread);
-            torrent->ProcessMeetingPeers();
-            cv.wait_for(lock, bittorrent_constants::sleep_time);
-            if (torrent->CouldReconnect()) {
-                torrent->TryConnect(bittorrent::Launch::Best, bittorrent::Event::Empty);
+        main_thread = std::thread([&] {
+            std::mutex cur_thread;
+            while (working.load()) {
+                unique_lock<mutex> lock(cur_thread);
+                torrent->ProcessMeetingPeers();
+                cv.wait_for(lock, bittorrent_constants::sleep_time);
+                if (torrent->CouldReconnect()) {
+                    torrent->TryConnect(bittorrent::Launch::Best, bittorrent::Event::Empty);
+                }
             }
-        }
+        });
     } catch (std::exception &e) {
         std::cerr << "ERROR: " << e.what() << std::endl;
         service_exit();
@@ -77,7 +82,10 @@ int main() {
     std::cout << "PRESS KEY TO CANCEL!" << std::endl;
     char c;
     std::cin >> c;
+    working.store(false);
     service_exit();
+    cv.notify_all();
+    main_thread.join();
 
     std::cout << "gonna die" << std::endl;
 
