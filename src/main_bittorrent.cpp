@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 
     auto start = std::chrono::steady_clock::now();
     // TODO сделать количество потоков иначе!
-    std::vector<std::thread> threads(/* std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 :*/ 1);
+    std::vector<std::thread> threads(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1);
     boost::asio::io_service service;
     boost::asio::io_service::work worker(service);
 
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     std::atomic_bool working = true;
     try {
         std::cerr << "Total piece count " << torrent->GetPieceCount() << std::endl;
-        if (!torrent->TryConnect(bittorrent::Launch::Best,
+        if (!torrent->TryConnect(bittorrent::Launch::Any,
                 bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                              // параллельно вызвать Best, чтобы подменить на наиболее лучший
             service_exit();

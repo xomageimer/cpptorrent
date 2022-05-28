@@ -99,6 +99,11 @@ void network::httpRequester::SetResponse(ReceiveData data) {
         SetException("Invalid peers");
     }
 
+    if (resp.peers.empty()) {
+        SetException("0 peers!");
+        return;
+    }
+
     LOG(tracker_.GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());
 
     promise_of_resp.set_value(std::move(resp));
@@ -230,6 +235,11 @@ void network::udpRequester::SetResponse(ReceiveData data) {
 
         bittorrent::PeerImage pi{bittorrent::Peer{ip, port}, bin};
         resp.peers.push_back(std::move(pi));
+    }
+
+    if (resp.peers.empty()) {
+        SetException("0 peers!");
+        return;
     }
 
     LOG(tracker_.GetUrl().Host, " : ", "Peers size is: ", std::dec, resp.peers.size());

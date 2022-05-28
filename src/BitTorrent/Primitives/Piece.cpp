@@ -3,6 +3,8 @@
 #include <boost/compute/detail/sha1.hpp>
 #include <boost/function_output_iterator.hpp>
 
+#include <cstring>
+
 std::string bittorrent::GetSHA1FromPiece(const Piece &p_arg) {
     boost::uuids::detail::sha1 sha1;
     for (const auto & block : p_arg.blocks) {

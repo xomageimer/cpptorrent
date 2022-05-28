@@ -10,7 +10,7 @@
 #include <utility>
 
 bittorrent::TorrentFilesManager::TorrentFilesManager(Torrent &torrent, std::filesystem::path path, size_t thread_count)
-    : torrent_(torrent), a_worker_(/* std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : */ 1),
+    : torrent_(torrent), a_worker_(thread_count),
       path_to_download_(std::move(path)) {
     fill_files();
 
@@ -105,7 +105,7 @@ void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
         if (!std::filesystem::exists(file.path.parent_path())) {
             std::filesystem::create_directories(file.path.parent_path());
         }
-        std::ofstream file_stream(file.path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out | std::ios_base::ate);
+        std::ofstream file_stream(file.path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out);
         if (!file_stream.is_open()) {
             file_stream.open(file.path.string(), std::ios::binary | std::ios_base::out | std::ios_base::trunc);
             file_stream.seekp(file.size, std::ios::beg);
@@ -134,12 +134,12 @@ bittorrent::Block bittorrent::TorrentFilesManager::ReadPieceBlockFromFile(size_t
     block.data_.reserve(length);
     for (; it != piece_files.end() && length; it++) {
         std::ifstream file_stream(it->path.string(),
-            std::ios::binary | std::ios_base::in | std::ios_base::out | std::ios_base::ate);
+            std::ios::binary | std::ios_base::in);
         if (!file_stream.is_open())
             throw std::logic_error("can't open file when read piece block from file!");
 
         file_stream.seekg(it->file_begin + block_beg, std::ios::beg);
-        auto size = std::min(it->size - it->file_begin - block_beg, length);
+        auto size = std::min(it->size - it->file_begin - block_beg,(unsigned long long)length);
         for (size_t j = 0; j < size; j++){
             file_stream.read(reinterpret_cast<char *>(block.data_.push_back(0), &block.data_.back()), 1);
         }

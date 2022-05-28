@@ -42,7 +42,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     auto directory_name = name_value.has_value() ? name_value.value().get().AsString() : backup_name;
     std::filesystem::create_directories(download_path / directory_name);
 
-    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name); // сначала файлы, потом мастер пир
+    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name, std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1); // сначала файлы, потом мастер пир
     master_peer_ = std::make_shared<MasterPeer>(*this);
 
     fill_trackers();

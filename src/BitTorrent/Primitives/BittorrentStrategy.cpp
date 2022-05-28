@@ -62,6 +62,12 @@ void bittorrent::BittorrentStrategy::OnNotInterested(std::shared_ptr<network::Pe
 }
 
 void bittorrent::BittorrentStrategy::OnHave(std::shared_ptr<network::PeerClient> peer, uint32_t i) {
+    if (i >= peer->TotalPiecesCount()){
+        LOG (peer->GetStrIP(), " : get index ", i, ", but pieces count is ", peer->TotalPiecesCount());
+        peer->Disconnect();
+        return;
+    }
+
     if (!peer->PieceDone(i)) {
         peer->TryToRequestPiece();
     }
@@ -75,6 +81,12 @@ void bittorrent::BittorrentStrategy::OnBitfield(std::shared_ptr<network::PeerCli
 }
 
 void bittorrent::BittorrentStrategy::OnRequest(std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, uint32_t length) {
+    if (index >= peer->TotalPiecesCount()){
+        LOG (peer->GetStrIP(), " : get index ", index, ", but pieces count is ", peer->TotalPiecesCount());
+        peer->Disconnect();
+        return;
+    }
+
     LOG(peer->GetStrIP(), " : size of message:", BytesToHumanReadable(length));
 
     if (peer->PieceDone(index)) {
@@ -84,6 +96,12 @@ void bittorrent::BittorrentStrategy::OnRequest(std::shared_ptr<network::PeerClie
 
 void bittorrent::BittorrentStrategy::OnPieceBlock(
     std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, const uint8_t *data, uint32_t size) {
+    if (index >= peer->TotalPiecesCount()){
+        LOG (peer->GetStrIP(), " : get index ", index, ", but pieces count is ", peer->TotalPiecesCount());
+        peer->Disconnect();
+        return;
+    }
+
     if (size > bittorrent_constants::most_request_size) {
        LOG(peer->GetStrIP(), " : ", "more than allowed to get, current message size is ", size,
                      ", but the maximum size can be ", bittorrent_constants::most_request_size);
@@ -124,12 +142,24 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
 }
 
 void bittorrent::BittorrentStrategy::OnCancel(std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, uint32_t length) {
+    if (index >= peer->TotalPiecesCount()){
+        LOG (peer->GetStrIP(), " : get index ", index, ", but pieces count is ", peer->TotalPiecesCount());
+        peer->Disconnect();
+        return;
+    }
+
     if (peer->PieceUploaded(index)) {
         peer->GetTorrent().CancelBlockUpload({peer, index, begin, length});
     }
 }
 
 void bittorrent::BittorrentStrategy::OnBlockReadyToSend(std::shared_ptr<network::PeerClient> peer, uint32_t pieceIdx, uint32_t offset, bittorrent::Block block) {
+    if (pieceIdx >= peer->TotalPiecesCount()){
+        LOG (peer->GetStrIP(), " : get index ", pieceIdx, ", but pieces count is ", peer->TotalPiecesCount());
+        peer->Disconnect();
+        return;
+    }
+
     LOG (peer->GetStrIP(), " make piece : ", pieceIdx, ", which block started from ", offset, "; ready to send");
     peer->send_block(pieceIdx, offset, block.data_.data(), block.data_.size());
 }
