@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     std::atomic_bool working = true;
     try {
         std::cerr << "Total piece count " << torrent->GetPieceCount() << std::endl;
-        if (!torrent->TryConnect(bittorrent::Launch::Any,
+        if (!torrent->TryConnect(bittorrent::Launch::Best,
                 bittorrent::Event::Empty)) { // TODO сначала вызывается Any, после чего мы уже сразу можем начать скачивать файлы и
                                              // параллельно вызвать Best, чтобы подменить на наиболее лучший
             service_exit();

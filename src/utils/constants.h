@@ -18,12 +18,13 @@ namespace bittorrent_constants {
     const size_t byte_size = 8;
     [[maybe_unused]] const size_t most_request_size = std::pow(2, 14);
     const int MAX_AVAILABLE_UNCHOKE_ONE_TIME = 35;
+    const int REQUEST_MAX_QUEUE_SIZE = 150;
 
     const boost::posix_time::milliseconds epsilon{boost::posix_time::milliseconds(15)};
     const boost::posix_time::milliseconds connection_waiting_time{boost::posix_time::milliseconds(2000)};
     const boost::posix_time::milliseconds announce_waiting_time{boost::posix_time::milliseconds(1000)};
     const boost::posix_time::seconds tracker_again_request_time_secs{900};
-    const boost::posix_time::seconds piece_waiting_time{35};
+    const boost::posix_time::seconds piece_waiting_time{60};
     const boost::posix_time::minutes waiting_time{boost::posix_time::minutes(2)};
     const boost::posix_time::minutes keep_alive_time {boost::posix_time::minutes(1)};
     const std::chrono::minutes sleep_time {std::chrono::minutes(3)};

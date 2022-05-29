@@ -166,7 +166,7 @@ namespace network {
 
         size_t connect_attempts = bittorrent_constants::MAX_CONNECT_ATTEMPTS;
 
-        std::optional<bittorrent::Piece> active_piece_;
+        std::optional<std::pair<bittorrent::Piece, size_t>> active_piece_;
 
         bittorrent::MasterPeer &master_peer_;
 
