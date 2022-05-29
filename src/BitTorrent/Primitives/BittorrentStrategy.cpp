@@ -117,7 +117,7 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
         return;
     }
 
-    if (!peer->PieceRequested(index)) {
+    if (!peer->PieceRequested(index) || peer->active_piece_.value().first.index != index) {
         LOG(peer->GetStrIP(), " : received piece ", index, " which didn't asked");
         return;
     }

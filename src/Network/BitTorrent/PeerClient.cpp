@@ -183,13 +183,14 @@ void network::PeerClient::TryToRequestPiece() {
             static_cast<size_t>(
                 std::ceil(static_cast<double>(piece_size) / static_cast<double>(bittorrent_constants::most_request_size)))}, 0);
     } else {
-        piece_size =  (active_piece_.value().first.index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
+        piece_size = (active_piece_.value().first.index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
                                                                                             : GetTorrent().GetPieceSize();
+        piece_size -= active_piece_.value().first.size();
     }
 
     size_t req_count = bittorrent_constants::REQUEST_MAX_QUEUE_SIZE;
     auto & begin = active_piece_.value().second;
-    for (; piece_size > bittorrent_constants::most_request_size && req_count--;
+    for (; piece_size > bittorrent_constants::most_request_size && --req_count;
          piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size) {
         send_request(active_piece_.value().first.index, begin, bittorrent_constants::most_request_size);
     }

@@ -152,7 +152,7 @@ bittorrent::Block bittorrent::TorrentFilesManager::ReadPieceBlockFromFile(size_t
 bool bittorrent::TorrentFilesManager::ArePieceValid(const WriteRequest &req) {
     auto &pieces_sha1 = torrent_.GetMeta()["info"]["pieces"];
     auto downloaded_sha1 = GetSHA1FromPiece(req.piece);
-    std::cerr << downloaded_sha1 << " ~ " <<std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20) << std::endl;
+//    std::cerr << downloaded_sha1 << " ~ " <<std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20) << std::endl;
     return downloaded_sha1 == std::string(&pieces_sha1.AsString()[req.piece_index * 20], 20);
 }
 
