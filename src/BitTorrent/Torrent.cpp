@@ -227,3 +227,7 @@ void bittorrent::Torrent::SayHave(size_t piece_num)  {
     master_peer_->GetBitfield().Set(piece_num);
     master_peer_->SendHaveToAll(piece_num);
 }
+
+size_t bittorrent::Torrent::ActivePeersCount() const {
+    return master_peer_->DistributorsCount();
+}

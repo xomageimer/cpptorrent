@@ -106,6 +106,8 @@ namespace bittorrent {
 
         bool CanUnchokePeer(size_t peer_ip) const;
 
+        [[nodiscard]] size_t DistributorsCount() const;
+
         [[nodiscard]] bittorrent::Bitfield &GetBitfield();
 
         [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const;

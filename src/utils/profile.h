@@ -22,7 +22,7 @@ struct TotalDuration {
 
     ~TotalDuration() {
         if (!count) {
-            std::cerr << message << ": " << "\n\tnever called" << std::endl;
+            std::cerr << message << ": " << "\n\tnever called\n" << std::endl;
             return;
         }
 

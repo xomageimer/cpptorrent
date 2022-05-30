@@ -76,6 +76,16 @@ void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
     LOG("peers remain: ", (int)peers_subscribers_.size());
 }
 
+size_t bittorrent::MasterPeer::DistributorsCount() const {
+    size_t c = 0;
+    std::shared_lock lock(mut_);
+
+    for (auto &[id, peer] : peers_subscribers_) {
+        c += peer->IsClientInterested() && !peer->IsRemoteChoked();
+    }
+    return c;
+}
+
 void bittorrent::MasterPeer::MakeHandshake() {
     handshake_message_[0] = 0x13;
     std::memcpy(&handshake_message_[1], "BitTorrent protocol", 19);
@@ -89,7 +99,7 @@ const uint8_t *bittorrent::MasterPeer::GetHandshake() const {
 }
 
 size_t bittorrent::MasterPeer::GetTotalPiecesCount() const {
-    return GetBitfield().Size();
+    return torrent_.GetPieceCount();
 }
 
 bittorrent::Torrent &bittorrent::MasterPeer::GetTorrent() {
@@ -143,7 +153,8 @@ void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
     std::shared_lock lock(mut_);
 
     for (auto &[id, peer] : peers_subscribers_) {
-        peer->send_have(piece_num);
+        if (peer->IsClientInterested())
+            peer->send_have(piece_num);
     }
 }
 

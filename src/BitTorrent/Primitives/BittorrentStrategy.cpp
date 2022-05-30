@@ -30,7 +30,7 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t total_piece_count,
     auto percent = (double)pieces_already_downloaded / ((double)total_piece_count / 100.f);
     std::cerr << '\r' << std::setfill(' ') << std::setw(4);
     std::cout << std::fixed << std::setprecision(2) << percent << "%"
-              << " downloaded";
+              << " downloaded" << "(" << torrent.ActivePeersCount() << " peers-distributors)";
     LOG(pieces_already_downloaded, " out of ", total_piece_count, " pieces downloaded after ",
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count(), " seconds from starting");
 
@@ -117,7 +117,7 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
         return;
     }
 
-    if (!peer->PieceRequested(index) || peer->active_piece_.value().first.index != index) {
+    if (!peer->PieceRequested(index)) {
         LOG(peer->GetStrIP(), " : received piece ", index, " which didn't asked");
         return;
     }

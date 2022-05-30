@@ -62,6 +62,8 @@ namespace bittorrent {
 
         [[nodiscard]] bool CouldReconnect() const;
 
+        [[nodiscard]] size_t ActivePeersCount() const;
+
         [[nodiscard]] std::string const &GetInfoHash() const { return meta_info_.info_hash; }
 
         [[nodiscard]] bencode::Node const &GetMeta() const { return meta_info_.dict; }

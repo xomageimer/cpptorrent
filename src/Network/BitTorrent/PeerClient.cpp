@@ -183,19 +183,22 @@ void network::PeerClient::TryToRequestPiece() {
             static_cast<size_t>(
                 std::ceil(static_cast<double>(piece_size) / static_cast<double>(bittorrent_constants::most_request_size)))}, 0);
     } else {
-        piece_size = (active_piece_.value().first.index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
+        piece_size =  (active_piece_.value().first.index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
                                                                                             : GetTorrent().GetPieceSize();
-        piece_size -= active_piece_.value().first.size();
+        if (piece_size - active_piece_.value().second == 0)
+            return;
     }
 
-    size_t req_count = bittorrent_constants::REQUEST_MAX_QUEUE_SIZE;
+    int req_count = bittorrent_constants::REQUEST_MAX_QUEUE_SIZE;
     auto & begin = active_piece_.value().second;
-    for (; piece_size > bittorrent_constants::most_request_size && --req_count;
+    for (; piece_size > bittorrent_constants::most_request_size && req_count--;
          piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size) {
         send_request(active_piece_.value().first.index, begin, bittorrent_constants::most_request_size);
     }
-    if (req_count > 0)
+    if (req_count > 0) {
         send_request(active_piece_.value().first.index, begin, piece_size);
+        begin += piece_size;
+    }
 
     wait_piece();
 }
@@ -317,7 +320,7 @@ void network::PeerClient::send_msg(SendPeerData data) {
     Send(
         std::move(data),
         [this, type](size_t xfr) {
-            LOG(GetStrIP(), " : data of type ", xfr > bittorrent::header_length ? bittorrent::type_by_id_.at(type) : " keep-alive ", " successfully sent");
+//            LOG(GetStrIP(), " : data of type ", xfr > bittorrent::header_length ? bittorrent::type_by_id_.at(type) : " keep-alive ", " successfully sent");
             remind_about_self();
         },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
