@@ -189,7 +189,7 @@ void network::PeerClient::TryToRequestPiece() {
             return;
     }
 
-    int req_count = bittorrent_constants::REQUEST_MAX_QUEUE_SIZE;
+    long long req_count = bittorrent_constants::REQUEST_MAX_QUEUE_SIZE;
     auto & begin = active_piece_.value().second;
     for (; piece_size > bittorrent_constants::most_request_size && req_count--;
          piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size) {

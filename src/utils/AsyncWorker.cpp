@@ -23,7 +23,7 @@ void AsyncWorker::run() {
 
         cv_.wait(lock, [&] { return (!stopped_ && !queue_.empty()) || quit_.load(); });
 
-        if (!queue_.empty() && !stopped_) {
+        if (!queue_.empty() && !stopped_ && !quit_.load()) {
             auto [func, id] = std::move(queue_.front());
             queue_.pop_front();
             executing_callbacks_.erase(id);

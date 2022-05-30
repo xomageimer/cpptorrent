@@ -62,8 +62,6 @@ namespace bittorrent {
 
         Torrent &torrent_;
 
-        AsyncWorker a_worker_;
-
         mutable std::mutex manager_mut_;
 
         std::map<ReadRequest, size_t> active_requests_; // активные request'ы из a_worker_
@@ -81,6 +79,8 @@ namespace bittorrent {
         std::map<std::filesystem::path, std::mutex> files_muts_;
 
         std::atomic<size_t> ready_pieces_num_ = 0;
+
+        AsyncWorker a_worker_;
 
         TotalDuration write_to_disk {"write to disk action"};
         TotalDuration read_from_disk {"read from disk action"};
