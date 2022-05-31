@@ -51,10 +51,12 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t id, Torrent &torre
 }
 
 void bittorrent::BittorrentStrategy::OnChoked(std::shared_ptr<network::PeerClient> peer) {
-    if (peer->active_piece_.has_value()) {
-        peer->UnbindRequest(peer->active_piece_.value().first.index);
-        peer->active_piece_.reset();
-    }
+    peer->Post([=]{
+        if (peer->active_piece_.has_value()) {
+            peer->UnbindRequest(peer->active_piece_.value().first.index);
+            peer->active_piece_.reset();
+        }
+    });
 }
 
 void bittorrent::BittorrentStrategy::OnUnchoked(std::shared_ptr<network::PeerClient> peer) {
@@ -135,22 +137,24 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
         peer->piece_wait_timeout_.cancel();
         LOG(peer->GetStrIP(), " : received piece ", index, " was asked early");
 
-        auto &cur_piece = peer->active_piece_.value().first;
+        peer->Post([=] {
+            auto &cur_piece = peer->active_piece_.value().first;
 
-        uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-        cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
+            uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
+            cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
 
-        cur_piece.current_blocks_num++;
-        LOG(cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ",
-            peer->GetStrIP());
-        if (cur_piece.current_blocks_num == cur_piece.block_count) {
-            LOG(cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
+            cur_piece.current_blocks_num++;
+            LOG(cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ",
+                peer->GetStrIP());
+            if (cur_piece.current_blocks_num == cur_piece.block_count) {
+                LOG(cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
 
-            peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
-            peer->ClearAndTryRequest();
-        } else if (cur_piece.current_blocks_num % bittorrent_constants::REQUEST_MAX_QUEUE_SIZE == 0) {
-            peer->TryToRequestPiece();
-        }
+                peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
+                peer->ClearAndTryRequest();
+            } else if (cur_piece.current_blocks_num % bittorrent_constants::REQUEST_MAX_QUEUE_SIZE == 0) {
+                peer->TryToRequestPiece();
+            }
+        });
     }
 }
 
@@ -178,8 +182,7 @@ void bittorrent::BittorrentStrategy::OnBlockReadyToSend(
     peer->send_block(pieceIdx, offset, block.data_.data(), block.data_.size());
 }
 
-void bittorrent::OptimalStrategy::OnPieceDownloaded(
-    size_t id, bittorrent::Torrent &torrent) {
+void bittorrent::OptimalStrategy::OnPieceDownloaded(size_t id, bittorrent::Torrent &torrent) {
     {
         std::lock_guard<std::mutex> lock(out_mutex);
         if (!end_game_) {
@@ -213,13 +216,13 @@ std::optional<size_t> bittorrent::OptimalStrategy::ChoosePiece(bittorrent::Maste
 
     auto chosen_piece = pieces_ids[random_generator::Random().GetNumberBetween<size_t>(0, pieces_ids.size() - 1)];
 
-    if (!end_game_)
-        peer_owner.MarkRequestedPiece(chosen_piece);
+    if (!end_game_) peer_owner.MarkRequestedPiece(chosen_piece);
 
     return chosen_piece;
 }
 
-void bittorrent::OptimalStrategy::OnPieceBlock(std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, const uint8_t *data, uint32_t size) {
+void bittorrent::OptimalStrategy::OnPieceBlock(
+    std::shared_ptr<network::PeerClient> peer, uint32_t index, uint32_t begin, const uint8_t *data, uint32_t size) {
     if (index >= peer->TotalPiecesCount()) {
         LOG(peer->GetStrIP(), " : get index ", index, ", but pieces count is ", peer->TotalPiecesCount());
         peer->Disconnect();
@@ -239,28 +242,28 @@ void bittorrent::OptimalStrategy::OnPieceBlock(std::shared_ptr<network::PeerClie
 
     if (peer->PieceDone(index)) {
         LOG(peer->GetStrIP(), " : received piece ", index, " which already done");
-        if (peer->active_piece_.has_value() && peer->active_piece_.value().first.index == index) {
-            peer->cancel_piece(index);
-        }
+        peer->cancel_piece(index);
     } else {
         peer->piece_wait_timeout_.cancel();
         LOG(peer->GetStrIP(), " : received piece ", index, " was asked early");
 
-        auto &cur_piece = peer->active_piece_.value().first;
+        peer->Post([=] {
+            auto &cur_piece = peer->active_piece_.value().first;
 
-        uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
-        cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
+            uint32_t blockIndex = begin / bittorrent_constants::most_request_size;
+            cur_piece.blocks[blockIndex] = std::move(Block{data, size, begin});
 
-        cur_piece.current_blocks_num++;
-        LOG(cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ",
-            peer->GetStrIP());
-        if (cur_piece.current_blocks_num == cur_piece.block_count) {
-            LOG(cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
+            cur_piece.current_blocks_num++;
+            LOG(cur_piece.current_blocks_num, " of ", cur_piece.block_count, " blocks added to piece ", cur_piece.index, " from ",
+                peer->GetStrIP());
+            if (cur_piece.current_blocks_num == cur_piece.block_count) {
+                LOG(cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
 
-            peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
-            peer->ClearAndTryRequest();
-        } else if (cur_piece.current_blocks_num % bittorrent_constants::REQUEST_MAX_QUEUE_SIZE == 0) {
-            peer->TryToRequestPiece();
-        }
+                peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
+                peer->ClearAndTryRequest();
+            } else if (cur_piece.current_blocks_num % bittorrent_constants::REQUEST_MAX_QUEUE_SIZE == 0) {
+                peer->TryToRequestPiece();
+            }
+        });
     }
 }
