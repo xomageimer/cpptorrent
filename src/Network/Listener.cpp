@@ -12,7 +12,8 @@ void network::participant::Verify() {
             timeout_.cancel();
             if (!ec && bytes_transferred >= bittorrent_constants::handshake_length) {
                 std::string info_hash(reinterpret_cast<const char *>(&buff[28]), 20);
-                LOG ("Listener : ", "check handshake message == ", listener_.torrents.count(info_hash));
+                LOG ("Listener : ", "check handshake message == ", listener_.torrents.count(info_hash),
+                    "\n", info_hash, " ~ ", listener_.torrents.begin()->second->GetInfoHash());
                 if (listener_.torrents.count(info_hash)) {
                     auto local_master_peer = listener_.torrents[info_hash]->GetRootPeer();
 

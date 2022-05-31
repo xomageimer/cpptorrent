@@ -127,6 +127,8 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
         }
         file_manager_->Process();
 
+        std::cerr << "Get peers " << GetResponse().peers.size() << std::endl;
+
         return true;
     } catch (boost::exception &excp) {
         std::cerr << "got exception" << std::endl;
@@ -149,7 +151,6 @@ void bittorrent::Torrent::ProcessMeetingPeers() {
 
     LOG("Get ", GetResponse().peers.size(), " peers");
 
-//    std::cout << GetResponse().peers.size() << " potential peers" << std::endl;
     master_peer_->InitiateJob(GetService(), GetResponse().peers);
 }
 

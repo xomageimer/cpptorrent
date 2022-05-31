@@ -11,13 +11,13 @@ TotalDuration handle_response_time{"HandleResponse method"};
 
 network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &master_peer, bittorrent::Peer slave_peer,
     const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
-    : TCPSocket(executor), keep_alive_timeout_(executor), piece_wait_timeout_(executor), master_peer_(*master_peer), slave_peer_(std::move(slave_peer)),
-      active_piece_(std::nullopt) {}
+    : TCPSocket(executor), keep_alive_timeout_(executor), piece_wait_timeout_(executor), master_peer_(*master_peer),
+      slave_peer_(std::move(slave_peer)), active_piece_(std::nullopt) {}
 
 network::PeerClient::PeerClient(
     const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
-    : TCPSocket(std::move(socket)), keep_alive_timeout_(TCPSocket::socket_.get_executor()), piece_wait_timeout_(TCPSocket::socket_.get_executor()), master_peer_(*master_peer),
-      active_piece_(std::nullopt) {
+    : TCPSocket(std::move(socket)), keep_alive_timeout_(TCPSocket::socket_.get_executor()),
+      piece_wait_timeout_(TCPSocket::socket_.get_executor()), master_peer_(*master_peer), active_piece_(std::nullopt) {
 
     asio::ip::tcp::endpoint remote_ep = socket_.remote_endpoint();
     uint32_t ip_int = IpToInt(remote_ep.address().to_string());
@@ -60,7 +60,7 @@ void network::PeerClient::try_again_connect() {
     if (--connect_attempts) {
         LOG(GetStrIP(), " : attempts ", connect_attempts);
         Connect(GetStrIP(), std::to_string(slave_peer_.GetPort()), std::bind(&PeerClient::send_handshake, this),
-            std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
+            [this](boost::system::error_code) { try_again_connect(); });
         Await(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
     } else
         Disconnect();
@@ -104,7 +104,7 @@ void network::PeerClient::wait_piece() {
     piece_wait_timeout_.expires_from_now(bittorrent_constants::piece_waiting_time);
     piece_wait_timeout_.async_wait([this, self = shared_from(this)](boost::system::error_code ec) {
         if (!ec && active_piece_) {
-            LOG (GetStrIP(), " : piece wait timeout");
+            LOG(GetStrIP(), " : piece wait timeout");
             UnbindRequest(active_piece_.value().first.index);
             master_peer_.TryToRequestAgain();
             if (!IsRemoteChoked()) {
@@ -157,25 +157,26 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequestPiece() {
-    if (GetOwnerBitfield().Popcount() == TotalPiecesCount()) {
-        LOG (GetStrIP(), " : all pieces done!");
-        send_not_interested();
-        return;
-    }
-
     ADD_DURATION(try_to_request_time);
-
-    if (IsRemoteChoked()) return;
-    if (!IsClientInterested()) send_interested();
 
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
     size_t piece_size;
+
     if (!active_piece_.has_value()) {
+        if (GetOwnerBitfield().Popcount() == TotalPiecesCount()) {
+            LOG(GetStrIP(), " : all pieces done!");
+            send_not_interested();
+            return;
+        }
+
+        if (IsRemoteChoked()) return;
+        if (!IsClientInterested()) send_interested();
+
         auto chosen_piece_index = GetTorrent().DetermineNextPiece(GetPeerData());
 
         if (!chosen_piece_index) {
-            LOG (GetStrIP(), " : nothing interested, just wait");
+            LOG(GetStrIP(), " : nothing interested, just wait");
             return;
         }
 
@@ -184,17 +185,17 @@ void network::PeerClient::TryToRequestPiece() {
         piece_size = (chosen_piece_index.value() == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
                                                                                             : GetTorrent().GetPieceSize();
         active_piece_.emplace(bittorrent::Piece{chosen_piece_index.value(),
-            static_cast<size_t>(
-                std::ceil(static_cast<double>(piece_size) / static_cast<double>(bittorrent_constants::most_request_size)))}, 0);
+                                  static_cast<size_t>(std::ceil(
+                                      static_cast<double>(piece_size) / static_cast<double>(bittorrent_constants::most_request_size)))},
+            0);
     } else {
-        piece_size =  (active_piece_.value().first.index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
-                                                                                            : GetTorrent().GetPieceSize();
-        if (piece_size - active_piece_.value().second == 0)
-            return;
+        piece_size = (active_piece_.value().first.index == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize()
+                                                                                                   : GetTorrent().GetPieceSize();
+        if (piece_size - active_piece_.value().second == 0) return;
     }
 
     long long req_count = bittorrent_constants::REQUEST_MAX_QUEUE_SIZE;
-    auto & begin = active_piece_.value().second;
+    auto &begin = active_piece_.value().second;
     for (; piece_size > bittorrent_constants::most_request_size && req_count--;
          piece_size -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size) {
         send_request(active_piece_.value().first.index, begin, bittorrent_constants::most_request_size);
@@ -324,7 +325,8 @@ void network::PeerClient::send_msg(SendPeerData data) {
     Send(
         std::move(data),
         [this, type](size_t xfr) {
-//            LOG(GetStrIP(), " : data of type ", xfr > bittorrent::header_length ? bittorrent::type_by_id_.at(type) : " keep-alive ", " successfully sent");
+            //            LOG(GetStrIP(), " : data of type ", xfr > bittorrent::header_length ? bittorrent::type_by_id_.at(type) : "
+            //            keep-alive ", " successfully sent");
             remind_about_self();
         },
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));

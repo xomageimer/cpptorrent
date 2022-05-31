@@ -81,7 +81,7 @@ size_t bittorrent::MasterPeer::DistributorsCount() const {
     std::shared_lock lock(mut_);
 
     for (auto &[id, peer] : peers_subscribers_) {
-        c += peer->IsClientInterested() && !peer->IsRemoteChoked();
+        c += peer->active_piece_.has_value() && peer->IsClientInterested() && !peer->IsRemoteChoked();
     }
     return c;
 }
@@ -153,7 +153,7 @@ void bittorrent::MasterPeer::SendHaveToAll(size_t piece_num) {
     std::shared_lock lock(mut_);
 
     for (auto &[id, peer] : peers_subscribers_) {
-        if (peer->IsClientInterested())
+        if (peer->IsRemoteInterested())
             peer->send_have(piece_num);
     }
 }
@@ -168,7 +168,6 @@ void bittorrent::MasterPeer::CancelPiece(size_t piece_id) const {
         }
     }
 }
-
 
 void bittorrent::MasterPeer::TryToRequestAgain() {
     std::shared_lock lock(mut_);
