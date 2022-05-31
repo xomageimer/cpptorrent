@@ -90,6 +90,10 @@ namespace bittorrent {
 
         bool IsPieceDone(size_t piece_id) const;
 
+        void TryToRequestAgain();
+
+        void CancelPiece(size_t piece_id) const;
+
         auto Get() { return shared_from_this(); }
 
         [[nodiscard]] bittorrent::Torrent &GetTorrent();

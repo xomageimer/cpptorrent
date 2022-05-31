@@ -49,6 +49,8 @@ void network::PeerClient::Disconnect() {
 
     Cancel();
     master_peer_.Unsubscribe(GetPeerData().GetIP());
+    keep_alive_timeout_.cancel();
+    piece_wait_timeout_.cancel();
     is_disconnected = true;
 }
 
@@ -104,6 +106,7 @@ void network::PeerClient::wait_piece() {
         if (!ec && active_piece_) {
             LOG (GetStrIP(), " : piece wait timeout");
             UnbindRequest(active_piece_.value().first.index);
+            master_peer_.TryToRequestAgain();
             if (!IsRemoteChoked()) {
                 cancel_piece(active_piece_.value().first.index);
             }
@@ -154,6 +157,12 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::TryToRequestPiece() {
+    if (GetOwnerBitfield().Popcount() == TotalPiecesCount()) {
+        LOG (GetStrIP(), " : all pieces done!");
+        send_not_interested();
+        return;
+    }
+
     ADD_DURATION(try_to_request_time);
 
     if (IsRemoteChoked()) return;
@@ -163,15 +172,10 @@ void network::PeerClient::TryToRequestPiece() {
 
     size_t piece_size;
     if (!active_piece_.has_value()) {
-        if (GetOwnerBitfield().Popcount() == TotalPiecesCount()) {
-            send_not_interested();
-            return;
-        }
-
         auto chosen_piece_index = GetTorrent().DetermineNextPiece(GetPeerData());
 
         if (!chosen_piece_index) {
-            send_not_interested();
+            LOG (GetStrIP(), " : nothing interested, just wait");
             return;
         }
 

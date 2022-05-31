@@ -48,6 +48,8 @@ namespace bittorrent {
 
         void ProcessMeetingPeers();
 
+        [[nodiscard]] size_t DownloadedPieceCount() const { return ready_pieces_num_.load(); }
+
         void DownloadPiece(WriteRequest req);
 
         size_t UploadPieceBlock(ReadRequest req);
@@ -117,6 +119,8 @@ namespace bittorrent {
         std::shared_ptr<bittorrent::MasterPeer> master_peer_;
 
         std::shared_ptr<TorrentFilesManager> file_manager_;
+
+        std::atomic<size_t> ready_pieces_num_ = 0;
 
         TotalDuration determine_timer {"determine next piece func"};
     };

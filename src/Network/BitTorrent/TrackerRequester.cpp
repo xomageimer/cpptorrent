@@ -32,6 +32,11 @@ void network::httpRequester::SetResponse(ReceiveData data) {
     resp_str.resize(data.Size());
     data.CopyTo(resp_str.data(), resp_str.size());
 
+//    for (auto ch : resp_str){
+//        std::cerr << ch;
+//    }
+//    std::cerr << std::endl;
+
     std::vector<std::string> bencode_response;
     boost::regex expression("(^d(?:.|\\n)*e\\Z)");
     if (!boost::regex_split(std::back_inserter(bencode_response), resp_str, expression)) {

@@ -25,7 +25,7 @@ namespace bittorrent {
 
         void OnBlockReadyToSend(std::shared_ptr<network::PeerClient> peer, uint32_t pieceIdx, uint32_t offset, Block block);
 
-        virtual void OnPieceDownloaded(size_t total_piece_count, size_t pieces_already_downloaded, [[maybe_unused]] Torrent &torrent);
+        virtual void OnPieceDownloaded(size_t id, [[maybe_unused]] Torrent &torrent);
 
         virtual void OnChoked([[maybe_unused]] std::shared_ptr<network::PeerClient>); // do_nothing
 
@@ -51,6 +51,17 @@ namespace bittorrent {
         std::chrono::steady_clock::time_point start_;
 
         std::mutex out_mutex;
+    };
+
+    struct OptimalStrategy : public BittorrentStrategy {
+        std::optional<size_t> ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh) override;
+
+        void OnPieceDownloaded(size_t id, [[maybe_unused]] Torrent &torrent) override;
+
+        void OnPieceBlock([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t, uint32_t, const uint8_t *, uint32_t) override;
+
+    private:
+        bool end_game_ = false;
     };
 } // namespace bittorrent
 

@@ -48,7 +48,7 @@ bencode::Node bencode::Deserialize::LoadArray(std::istream &input) {
 
 bencode::Node bencode::Deserialize::LoadStr(std::istream &input) {
     std::string str;
-    size_t str_size;
+    size_t str_size {0};
 
     input >> str_size;
     str.reserve(str_size);

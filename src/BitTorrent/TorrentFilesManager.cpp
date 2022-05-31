@@ -49,11 +49,14 @@ void bittorrent::TorrentFilesManager::fill_files() {
         auto bytes_size = file_info["length"].AsNumber();
         total_size_GB_ = BytesToGiga(bytes_size);
         long long file_beg = 0;
-        for (size_t i = 0; i < torrent_.GetPieceCount(); i++) {
-            pieces_by_files_[i].emplace_back(FileInfo{file_info["name"].AsString(), i, file_beg, bytes_size});
+        auto cur_file_path = path_to_download_ / file_info["name"].AsString();
+        size_t i = 0;
+        for (; i < torrent_.GetPieceCount(); i++) {
+            pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, file_beg, static_cast<long long>(piece_size_)});
             file_beg += piece_size_;
         }
         last_piece_size_ = bytes_size % file_info["piece length"].AsNumber();
+        pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, file_beg, static_cast<long long>(last_piece_size_)});
     } else { // multi-file mode torrent
         const long long piece_length = file_info["piece length"].AsNumber();
         total_size_GB_ = 0;
@@ -196,7 +199,6 @@ void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req
 }
 
 void bittorrent::TorrentFilesManager::SetPiece(size_t piece_index) {
-    ready_pieces_num_++;
     torrent_.SayHave(piece_index);
-    torrent_.OnPieceDownloaded(ready_pieces_num_.load()); // TODO сделать всё в таком же стиле!
+    torrent_.OnPieceDownloaded(piece_index); // TODO сделать всё в таком же стиле!
 }

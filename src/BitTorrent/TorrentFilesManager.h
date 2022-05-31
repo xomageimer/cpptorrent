@@ -78,8 +78,6 @@ namespace bittorrent {
 
         std::map<std::filesystem::path, std::mutex> files_muts_;
 
-        std::atomic<size_t> ready_pieces_num_ = 0;
-
         AsyncWorker a_worker_;
 
         TotalDuration write_to_disk {"write to disk action"};

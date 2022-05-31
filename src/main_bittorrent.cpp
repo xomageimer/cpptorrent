@@ -1,7 +1,12 @@
 #include "Listener.h"
 #include "Torrent.h"
 #include "Tracker.h"
+
+#include "Primitives/BittorrentStrategy.h"
+
 #include "logger.h"
+
+
 
 using namespace std;
 
@@ -42,7 +47,7 @@ int main(int argc, char *argv[]) {
     std::string output_dir = argv[2];
 
     auto torrent = std::make_shared<bittorrent::Torrent>(
-        service, torrent_dir, output_dir, listener->GetPort()); // TODO config from console
+        service, torrent_dir, output_dir, listener->GetPort(), std::make_shared<bittorrent::OptimalStrategy>()); // TODO config from console
 
     //    service_exit();
     //    return 0;

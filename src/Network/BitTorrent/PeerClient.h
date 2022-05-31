@@ -49,6 +49,7 @@ namespace network {
         using piece_index = size_t;
 
         friend class bittorrent::BittorrentStrategy;
+        friend class bittorrent::OptimalStrategy;
 
         friend class bittorrent::MasterPeer;
 
