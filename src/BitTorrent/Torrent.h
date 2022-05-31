@@ -56,7 +56,7 @@ namespace bittorrent {
 
         void CancelBlockUpload(ReadRequest req);
 
-        void SayHave(size_t piece_num);
+        void Have(size_t piece_num);
 
         std::optional<size_t> DetermineNextPiece(const Peer &peer);
 

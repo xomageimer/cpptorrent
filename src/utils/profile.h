@@ -21,6 +21,8 @@ struct TotalDuration {
     }
 
     ~TotalDuration() {
+        std::lock_guard<std::mutex> lock(m);
+
         if (!count) {
             std::cerr << message << ": " << "\n\tnever called\n" << std::endl;
             return;

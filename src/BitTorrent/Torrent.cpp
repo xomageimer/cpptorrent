@@ -42,7 +42,7 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     auto directory_name = (name_value.has_value() && meta_info_.dict["info"].TryAt("files")) ? name_value.value().get().AsString() : backup_name;
     std::filesystem::create_directories(download_path / directory_name);
 
-    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name, std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1); // сначала файлы, потом мастер пир
+    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name, std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1); // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ
     master_peer_ = std::make_shared<MasterPeer>(*this);
 
     fill_trackers();
@@ -225,8 +225,8 @@ void bittorrent::Torrent::OnPieceDownloaded(size_t id) {
     strategy_->OnPieceDownloaded(id, *this);
 }
 
-void bittorrent::Torrent::SayHave(size_t piece_num)  {
-    master_peer_->GetBitfield().Set(piece_num);
+void bittorrent::Torrent::Have(size_t piece_num) {
+    master_peer_->GetBitfield().bits.Set(piece_num);
     master_peer_->SendHaveToAll(piece_num);
 }
 

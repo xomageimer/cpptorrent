@@ -112,9 +112,19 @@ namespace bittorrent {
 
         [[nodiscard]] size_t DistributorsCount() const;
 
-        [[nodiscard]] bittorrent::Bitfield &GetBitfield();
+        struct UniqueAccess {
+            std::unique_lock<std::shared_mutex> lock;
+            bittorrent::Bitfield & bits;
+        };
 
-        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const;
+        struct SharedAccess {
+            std::shared_lock<std::shared_mutex> lock;
+            const bittorrent::Bitfield & bits;
+        };
+
+        [[nodiscard]] UniqueAccess GetBitfield();
+
+        [[nodiscard]] SharedAccess GetBitfield() const;
 
     private:
         void MakeHandshake();
@@ -129,8 +139,8 @@ namespace bittorrent {
 
         std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
 
-        std::set<size_t> uploaded_pieces_; // запрошенные куски ОТ нас!
-        std::set<size_t> requested_pieces_; // запрошенные куски ДЛЯ нас!
+        std::set<size_t> uploaded_pieces_; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ!
+        std::set<size_t> requested_pieces_; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅ!
 
         size_t available_unchoke_count_ = bittorrent_constants::MAX_AVAILABLE_UNCHOKE_ONE_TIME;
     };

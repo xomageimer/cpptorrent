@@ -44,7 +44,9 @@ int main(int argc, char *argv[]) {
     };
 
     std::string torrent_dir = argv[1];
-    std::string output_dir = argv[2];
+    std::string output_dir = std::filesystem::current_path().string();
+        if (argc > 2)
+        output_dir = argv[2];
 
     auto torrent = std::make_shared<bittorrent::Torrent>(
         service, torrent_dir, output_dir, listener->GetPort(), std::make_shared<bittorrent::OptimalStrategy>()); // TODO config from console

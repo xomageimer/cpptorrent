@@ -9,7 +9,11 @@ bittorrent::BittorrentStrategy::BittorrentStrategy() {
 }
 
 std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh) {
-    auto available_bitfield = GetMismatchedBitfield(peer_owner.GetBitfield(), peer_neigh.GetBitfield());
+    bittorrent::Bitfield available_bitfield;
+    {
+        auto owner = peer_owner.GetBitfield();
+        available_bitfield = GetMismatchedBitfield(owner.bits, peer_neigh.GetBitfield());
+    }
 
     if (!available_bitfield.Popcount()) return std::nullopt;
 
@@ -68,7 +72,7 @@ void bittorrent::BittorrentStrategy::OnInterested(std::shared_ptr<network::PeerC
 void bittorrent::BittorrentStrategy::OnNotInterested(std::shared_ptr<network::PeerClient> peer) {
     if (!peer->IsClientChoked() && peer->IsRemoteChoked()) {
         peer->send_choke();
-        // TODO что-то сделать если задушили пир
+        // TODO пїЅпїЅпїЅ-пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ
     }
 }
 
@@ -85,7 +89,7 @@ void bittorrent::BittorrentStrategy::OnHave(std::shared_ptr<network::PeerClient>
 }
 
 void bittorrent::BittorrentStrategy::OnBitfield(std::shared_ptr<network::PeerClient> peer) {
-    if (GetMismatchedBitfield(peer->GetOwnerBitfield(), peer->GetPeerBitfield()).Popcount()) {
+    if (GetMismatchedBitfield(peer->master_peer_.GetBitfield().bits, peer->GetPeerBitfield()).Popcount()) {
         peer->send_interested();
     }
     peer->TryToRequestPiece();
@@ -126,9 +130,7 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
 
     if (peer->PieceDone(index)) {
         LOG(peer->GetStrIP(), " : received piece ", index, " which already done");
-        if (peer->active_piece_.has_value() && peer->active_piece_.value().first.index == index) {
-            peer->cancel_piece(index);
-        }
+        peer->cancel_piece(index);
     } else {
         peer->piece_wait_timeout_.cancel();
         LOG(peer->GetStrIP(), " : received piece ", index, " was asked early");
@@ -145,8 +147,7 @@ void bittorrent::BittorrentStrategy::OnPieceBlock(
             LOG(cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
 
             peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
-            peer->active_piece_.reset();
-            peer->TryToRequestPiece();
+            peer->ClearAndTryRequest();
         } else if (cur_piece.current_blocks_num % bittorrent_constants::REQUEST_MAX_QUEUE_SIZE == 0) {
             peer->TryToRequestPiece();
         }
@@ -196,7 +197,11 @@ void bittorrent::OptimalStrategy::OnPieceDownloaded(
 }
 
 std::optional<size_t> bittorrent::OptimalStrategy::ChoosePiece(bittorrent::MasterPeer &peer_owner, const bittorrent::Peer &peer_neigh) {
-    auto available_bitfield = GetMismatchedBitfield(peer_owner.GetBitfield(), peer_neigh.GetBitfield());
+    bittorrent::Bitfield available_bitfield;
+    {
+        auto owner = peer_owner.GetBitfield();
+        available_bitfield = GetMismatchedBitfield(owner.bits, peer_neigh.GetBitfield());
+    }
 
     if (!available_bitfield.Popcount()) return std::nullopt;
 
@@ -253,8 +258,7 @@ void bittorrent::OptimalStrategy::OnPieceBlock(std::shared_ptr<network::PeerClie
             LOG(cur_piece.index, " piece ready to download", " from ", peer->GetStrIP());
 
             peer->GetTorrent().DownloadPiece({peer, index, std::move(cur_piece)});
-            peer->active_piece_.reset();
-            peer->TryToRequestPiece();
+            peer->ClearAndTryRequest();
         } else if (cur_piece.current_blocks_num % bittorrent_constants::REQUEST_MAX_QUEUE_SIZE == 0) {
             peer->TryToRequestPiece();
         }

@@ -66,6 +66,8 @@ namespace network {
 
         void TryToRequestPiece();
 
+        void ClearAndTryRequest();
+
         std::string GetStrIP() const;
 
         bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
@@ -79,8 +81,6 @@ namespace network {
         const bittorrent::Peer &GetPeerData() const { return slave_peer_; }
 
         size_t TotalPiecesCount() const { return master_peer_.GetTotalPiecesCount(); }
-
-        const bittorrent::Bitfield &GetOwnerBitfield() const { return master_peer_.GetBitfield(); }
 
         void BindUpload(size_t id);
 

@@ -199,6 +199,6 @@ void bittorrent::TorrentFilesManager::DownloadPiece(bittorrent::WriteRequest req
 }
 
 void bittorrent::TorrentFilesManager::SetPiece(size_t piece_index) {
-    torrent_.SayHave(piece_index);
-    torrent_.OnPieceDownloaded(piece_index); // TODO сделать всё в таком же стиле!
+    torrent_.Have(piece_index);
+    torrent_.OnPieceDownloaded(piece_index); // TODO пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ!
 }

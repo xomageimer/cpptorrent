@@ -71,7 +71,7 @@ void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {
 
     peers_subscribers_.erase(unsub_ip);
 
-    // TODO если пиров не осталось или осталось очень мало, то можно попробовать сразу начать общение с трекерами
+    // TODO пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 
     LOG("peers remain: ", (int)peers_subscribers_.size());
 }
@@ -81,7 +81,7 @@ size_t bittorrent::MasterPeer::DistributorsCount() const {
     std::shared_lock lock(mut_);
 
     for (auto &[id, peer] : peers_subscribers_) {
-        c += peer->active_piece_.has_value() && peer->IsClientInterested() && !peer->IsRemoteChoked();
+        c += peer->IsClientInterested() && !peer->IsRemoteChoked();
     }
     return c;
 }
@@ -177,12 +177,10 @@ void bittorrent::MasterPeer::TryToRequestAgain() {
     }
 }
 
-bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() {
-    std::unique_lock lock(bitfield_mut_);
-    return Peer::GetBitfield();
+bittorrent::MasterPeer::UniqueAccess bittorrent::MasterPeer::GetBitfield() {
+    return {std::unique_lock{bitfield_mut_}, Peer::GetBitfield()};
 }
 
-const bittorrent::Bitfield &bittorrent::MasterPeer::GetBitfield() const {
-    std::shared_lock lock(bitfield_mut_);
-    return Peer::GetBitfield();
+bittorrent::MasterPeer::SharedAccess bittorrent::MasterPeer::GetBitfield() const {
+    return {std::shared_lock{bitfield_mut_}, Peer::GetBitfield()};
 }

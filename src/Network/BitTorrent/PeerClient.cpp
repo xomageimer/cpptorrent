@@ -103,13 +103,18 @@ void network::PeerClient::wait_piece() {
     piece_wait_timeout_.cancel();
     piece_wait_timeout_.expires_from_now(bittorrent_constants::piece_waiting_time);
     piece_wait_timeout_.async_wait([this, self = shared_from(this)](boost::system::error_code ec) {
-        if (!ec && active_piece_) {
-            LOG(GetStrIP(), " : piece wait timeout");
-            UnbindRequest(active_piece_.value().first.index);
-            master_peer_.TryToRequestAgain();
-            if (!IsRemoteChoked()) {
-                cancel_piece(active_piece_.value().first.index);
-            }
+        if (!ec) {
+            Post([this, self = shared_from(this)] {
+                std::cerr << "wait piece timeout" << std::endl;
+                if (active_piece_) {
+                    LOG(GetStrIP(), " : piece wait timeout");
+                    UnbindRequest(active_piece_.value().first.index);
+                    master_peer_.TryToRequestAgain();
+                    if (!IsRemoteChoked()) {
+                        cancel_piece(active_piece_.value().first.index);
+                    }
+                }
+            });
         }
     });
 }
@@ -156,6 +161,13 @@ void network::PeerClient::do_read_body() {
         std::bind(&PeerClient::error_callback, this, std::placeholders::_1));
 }
 
+void network::PeerClient::ClearAndTryRequest() {
+    Post([this, self = shared_from(this)]{
+        active_piece_.reset();
+        TryToRequestPiece();
+    });
+}
+
 void network::PeerClient::TryToRequestPiece() {
     ADD_DURATION(try_to_request_time);
 
@@ -164,7 +176,7 @@ void network::PeerClient::TryToRequestPiece() {
     size_t piece_size;
 
     if (!active_piece_.has_value()) {
-        if (GetOwnerBitfield().Popcount() == TotalPiecesCount()) {
+        if (master_peer_.GetBitfield().bits.Popcount() == TotalPiecesCount()) {
             LOG(GetStrIP(), " : all pieces done!");
             send_not_interested();
             return;
@@ -237,17 +249,21 @@ void network::PeerClient::UnbindRequest(size_t id) {
 }
 
 void network::PeerClient::cancel_piece(uint32_t id) {
-    size_t begin = 0;
-    size_t length = (id == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
-    for (; length > bittorrent_constants::most_request_size;
-         length -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size)
-        send_cancel(id, begin, bittorrent_constants::most_request_size);
-    send_cancel(id, begin, length);
-    active_piece_.reset();
+    Post([this, self = shared_from(this), id] {
+        if (active_piece_.has_value() &&active_piece_.value().first.index == id) {
+            size_t begin = 0;
+            size_t length = (id == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
+            for (; length > bittorrent_constants::most_request_size;
+                 length -= bittorrent_constants::most_request_size, begin += bittorrent_constants::most_request_size)
+                send_cancel(id, begin, bittorrent_constants::most_request_size);
+            send_cancel(id, begin, length);
+            active_piece_.reset();
+        }
+    });
 }
 
 void network::PeerClient::access() {
-    GetPeerBitfield() = std::move(bittorrent::Bitfield(GetOwnerBitfield().Size()));
+    GetPeerBitfield() = std::move(bittorrent::Bitfield(master_peer_.GetBitfield().bits.Size()));
 
     LOG(GetStrIP(), " was connected!");
 
@@ -321,10 +337,10 @@ void network::PeerClient::send_msg(SendPeerData data) {
     if (is_disconnected) return;
 
     data.EncodeHeader();
-    auto type = data.Type();
+    //    auto type = data.Type();
     Send(
         std::move(data),
-        [this, type](size_t xfr) {
+        [this](size_t xfr) {
             //            LOG(GetStrIP(), " : data of type ", xfr > bittorrent::header_length ? bittorrent::type_by_id_.at(type) : "
             //            keep-alive ", " successfully sent");
             remind_about_self();
@@ -399,10 +415,10 @@ void network::PeerClient::send_bitfield() {
     using namespace bittorrent;
 
     SendPeerData msg;
-    const auto &bitfs = GetOwnerBitfield();
-    const auto bytesToSend = (size_t)ceil((float)GetOwnerBitfield().Size() / 8.0f);
+    const auto &bitfs = master_peer_.GetBitfield().bits;
+    const auto bytesToSend = (size_t)ceil((float)master_peer_.GetBitfield().bits.Size() / 8.0f);
     msg << bitfield;
-    auto bits_like_bytes = GetOwnerBitfield().GetCast();
+    auto bits_like_bytes = master_peer_.GetBitfield().bits.GetCast();
     msg.CopyFrom(bits_like_bytes.data(), bytesToSend);
 
     send_msg(std::move(msg));

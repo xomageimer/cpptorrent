@@ -18,7 +18,7 @@ namespace bittorrent_constants {
     const size_t byte_size = 8;
     [[maybe_unused]] const size_t most_request_size = std::pow(2, 14);
     const int MAX_AVAILABLE_UNCHOKE_ONE_TIME = 35;
-    const int REQUEST_MAX_QUEUE_SIZE = 80;
+    const int REQUEST_MAX_QUEUE_SIZE = 150;
 
     const size_t END_GAME_STARTED_FROM = 92;
     static_assert(END_GAME_STARTED_FROM >= 0 && END_GAME_STARTED_FROM < 100);

@@ -137,6 +137,8 @@ namespace network {
         asio::deadline_timer timeout_;
 
         boost::asio::streambuf read_streambuff_;
+
+        std::mutex queue_mut_;
         std::list<SendAnyData> queue_send_buff_;
     };
 
@@ -146,10 +148,16 @@ namespace network {
         using base_type::base_type;
 
         void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+            std::unique_lock lock(queue_mut_);
             auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
+            lock.unlock();
+
             Post([=, self = shared_from_this()] {
                 async_write(socket_, asio::buffer(it->GetBufferData()), [=, self = self](error_code ec, size_t xfr) {
+                    std::unique_lock lock(queue_mut_);
                     queue_send_buff_.erase(it);
+                    lock.unlock();
+
                     if (!ec) {
                         write_callback(xfr);
                     } else {
@@ -216,12 +224,18 @@ namespace network {
         using base_type::base_type;
 
         void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+            std::unique_lock lock(queue_mut_);
             auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
+            lock.unlock();
+
             Post([=, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
                 socket_.async_send_to(asio::buffer(it->GetBufferData()), *endpoint_ptr,
                     [=, self = self](error_code ec, size_t xfr) {
+                        std::unique_lock lock(queue_mut_);
                         queue_send_buff_.erase(it);
+                        lock.unlock();
+
                         if (!ec) {
                             write_callback(xfr);
                         } else {
