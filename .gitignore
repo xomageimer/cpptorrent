@@ -43,6 +43,7 @@
 *.vcxproj.user
 *.idea
 cmake-build-debug
+cmake-build-release
 BuildPart1
 BuildPart2
 /Debug
