@@ -35,6 +35,8 @@ namespace bittorrent {
 
         explicit TorrentFilesManager(Torrent &torrent, std::filesystem::path, size_t thread_count = 1);
 
+        ~TorrentFilesManager() { is_quit_.store(true); }
+
         void Process() { a_worker_.Start(); }
 
         [[nodiscard]] long double GetFilesSize() const { return total_size_GB_; }; // GigaBytes
@@ -76,7 +78,7 @@ namespace bittorrent {
 
         std::map<piece_index, std::vector<FileInfo>> pieces_by_files_;
 
-        std::map<std::filesystem::path, std::mutex> files_muts_;
+        std::atomic_bool is_quit_ = false;
 
         AsyncWorker a_worker_;
 

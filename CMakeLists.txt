@@ -26,10 +26,11 @@ add_library(helpers SHARED src/utils/constants.h
         src/utils/AsyncWorker.h src/utils/AsyncWorker.cpp
         src/utils/move_function.h)
 
-add_library(bittorrent STATIC
+add_library(network STATIC
         src/Network/Primitives/Socket.h
-        src/Network/Primitives/Message.h src/Network/Primitives/Message.cpp
+        src/Network/Primitives/Message.h src/Network/Primitives/Message.cpp)
 
+add_library(bittorrent STATIC
         src/Network/BitTorrent/TrackerRequester.h src/Network/BitTorrent/TrackerRequester.cpp
         src/Network/BitTorrent/PeerClient.h src/Network/BitTorrent/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
 
@@ -42,13 +43,14 @@ add_library(bittorrent STATIC
         src/BitTorrent/TorrentFilesManager.cpp)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
-target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} helpers bencode)
+target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} network helpers bencode)
 
 if (WIN32)
     target_link_libraries(bittorrent PUBLIC -lws2_32 -lwsock32)
 endif ()
 
 add_executable(cpptorrent src/main_bittorrent.cpp)
+add_executable(cppDHT src/main_DHT.cpp)
 
 include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils dependence/BigInteger-master/src/header)
-target_link_libraries(cpptorrent PUBLIC bittorrent bencode helpers)
+target_link_libraries(cpptorrent PUBLIC bittorrent helpers)

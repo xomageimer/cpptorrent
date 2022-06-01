@@ -138,8 +138,9 @@ void network::httpRequester::Connect(const bittorrent::Query &query) {
     auto str = msg_is.str();
     msg_.CopyFrom(reinterpret_cast<const uint8_t *>(str.data()), str.size());
 
+    auto port = !tracker_.GetUrl().Port.empty() ? tracker_.GetUrl().Port : "http";
     TCPSocket::Connect(
-        tracker_.GetUrl().Host, tracker_.GetUrl().Port, [this]() mutable { do_request(); },
+        tracker_.GetUrl().Host, port, [this]() mutable { do_request(); },
         [this](boost::system::error_code ec) { SetException(ec.message()); });
     Await(connect_waiting_);
 
