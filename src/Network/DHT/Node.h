@@ -7,13 +7,17 @@
 #include "bitfield.h"
 #include "Primitives/Socket.h"
 
-namespace network::dht {
+namespace network {
     using GUID = Bitfield;
+
     enum class status {
         DISABLED,
         ENABLED
     };
+
     struct NodeInfo {
+        NodeInfo();
+
         explicit NodeInfo(uint32_t ip, uint32_t port);
 
         GUID id{dht_constants::SHA1_SIZE_BITS};
@@ -27,19 +31,18 @@ namespace network::dht {
 
     struct Node : public NodeInfo, public network::UDPSocket {
     public:
+        using OnFailedCallback = std::function<void()>;
+
         Node(uint32_t ip, uint32_t port, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor)
             : NodeInfo(ip, port), UDPSocket(executor) {}
 
-        template <typename Handler> void Ping(Handler && on_failed) {
-
-            // TODO если не вышло, то делаем on_failed, а ѕќ—Ћ≈ него помечаем status как DISABLED
-        }
+        void Ping(OnFailedCallback on_failed);
 
         [[nodiscard]] bool IsAlive() const;
 
     private:
         status status_ = status::ENABLED;
     };
-} // namespace netwrok::dht
+} // namespace network::dht
 
 #endif // CPPTORRENT_NODE_H

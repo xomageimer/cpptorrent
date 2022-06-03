@@ -38,6 +38,7 @@ namespace bittorrent_constants {
 
 namespace dht_constants {
     const size_t KBuckets_deep = 8;
+    const size_t max_nearest_nodes = 35;
     const size_t key_size = 100;
     const size_t SHA1_SIZE_BITS = 20 * bittorrent_constants::byte_size;
     const boost::posix_time::seconds bucket_refresh_interval{900};

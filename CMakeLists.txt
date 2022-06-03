@@ -45,13 +45,16 @@ add_library(bittorrent STATIC
         src/BitTorrent/TorrentFilesManager.cpp)
 
 add_library(dht STATIC
+        src/Network/DHT/Server.h src/Network/DHT/Server.cpp
+        src/Network/DHT/Master.h src/Network/DHT/Master.cpp
         src/Network/DHT/Node.h src/Network/DHT/Node.cpp
-        src/Network/DHT/Kbucket.h src/Network/DHT/Kbucket.cpp
-        src/Network/DHT/RouteTable.h src/Network/DHT/RouteTable.cpp
-        src/Network/DHT/Server.h src/Network/DHT/Server.cpp)
+
+        src/DHT/Kbucket.h src/DHT/Kbucket.cpp
+        src/DHT/RouteTable.h src/DHT/RouteTable.cpp)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} network helpers bencode)
+target_link_libraries(dht PUBLIC ${Boost_LIBRARIES} network helpers bencode)
 
 if (WIN32)
     target_link_libraries(bittorrent PUBLIC -lws2_32 -lwsock32)
@@ -64,4 +67,4 @@ add_executable(cppdht src/main_dht.cpp)
 include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils dependence/BigInteger-master/src/header)
 
 target_link_libraries(cpptorrent PUBLIC bittorrent helpers)
-target_link_libraries(cppdht PUBLIC dht helpers bencode)
+target_link_libraries(cppdht PUBLIC dht helpers)

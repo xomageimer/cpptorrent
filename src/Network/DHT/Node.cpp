@@ -2,7 +2,12 @@
 
 using namespace network;
 
-dht::NodeInfo::NodeInfo(uint32_t ip, uint32_t port) : ip(ip), port(port) {
+network::NodeInfo::NodeInfo(uint32_t arg_ip, uint32_t arg_port) : NodeInfo() {
+    ip = arg_ip;
+    port = arg_port;
+}
+
+network::NodeInfo::NodeInfo() {
     std::string str;
     for (size_t i = 0; i < dht_constants::key_size; ++i) {
         str.push_back(random_generator::Random().GetNumber<char>());
@@ -12,6 +17,10 @@ dht::NodeInfo::NodeInfo(uint32_t ip, uint32_t port) : ip(ip), port(port) {
     assert(id.Size() == dht_constants::SHA1_SIZE_BITS);
 }
 
-[[nodiscard]] bool dht::Node::IsAlive() const {
+void network::Node::Ping(network::Node::OnFailedCallback on_failed) {
+    // TODO если не вышло, то делаем on_failed, а ѕќ—Ћ≈ него помечаем status как DISABLED
+}
+
+[[nodiscard]] bool network::Node::IsAlive() const {
     return status_ == status::ENABLED;
 }

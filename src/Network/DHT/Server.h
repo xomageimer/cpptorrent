@@ -2,7 +2,7 @@
 #define CPPTORRENT_SERVER_H
 
 namespace network {
-    class Server {};
+    class DHTServer {};
 } // namespace network
 
 #endif // CPPTORRENT_SERVER_H
