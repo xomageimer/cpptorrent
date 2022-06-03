@@ -11,7 +11,7 @@
 #include <shared_mutex>
 #include <mutex>
 
-#include "AsyncWorker.h"
+#include "async_worker.h"
 #include "Primitives/ManagerRequests.h"
 #include "Primitives/Piece.h"
 

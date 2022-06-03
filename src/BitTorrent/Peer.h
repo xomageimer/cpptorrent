@@ -11,7 +11,7 @@
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 
-#include "Primitives/Bitfield.h"
+#include "bitfield.h"
 
 #include "constants.h"
 #include "bencode_lib.h"
@@ -44,16 +44,16 @@ namespace bittorrent {
 
         [[nodiscard]] size_t GetIP() const { return ip; }
 
-        [[nodiscard]] bittorrent::Bitfield &GetBitfield() { return bitfield_; }
+        [[nodiscard]] Bitfield & GetBitfield() { return bitfield_; }
 
-        [[nodiscard]] const bittorrent::Bitfield &GetBitfield() const { return bitfield_; }
+        [[nodiscard]] const Bitfield & GetBitfield() const { return bitfield_; }
 
     protected:
         uint8_t id[20];
         uint32_t ip{};
         uint16_t port{};
 
-        bittorrent::Bitfield bitfield_{0};
+        Bitfield bitfield_{0};
     };
 
     struct PeerImage {
@@ -114,12 +114,12 @@ namespace bittorrent {
 
         struct UniqueAccess {
             std::unique_lock<std::shared_mutex> lock;
-            bittorrent::Bitfield & bits;
+            Bitfield& bits;
         };
 
         struct SharedAccess {
             std::shared_lock<std::shared_mutex> lock;
-            const bittorrent::Bitfield & bits;
+            const Bitfield& bits;
         };
 
         [[nodiscard]] UniqueAccess GetBitfield();

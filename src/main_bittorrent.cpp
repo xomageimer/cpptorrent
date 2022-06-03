@@ -43,6 +43,17 @@ int main(int argc, char *argv[]) {
         }
     };
 
+//    std::shared_ptr<bittorrent::MasterPeer> mp;
+//    bittorrent::Peer peer_struct {(uint32_t)IpToInt("5.35.74.31"), 2001};
+//    std::shared_ptr<network::PeerClient> pc = std::make_shared<network::PeerClient>(mp, peer_struct, ba::make_strand(service));
+//    pc->Process();
+//
+//    char f;
+//    std::cin >> f;
+//
+//    service_exit();
+//    return 0;
+
     std::string torrent_dir = argv[1];
     std::string output_dir = std::filesystem::current_path().string();
         if (argc > 2)

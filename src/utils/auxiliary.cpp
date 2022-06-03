@@ -58,12 +58,18 @@ std::string UrlEncode(const std::string &url_to_encode) {
 }
 
 int IpToInt(const std::string &ip_address) {
-    //    int iip = 0;
-    //    for (auto const & el : ip_address) {
-    //        iip <<= 8;
-    //
-    //    }
-    return 0;
+    int res{};
+    std::istringstream ssin(ip_address);
+    int val{};
+    char delim{};
+
+    do {
+        ssin >> val;
+        res <<= CHAR_BIT;
+        res |= val;
+    } while (ssin >> delim);
+
+    return res;
 }
 
 std::string IpToStr(size_t ip) {

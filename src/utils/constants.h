@@ -29,11 +29,18 @@ namespace bittorrent_constants {
     const boost::posix_time::seconds tracker_again_request_time_secs{900};
     const boost::posix_time::seconds piece_waiting_time{15};
     const boost::posix_time::minutes waiting_time{boost::posix_time::minutes(2)};
-    const boost::posix_time::minutes keep_alive_time {boost::posix_time::minutes(1)};
-    const std::chrono::minutes sleep_time {std::chrono::minutes(3)};
+    const boost::posix_time::minutes keep_alive_time{boost::posix_time::minutes(1)};
+    const std::chrono::seconds sleep_time{std::chrono::seconds(15)};
 
     const int MAX_CONNECT_ATTEMPTS = 4;
     const int MAX_ANNOUNCE_ATTEMPTS = 3;
 } // namespace bittorrent_constants
+
+namespace dht_constants {
+    const size_t KBuckets_deep = 8;
+    const size_t key_size = 100;
+    const size_t SHA1_SIZE_BITS = 20 * bittorrent_constants::byte_size;
+    const boost::posix_time::seconds bucket_refresh_interval{900};
+} // namespace dht_constants
 
 #endif // CPPTORRENT_CONSTANTS_H

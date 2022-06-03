@@ -1,5 +1,5 @@
-#ifndef CPPTORRENT_ASYNCWORKER_H
-#define CPPTORRENT_ASYNCWORKER_H
+#ifndef CPPTORRENT_ASYNC_WORKER_H
+#define CPPTORRENT_ASYNC_WORKER_H
 
 #include <functional>
 #include <vector>
@@ -53,4 +53,4 @@ private:
     std::atomic_bool stopped_ = true;
 };
 
-#endif // CPPTORRENT_ASYNCWORKER_H
+#endif // CPPTORRENT_ASYNC_WORKER_H

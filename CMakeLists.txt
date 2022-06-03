@@ -16,14 +16,17 @@ endif ()
 
 find_package(Boost 1.71.0 COMPONENTS system regex thread REQUIRED)
 
+
 add_compile_definitions(FILE_LOGGER)
+
 
 add_library(bencode SHARED src/utils/bencode_lib.cpp src/utils/bencode_lib.h)
 add_library(helpers SHARED src/utils/constants.h
         src/utils/auxiliary.cpp src/utils/auxiliary.h
         src/utils/random_generator.cpp src/utils/random_generator.h
         src/utils/logger.cpp src/utils/logger.h
-        src/utils/AsyncWorker.h src/utils/AsyncWorker.cpp
+        src/utils/async_worker.h src/utils/async_worker.cpp
+        src/utils/bitfield.h src/utils/bitfield.cpp
         src/utils/move_function.h)
 
 add_library(network STATIC
@@ -34,7 +37,6 @@ add_library(bittorrent STATIC
         src/Network/BitTorrent/TrackerRequester.h src/Network/BitTorrent/TrackerRequester.cpp
         src/Network/BitTorrent/PeerClient.h src/Network/BitTorrent/PeerClient.cpp src/Network/Listener.h src/Network/Listener.cpp
 
-        src/BitTorrent/Primitives/Bitfield.h src/BitTorrent/Primitives/Bitfield.cpp
         src/BitTorrent/Primitives/Piece.h src/BitTorrent/Primitives/Piece.cpp
         src/BitTorrent/Primitives/ManagerRequests.h
         src/BitTorrent/Primitives/BittorrentStrategy.h src/BitTorrent/Primitives/BittorrentStrategy.cpp
@@ -42,15 +44,24 @@ add_library(bittorrent STATIC
         src/BitTorrent/Tracker.cpp src/BitTorrent/Torrent.cpp src/BitTorrent/Peer.cpp
         src/BitTorrent/TorrentFilesManager.cpp)
 
+add_library(dht STATIC
+        src/Network/DHT/Node.h src/Network/DHT/Node.cpp
+        src/Network/DHT/Kbucket.h src/Network/DHT/Kbucket.cpp
+        src/Network/DHT/RouteTable.h src/Network/DHT/RouteTable.cpp
+        src/Network/DHT/Server.h src/Network/DHT/Server.cpp)
+
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} network helpers bencode)
 
 if (WIN32)
     target_link_libraries(bittorrent PUBLIC -lws2_32 -lwsock32)
+    target_link_libraries(dht PUBLIC -lws2_32 -lwsock32)
 endif ()
 
 add_executable(cpptorrent src/main_bittorrent.cpp)
-add_executable(cppDHT src/main_DHT.cpp)
+add_executable(cppdht src/main_dht.cpp)
 
 include_directories(${Boost_INCLUDE_DIR} src/Network contrib/boostorg/include/boost src/BitTorrent src/utils dependence/BigInteger-master/src/header)
+
 target_link_libraries(cpptorrent PUBLIC bittorrent helpers)
+target_link_libraries(cppdht PUBLIC dht helpers bencode)

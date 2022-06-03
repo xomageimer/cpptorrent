@@ -51,6 +51,18 @@ void bittorrent::TorrentFilesManager::fill_files() {
         total_size_GB_ = BytesToGiga(bytes_size);
         long long file_beg = 0;
         auto cur_file_path = path_to_download_ / file_info["name"].AsString();
+
+        if (!std::filesystem::exists(cur_file_path.parent_path())) {
+            std::filesystem::create_directories(cur_file_path.parent_path());
+        }
+        std::fstream file_stream(cur_file_path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out);;
+        if (!file_stream.is_open()) {
+            file_stream.open(cur_file_path, std::ios::binary | std::ios_base::out | std::ios_base::trunc);
+            file_stream.seekp(bytes_size - 1, std::ios::beg);
+            file_stream.write("", 1);
+            file_stream.close();
+        } else file_stream.close();
+
         size_t i = 0;
         for (; i < torrent_.GetPieceCount(); i++) {
             pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, file_beg, static_cast<long long>(piece_size_)});
@@ -71,7 +83,10 @@ void bittorrent::TorrentFilesManager::fill_files() {
             }
             auto bytes_size = file["length"].AsNumber();
 
-            std::fstream file_stream(cur_file_path, std::ios::binary | std::ios_base::in | std::ios_base::out);;
+            if (!std::filesystem::exists(cur_file_path.parent_path())) {
+                std::filesystem::create_directories(cur_file_path.parent_path());
+            }
+            std::fstream file_stream(cur_file_path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out);
             if (!file_stream.is_open()) {
                 file_stream.open(cur_file_path, std::ios::binary | std::ios_base::out | std::ios_base::trunc);
                 file_stream.seekp(bytes_size - 1, std::ios::beg);
@@ -112,9 +127,6 @@ void bittorrent::TorrentFilesManager::WritePieceToFile(Piece piece) {
     auto &files = pieces_by_files_.at(piece.index);
 
     for (auto &file : files) {
-        if (!std::filesystem::exists(file.path.parent_path())) {
-            std::filesystem::create_directories(file.path.parent_path());
-        }
         std::ofstream file_stream(file.path.string(), std::ios::binary | std::ios_base::in | std::ios_base::out);
         if (!file_stream.is_open())
         {

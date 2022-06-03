@@ -71,7 +71,11 @@ void network::PeerClient::Process() {
         Post([this] { verify_handshake(); });
     } else {
         Connect(GetStrIP(), std::to_string(slave_peer_.GetPort()), std::bind(&PeerClient::send_handshake, this),
-            std::bind(&PeerClient::try_again_connect, this));
+            [=](boost::system::error_code ec) {
+//                SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+//                std::cerr << GetStrIP() << " : " << ec.message() << std::endl;
+                try_again_connect();
+            });
         Await(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
     }
 }
@@ -162,7 +166,7 @@ void network::PeerClient::do_read_body() {
 }
 
 void network::PeerClient::ClearAndTryRequest() {
-    Post([this, self = shared_from(this)]{
+    Post([this, self = shared_from(this)] {
         active_piece_.reset();
         TryToRequestPiece();
     });
@@ -250,7 +254,7 @@ void network::PeerClient::UnbindRequest(size_t id) {
 
 void network::PeerClient::cancel_piece(uint32_t id) {
     Post([this, self = shared_from(this), id] {
-        if (active_piece_.has_value() &&active_piece_.value().first.index == id) {
+        if (active_piece_.has_value() && active_piece_.value().first.index == id) {
             size_t begin = 0;
             size_t length = (id == master_peer_.GetTotalPiecesCount() - 1) ? GetTorrent().GetLastPieceSize() : GetTorrent().GetPieceSize();
             for (; length > bittorrent_constants::most_request_size;
@@ -263,7 +267,7 @@ void network::PeerClient::cancel_piece(uint32_t id) {
 }
 
 void network::PeerClient::access() {
-    GetPeerBitfield() = std::move(bittorrent::Bitfield(master_peer_.GetBitfield().bits.Size()));
+    GetPeerBitfield() = std::move(Bitfield(master_peer_.GetBitfield().bits.Size()));
 
     LOG(GetStrIP(), " was connected!");
 

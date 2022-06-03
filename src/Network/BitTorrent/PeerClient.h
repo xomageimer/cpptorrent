@@ -2,9 +2,6 @@
 #define CPPTORRENT_PEERCLIENT_H
 
 #include <boost/asio.hpp>
-#define BOOST_THREAD_PROVIDES_FUTURE
-#define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
-#define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #include <boost/regex.hpp>
 #include <boost/thread.hpp>
 #include <memory>
@@ -18,7 +15,7 @@
 
 #include "Primitives/BittorrentStrategy.h"
 #include "Primitives/Message.h"
-#include "Primitives/Bitfield.h"
+#include "bitfield.h"
 #include "Primitives/Piece.h"
 
 #include "auxiliary.h"
@@ -70,7 +67,7 @@ namespace network {
 
         std::string GetStrIP() const;
 
-        bittorrent::Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
+        Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
 
         bittorrent::Torrent &GetTorrent() { return master_peer_.GetTorrent(); }
 

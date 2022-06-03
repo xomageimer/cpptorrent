@@ -230,18 +230,17 @@ namespace network {
 
             Post([=, self = shared_from_this()] {
                 auto endpoint_ptr = std::make_shared<asio::ip::udp::endpoint>(*endpoint_iter_);
-                socket_.async_send_to(asio::buffer(it->GetBufferData()), *endpoint_ptr,
-                    [=, self = self](error_code ec, size_t xfr) {
-                        std::unique_lock lock(queue_mut_);
-                        queue_send_buff_.erase(it);
-                        lock.unlock();
+                socket_.async_send_to(asio::buffer(it->GetBufferData()), *endpoint_ptr, [=, self = self](error_code ec, size_t xfr) {
+                    std::unique_lock lock(queue_mut_);
+                    queue_send_buff_.erase(it);
+                    lock.unlock();
 
-                        if (!ec) {
-                            write_callback(xfr);
-                        } else {
-                            error_callback(ec);
-                        }
-                    });
+                    if (!ec) {
+                        write_callback(xfr);
+                    } else {
+                        error_callback(ec);
+                    }
+                });
             });
         }
 

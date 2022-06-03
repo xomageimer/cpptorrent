@@ -6,7 +6,7 @@
 #include <cctype>
 
 #include "Piece.h"
-#include "Bitfield.h"
+#include "bitfield.h"
 #include "Peer.h"
 
 #include "logger.h"
@@ -19,8 +19,6 @@ namespace network {
 namespace bittorrent {
     // default strategy
     struct BittorrentStrategy {
-        BittorrentStrategy();
-
         virtual std::optional<size_t> ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh);
 
         void OnBlockReadyToSend(std::shared_ptr<network::PeerClient> peer, uint32_t pieceIdx, uint32_t offset, Block block);
@@ -48,7 +46,7 @@ namespace bittorrent {
         virtual void OnPort([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t) { return; };
 
     protected:
-        std::chrono::steady_clock::time_point start_;
+        std::optional<std::chrono::steady_clock::time_point> start_;
 
         std::mutex out_mutex;
     };
@@ -61,7 +59,7 @@ namespace bittorrent {
         void OnPieceBlock([[maybe_unused]] std::shared_ptr<network::PeerClient>, uint32_t, uint32_t, const uint8_t *, uint32_t) override;
 
     private:
-        bool end_game_ = false;
+        std::atomic_bool end_game_ = false;
     };
 } // namespace bittorrent
 

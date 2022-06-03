@@ -4,12 +4,9 @@
 #include "BitTorrent/PeerClient.h"
 #include "random_generator.h"
 
-bittorrent::BittorrentStrategy::BittorrentStrategy() {
-    start_ = std::chrono::steady_clock::now();
-}
 
 std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh) {
-    bittorrent::Bitfield available_bitfield;
+    Bitfield available_bitfield;
     {
         auto owner = peer_owner.GetBitfield();
         available_bitfield = GetMismatchedBitfield(owner.bits, peer_neigh.GetBitfield());
@@ -30,22 +27,26 @@ std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &pe
 
 void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t id, Torrent &torrent) {
     std::lock_guard<std::mutex> lock(out_mutex);
+    if (!start_){
+        start_ = std::chrono::steady_clock::now();
+    }
+
     size_t total_piece_count = torrent.GetPieceCount();
     size_t pieces_already_downloaded = torrent.DownloadedPieceCount();
     auto percent = (double)pieces_already_downloaded / ((double)total_piece_count / 100.f);
     std::cerr << '\r' << std::setfill(' ') << std::setw(4);
     std::cout << std::fixed << std::setprecision(2) << percent << "%"
               << " downloaded"
-              << "(" << torrent.ActivePeersCount() << " peers-distributors)";
+              << "(in " <<  std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count() << " seconds with " << torrent.ActivePeersCount() << " peers-distributors)";
     LOG(pieces_already_downloaded, " out of ", total_piece_count, " pieces downloaded after ",
-        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count(), " seconds from starting");
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count(), " seconds from starting");
 
     if (total_piece_count == pieces_already_downloaded) {
         LOG("File(s) successfully downloaded in ",
-            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count(), " seconds");
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count(), " seconds");
         std::cerr << std::endl
                   << "File(s) downloaded in "
-                  << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start_).count() << " seconds"
+                  << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count() << " seconds"
                   << std::endl;
     }
 }
@@ -185,12 +186,13 @@ void bittorrent::BittorrentStrategy::OnBlockReadyToSend(
 void bittorrent::OptimalStrategy::OnPieceDownloaded(size_t id, bittorrent::Torrent &torrent) {
     {
         std::lock_guard<std::mutex> lock(out_mutex);
-        if (!end_game_) {
+        if (!end_game_.load()) {
             size_t total_piece_count = torrent.GetPieceCount();
             size_t pieces_already_downloaded = torrent.DownloadedPieceCount();
             auto percent = (double)pieces_already_downloaded / ((double)total_piece_count / 100.f);
             if (percent >= bittorrent_constants::END_GAME_STARTED_FROM) {
-                end_game_ = true;
+                end_game_.store(true);
+                std::cerr << "end game started" << std::endl;
             }
         } else {
             torrent.GetRootPeer()->CancelPiece(id);
@@ -200,7 +202,7 @@ void bittorrent::OptimalStrategy::OnPieceDownloaded(size_t id, bittorrent::Torre
 }
 
 std::optional<size_t> bittorrent::OptimalStrategy::ChoosePiece(bittorrent::MasterPeer &peer_owner, const bittorrent::Peer &peer_neigh) {
-    bittorrent::Bitfield available_bitfield;
+    Bitfield available_bitfield;
     {
         auto owner = peer_owner.GetBitfield();
         available_bitfield = GetMismatchedBitfield(owner.bits, peer_neigh.GetBitfield());
@@ -210,13 +212,13 @@ std::optional<size_t> bittorrent::OptimalStrategy::ChoosePiece(bittorrent::Maste
 
     std::vector<uint32_t> pieces_ids;
     for (size_t i = 0; i < available_bitfield.Size(); i++) {
-        if (available_bitfield.Test(i) && (end_game_ || !peer_owner.IsPieceRequested(i))) pieces_ids.push_back(i);
+        if (available_bitfield.Test(i) && (end_game_.load() || !peer_owner.IsPieceRequested(i))) pieces_ids.push_back(i);
     }
     if (pieces_ids.empty()) return std::nullopt;
 
     auto chosen_piece = pieces_ids[random_generator::Random().GetNumberBetween<size_t>(0, pieces_ids.size() - 1)];
 
-    if (!end_game_) peer_owner.MarkRequestedPiece(chosen_piece);
+    if (!end_game_.load()) peer_owner.MarkRequestedPiece(chosen_piece);
 
     return chosen_piece;
 }
@@ -235,7 +237,7 @@ void bittorrent::OptimalStrategy::OnPieceBlock(
         return;
     }
 
-    if (!end_game_ && !peer->PieceRequested(index)) {
+    if (!end_game_.load() && !peer->PieceRequested(index)) {
         LOG(peer->GetStrIP(), " : received piece ", index, " which didn't asked");
         return;
     }

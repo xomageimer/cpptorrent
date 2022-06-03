@@ -24,7 +24,7 @@ public:
 
         std::string line{};
         for (; std::getline(ss, line);) {
-            (*os_ptr) << '\t' << line << std::endl;
+            (*os_ptr) << '\t' << line << '\n';
         }
         (*os_ptr) << std::endl;
     }
