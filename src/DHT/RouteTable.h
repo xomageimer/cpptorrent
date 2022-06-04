@@ -5,7 +5,7 @@
 
 #include <utility>
 
-#include "DHT/Node.h"
+#include "DHT/NodeClient.h"
 #include "Kbucket.h"
 
 namespace dht {
@@ -14,7 +14,7 @@ namespace dht {
         using NodeType = Kbucket::NodeType;
         using RouteTableType = std::vector<Kbucket>;
 
-        explicit RouteTable(network::NodeInfo & master_ni, boost::asio::io_service & serv) : master_(master_ni), service_(serv) { buckets_.reserve(dht_constants::SHA1_SIZE_BITS); }
+        explicit RouteTable(dht::Node & master_ni, boost::asio::io_service & serv) : master_(master_ni), service_(serv) { buckets_.reserve(dht_constants::SHA1_SIZE_BITS); }
 
         void InsertNode(NodeType node);
 
@@ -22,16 +22,16 @@ namespace dht {
 
         size_t FindBucket(GUID const & id);
 
-        size_t FindBucket(network::NodeInfo const &ni);
+        size_t FindBucket(dht::Node const &ni);
 
-        [[nodiscard]] const network::NodeInfo & GetMasterInfo() const;
+        [[nodiscard]] const dht::Node & GetMasterInfo() const;
 
         [[nodiscard]] boost::asio::io_service & GetService() const { return service_; }
 
     private:
         bool try_to_split();
 
-        network::NodeInfo & master_;
+        dht::Node & master_;
 
         boost::asio::io_service & service_;
 

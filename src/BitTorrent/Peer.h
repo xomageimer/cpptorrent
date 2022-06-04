@@ -38,21 +38,40 @@ namespace bittorrent {
 
         [[maybe_unused]] explicit Peer(const uint8_t *key_arg);
 
+        Peer(const Peer &);
+
+        Peer& operator=(const Peer &);
+
+        Peer(Peer &&) noexcept;
+
+        Peer& operator=(Peer &&) noexcept;
+
         [[nodiscard]] const uint8_t *GetID() const { return id; }
 
         [[nodiscard]] virtual uint16_t GetPort() const { return port; }
 
         [[nodiscard]] size_t GetIP() const { return ip; }
 
-        [[nodiscard]] Bitfield & GetBitfield() { return bitfield_; }
+        struct UniqueAccess {
+            std::unique_lock<std::shared_mutex> lock;
+            Bitfield &bits;
+        };
 
-        [[nodiscard]] const Bitfield & GetBitfield() const { return bitfield_; }
+        struct SharedAccess {
+            std::shared_lock<std::shared_mutex> lock;
+            const Bitfield &bits;
+        };
+
+        [[nodiscard]] UniqueAccess GetBitfield();
+
+        [[nodiscard]] SharedAccess GetBitfield() const;
 
     protected:
         uint8_t id[20];
         uint32_t ip{};
         uint16_t port{};
 
+        mutable std::shared_mutex bitfield_mut_;
         Bitfield bitfield_{0};
     };
 
@@ -112,20 +131,6 @@ namespace bittorrent {
 
         [[nodiscard]] size_t DistributorsCount() const;
 
-        struct UniqueAccess {
-            std::unique_lock<std::shared_mutex> lock;
-            Bitfield& bits;
-        };
-
-        struct SharedAccess {
-            std::shared_lock<std::shared_mutex> lock;
-            const Bitfield& bits;
-        };
-
-        [[nodiscard]] UniqueAccess GetBitfield();
-
-        [[nodiscard]] SharedAccess GetBitfield() const;
-
     private:
         void MakeHandshake();
 
@@ -135,11 +140,10 @@ namespace bittorrent {
         bittorrent::Torrent &torrent_;
 
         mutable std::shared_mutex mut_;
-        mutable std::shared_mutex bitfield_mut_;
 
         std::unordered_map<IP, std::shared_ptr<network::PeerClient>> peers_subscribers_;
 
-        std::set<size_t> uploaded_pieces_; // ����������� ����� �� ���!
+        std::set<size_t> uploaded_pieces_;  // ����������� ����� �� ���!
         std::set<size_t> requested_pieces_; // ����������� ����� ��� ���!
 
         size_t available_unchoke_count_ = bittorrent_constants::MAX_AVAILABLE_UNCHOKE_ONE_TIME;

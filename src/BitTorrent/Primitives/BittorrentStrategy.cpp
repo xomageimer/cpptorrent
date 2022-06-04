@@ -4,12 +4,12 @@
 #include "BitTorrent/PeerClient.h"
 #include "random_generator.h"
 
-
 std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh) {
     Bitfield available_bitfield;
     {
         auto owner = peer_owner.GetBitfield();
-        available_bitfield = GetMismatchedBitfield(owner.bits, peer_neigh.GetBitfield());
+        auto current = peer_neigh.GetBitfield();
+        available_bitfield = GetMismatchedBitfield(owner.bits, current.bits);
     }
 
     if (!available_bitfield.Popcount()) return std::nullopt;
@@ -27,7 +27,7 @@ std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &pe
 
 void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t id, Torrent &torrent) {
     std::lock_guard<std::mutex> lock(out_mutex);
-    if (!start_){
+    if (!start_) {
         start_ = std::chrono::steady_clock::now();
     }
 
@@ -37,7 +37,8 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t id, Torrent &torre
     std::cerr << '\r' << std::setfill(' ') << std::setw(4);
     std::cout << std::fixed << std::setprecision(2) << percent << "%"
               << " downloaded"
-              << "(in " <<  std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count() << " seconds with " << torrent.ActivePeersCount() << " peers-distributors)";
+              << "(in " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count()
+              << " seconds with " << torrent.ActivePeersCount() << " peers-distributors)";
     LOG(pieces_already_downloaded, " out of ", total_piece_count, " pieces downloaded after ",
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *start_).count(), " seconds from starting");
 
@@ -52,7 +53,7 @@ void bittorrent::BittorrentStrategy::OnPieceDownloaded(size_t id, Torrent &torre
 }
 
 void bittorrent::BittorrentStrategy::OnChoked(std::shared_ptr<network::PeerClient> peer) {
-    peer->Post([=]{
+    peer->Post([=] {
         if (peer->active_piece_.has_value()) {
             peer->UnbindRequest(peer->active_piece_.value().first.index);
             peer->active_piece_.reset();
@@ -91,8 +92,12 @@ void bittorrent::BittorrentStrategy::OnHave(std::shared_ptr<network::PeerClient>
 }
 
 void bittorrent::BittorrentStrategy::OnBitfield(std::shared_ptr<network::PeerClient> peer) {
-    if (GetMismatchedBitfield(peer->master_peer_.GetBitfield().bits, peer->GetPeerBitfield()).Popcount()) {
-        peer->send_interested();
+    {
+        auto owner = peer->master_peer_.GetBitfield();
+        auto current = peer->GetPeerBitfield();
+        if (GetMismatchedBitfield(owner.bits, current.bits).Popcount()) {
+            peer->send_interested();
+        }
     }
     peer->TryToRequestPiece();
 }
@@ -204,7 +209,8 @@ std::optional<size_t> bittorrent::OptimalStrategy::ChoosePiece(bittorrent::Maste
     Bitfield available_bitfield;
     {
         auto owner = peer_owner.GetBitfield();
-        available_bitfield = GetMismatchedBitfield(owner.bits, peer_neigh.GetBitfield());
+        auto current = peer_neigh.GetBitfield();
+        available_bitfield = GetMismatchedBitfield(owner.bits, current.bits);
     }
 
     if (!available_bitfield.Popcount()) return std::nullopt;

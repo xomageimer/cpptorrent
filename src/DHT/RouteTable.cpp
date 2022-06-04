@@ -42,7 +42,7 @@ size_t dht::RouteTable::FindBucket(GUID const &id) {
     return bucket_index;
 }
 
-size_t dht::RouteTable::FindBucket(NodeInfo const &ni) {
+size_t dht::RouteTable::FindBucket(Node const &ni) {
     return FindBucket(ni.id);
 }
 
@@ -54,6 +54,6 @@ bool dht::RouteTable::try_to_split() {
     return false;
 }
 
-const network::NodeInfo &dht::RouteTable::GetMasterInfo() const {
+const dht::Node &dht::RouteTable::GetMasterInfo() const {
     return master_;
 }

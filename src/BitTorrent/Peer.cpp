@@ -31,6 +31,40 @@ bittorrent::Peer::Peer(uint32_t ip_address, uint16_t port_number, const uint8_t 
     port = port_number;
 }
 
+bittorrent::Peer::Peer(const bittorrent::Peer &cpy) : Peer(cpy.ip, cpy.port, cpy.id) {
+    bitfield_ = cpy.bitfield_;
+}
+
+bittorrent::Peer &bittorrent::Peer::operator=(const bittorrent::Peer &cpy) {
+    ip = cpy.ip;
+    port = cpy.port;
+    std::memcpy(id, cpy.id, sizeof cpy.id);
+    bitfield_ = cpy.bitfield_;
+    return *this;
+}
+
+bittorrent::Peer::Peer(bittorrent::Peer &&mv) noexcept : Peer(mv.ip, mv.port, mv.id) {
+    bitfield_ = std::move(mv.bitfield_);
+}
+
+bittorrent::Peer &bittorrent::Peer::operator=(bittorrent::Peer &&mv) noexcept {
+    if (this != &mv) {
+        ip = mv.ip;
+        port = mv.port;
+        std::memcpy(id, mv.id, sizeof mv.id);
+        bitfield_ = std::move(mv.bitfield_);
+    }
+    return *this;
+}
+
+bittorrent::Peer::UniqueAccess bittorrent::Peer::GetBitfield() {
+    return {std::unique_lock{bitfield_mut_}, bitfield_};
+}
+
+bittorrent::Peer::SharedAccess bittorrent::Peer::GetBitfield() const {
+    return {std::shared_lock{bitfield_mut_}, bitfield_};
+}
+
 bittorrent::MasterPeer::MasterPeer(bittorrent::Torrent &tor) : torrent_(tor) {
     bitfield_.Resize(torrent_.GetPieceCount());
     MakeHandshake();
@@ -176,12 +210,4 @@ void bittorrent::MasterPeer::TryToRequestAgain() {
     for (auto &[id, peer] : peers_subscribers_) {
         peer->Post([peer = peer] { peer->TryToRequestPiece(); });
     }
-}
-
-bittorrent::MasterPeer::UniqueAccess bittorrent::MasterPeer::GetBitfield() {
-    return {std::unique_lock{bitfield_mut_}, Peer::GetBitfield()};
-}
-
-bittorrent::MasterPeer::SharedAccess bittorrent::MasterPeer::GetBitfield() const {
-    return {std::shared_lock{bitfield_mut_}, Peer::GetBitfield()};
 }

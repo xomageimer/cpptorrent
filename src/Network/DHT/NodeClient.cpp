@@ -1,42 +1,27 @@
-#include "Node.h"
+#include "NodeClient.h"
 
 #include "Primitives/Message.h"
 
 using namespace network;
 
-network::NodeInfo::NodeInfo() {
-    std::string str;
-    for (size_t i = 0; i < dht_constants::key_size; ++i) {
-        str.push_back(random_generator::Random().GetNumber<char>());
-    }
-    auto sha1 = GetSHA1(str);
-    id = Bitfield(reinterpret_cast<const uint8_t *>(sha1.data()), sha1.size());
-    assert(id.Size() == dht_constants::SHA1_SIZE_BITS);
-}
+NodeClient::NodeClient(uint32_t ip, uint16_t port, dht::Node &master, const asio::strand<boost::asio::io_service::executor_type> &executor)
+    : dht::Node(ip, port), master_node(master), UDPSocket(executor) {}
 
-network::NodeInfo::NodeInfo(uint32_t arg_ip, uint16_t arg_port) : NodeInfo() {
-    ip = arg_ip;
-    port = arg_port;
-}
-
-Node::Node(uint32_t ip, uint16_t port, Master &master, const asio::strand<boost::asio::io_service::executor_type> &executor)
-    : NodeInfo(ip, port), master_node(master), UDPSocket(executor) {}
-
-void Node::Connect() {
+void NodeClient::Connect() {
     UDPSocket::Connect(IpToStr(ip), std::to_string(port), []{}, [](boost::system::error_code ec){});
     Await(bittorrent_constants::connection_waiting_time);
 }
 
-void network::Node::Ping(network::Node::OnFailedCallback on_failed) {
+void network::NodeClient::Ping(network::NodeClient::OnFailedCallback on_failed) {
     // TODO если не вышло, то делаем on_failed, а ѕќ—Ћ≈ него помечаем status как DISABLED
 }
 
-[[nodiscard]] bool network::Node::IsAlive() const {
+[[nodiscard]] bool network::NodeClient::IsAlive() const {
     std::lock_guard lock(status_mut_);
     return status_ == status::ENABLED;
 }
 
-void Node::get_dht_query() {
+void NodeClient::get_dht_query() {
     Read(
         bittorrent_constants::MTU,
         [this, self = shared_from(this)](const bittorrent::ReceivingMessage &data) {

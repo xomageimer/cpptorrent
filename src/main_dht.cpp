@@ -15,7 +15,7 @@ int main() {
     dht::RouteTable rt{service};
 
     for (size_t i = 0; i < 100; i++){
-        std::shared_ptr<network::Node> node = std::make_shared<network::Node>(random_generator::Random().GetNumber<uint32_t>(), random_generator::Random().GetNumber<uint16_t>(), boost::asio::make_strand(service));
+        std::shared_ptr<network::NodeClient> node = std::make_shared<network::NodeClient>(random_generator::Random().GetNumber<uint32_t>(), random_generator::Random().GetNumber<uint16_t>(), boost::asio::make_strand(service));
         rt.InsertNode(node);
     }
 

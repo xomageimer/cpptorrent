@@ -8,7 +8,7 @@
 #include <list>
 #include <optional>
 
-#include "DHT/Node.h"
+#include "DHT/NodeClient.h"
 
 #include "constants.h"
 #include "bitfield.h"
@@ -19,7 +19,7 @@ namespace dht {
 
     struct Kbucket {
     public:
-        using NodeType = std::shared_ptr<network::Node>;
+        using NodeType = std::shared_ptr<network::NodeClient>;
         using BucketType = std::list<NodeType>;
         using ConstIterType = BucketType::const_iterator;
         using IterType = BucketType::iterator;
@@ -42,13 +42,13 @@ namespace dht {
 
         void ResetNode(NodeType n);
 
-        [[nodiscard]] bool Exist(const network::NodeInfo &ni) const;
+        [[nodiscard]] bool Exist(const Node &ni) const;
 
-        [[nodiscard]] std::optional<NodeType> GetNode(const network::NodeInfo &ni);
+        [[nodiscard]] std::optional<NodeType> GetNode(const Node &ni);
 
         [[nodiscard]] size_t Size() const;
 
-        void Kick(const network::NodeInfo &ni);
+        void Kick(const Node &ni);
 
         Kbucket SplitTheBucket(size_t by_id);
 
@@ -63,9 +63,9 @@ namespace dht {
 
         void update_time();
 
-        [[nodiscard]] IterType find_node(const network::NodeInfo &id);
+        [[nodiscard]] IterType find_node(const Node &id);
 
-        [[nodiscard]] ConstIterType find_node(const network::NodeInfo &id) const;
+        [[nodiscard]] ConstIterType find_node(const Node &id) const;
 
         const RouteTable & table_;
 

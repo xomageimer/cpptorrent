@@ -72,8 +72,8 @@ void network::PeerClient::Process() {
     } else {
         Connect(GetStrIP(), std::to_string(slave_peer_.GetPort()), std::bind(&PeerClient::send_handshake, this),
             [=](boost::system::error_code ec) {
-//                SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-//                std::cerr << GetStrIP() << " : " << ec.message() << std::endl;
+                //                SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+                //                std::cerr << GetStrIP() << " : " << ec.message() << std::endl;
                 try_again_connect();
             });
         Await(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
@@ -267,7 +267,7 @@ void network::PeerClient::cancel_piece(uint32_t id) {
 }
 
 void network::PeerClient::access() {
-    GetPeerBitfield() = std::move(Bitfield(master_peer_.GetBitfield().bits.Size()));
+    GetPeerBitfield().bits = std::move(Bitfield(master_peer_.GetBitfield().bits.Size()));
 
     LOG(GetStrIP(), " was connected!");
 
@@ -545,7 +545,8 @@ void network::PeerClient::handle_response() {
                 return;
             }
             LOG(GetStrIP(), " correct index from have message: ", i);
-            GetPeerBitfield().Set(i);
+
+            GetPeerBitfield().bits.Set(i);
 
             Strategy()->OnHave(shared_from(this), i);
 
@@ -562,11 +563,15 @@ void network::PeerClient::handle_response() {
                 Disconnect();
                 return;
             }
-            for (size_t i = 1; i < payload_size; ++i) {
-                for (size_t x = 0; x < 8; ++x) {
-                    if (payload.Body()[i] & (1 << (7 - x))) {
-                        size_t idx = (i - 1) * 8 + x;
-                        if (idx < TotalPiecesCount()) GetPeerBitfield().Set(idx);
+
+            {
+                auto bitfield_accessor = GetPeerBitfield();
+                for (size_t i = 1; i < payload_size; ++i) {
+                    for (size_t x = 0; x < 8; ++x) {
+                        if (payload.Body()[i] & (1 << (7 - x))) {
+                            size_t idx = (i - 1) * 8 + x;
+                            if (idx < TotalPiecesCount()) bitfield_accessor.bits.Set(idx);
+                        }
                     }
                 }
             }

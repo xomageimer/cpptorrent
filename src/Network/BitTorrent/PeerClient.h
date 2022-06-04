@@ -67,7 +67,7 @@ namespace network {
 
         std::string GetStrIP() const;
 
-        Bitfield &GetPeerBitfield() { return slave_peer_.GetBitfield(); }
+        auto GetPeerBitfield() { return slave_peer_.GetBitfield(); }
 
         bittorrent::Torrent &GetTorrent() { return master_peer_.GetTorrent(); }
 

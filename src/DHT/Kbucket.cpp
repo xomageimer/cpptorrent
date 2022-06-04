@@ -56,20 +56,20 @@ size_t dht::Kbucket::Size() const {
     return nodes_.size();
 }
 
-bool dht::Kbucket::Exist(const NodeInfo &ni) const {
+bool dht::Kbucket::Exist(const Node &ni) const {
     std::shared_lock lock(mut_);
     auto it = find_node(ni);
     return it != nodes_.end() && (*it)->IsAlive();
 }
 
-std::optional<dht::Kbucket::NodeType> dht::Kbucket::GetNode(const NodeInfo &ni) {
+std::optional<dht::Kbucket::NodeType> dht::Kbucket::GetNode(const Node &ni) {
     std::shared_lock lock(mut_);
     auto it = find_node(ni);
     if (it == nodes_.end()) return std::nullopt;
     return *it;
 }
 
-void dht::Kbucket::Kick(const NodeInfo &ni) {
+void dht::Kbucket::Kick(const Node &ni) {
     std::unique_lock lock(mut_);
     auto it = find_node(ni);
     if (it != nodes_.end()) nodes_.erase(it);
@@ -106,11 +106,11 @@ dht::Kbucket::Access dht::Kbucket::GetOrigin() const {
     return {std::shared_lock{mut_}, nodes_};
 }
 
-dht::Kbucket::IterType dht::Kbucket::find_node(const NodeInfo &ni) {
+dht::Kbucket::IterType dht::Kbucket::find_node(const Node &ni) {
     return std::find_if(nodes_.begin(), nodes_.end(), [&ni](const auto &n) { return n->id == ni.id; });
 }
 
-dht::Kbucket::ConstIterType dht::Kbucket::find_node(const NodeInfo &ni) const {
+dht::Kbucket::ConstIterType dht::Kbucket::find_node(const Node &ni) const {
     return std::find_if(nodes_.cbegin(), nodes_.cend(), [&ni](const auto &n) { return n->id == ni.id; });
 }
 
