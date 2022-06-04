@@ -5,7 +5,9 @@
 
 #include "Primitives/Socket.h"
 
+#include <nlohmann/json.hpp>
 #include "bencode_lib.h"
+
 #include "random_generator.h"
 #include "auxiliary.h"
 #include "constants.h"
@@ -30,8 +32,6 @@ namespace network {
         uint16_t port{};
 
         std::filesystem::path cash_path {std::filesystem::current_path()};
-
-
 
         size_t raznica = 0;
         // boost::asio::ip::udp::endpoint endpoint{boost::asio::ip::address::from_string("127.0.0.1"), 2889};
