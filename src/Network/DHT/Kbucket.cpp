@@ -4,7 +4,7 @@
 
 using namespace network;
 
-dht::Kbucket::Kbucket(const dht::RouteTable &rt) : table_(rt), last_changed_(boost::posix_time::microsec_clock::local_time()) {}
+dht::Kbucket::Kbucket(const dht::RouteTable &rt) : table_(rt),  last_changed_timeout_(boost::asio::make_strand(rt.GetService())) {}
 
 dht::Kbucket::Kbucket(const dht::Kbucket &cpy) : Kbucket(cpy.table_) {
     nodes_ = cpy.nodes_;
@@ -20,6 +20,8 @@ dht::Kbucket &dht::Kbucket::operator=(const dht::Kbucket &cpy) {
 dht::Kbucket::Kbucket(dht::Kbucket &&mv) noexcept : Kbucket(mv.table_) {
     nodes_ = std::move(mv.nodes_);
 }
+
+dht::Kbucket::~Kbucket() { last_changed_timeout_.cancel(); }
 
 dht::Kbucket &dht::Kbucket::operator=(dht::Kbucket &&mv) noexcept {
     if (this != &mv) {
@@ -58,11 +60,6 @@ bool dht::Kbucket::Exist(const NodeInfo &ni) const {
     std::shared_lock lock(mut_);
     auto it = find_node(ni);
     return it != nodes_.end() && (*it)->IsAlive();
-}
-
-boost::posix_time::ptime dht::Kbucket::GetLastChangedTime() const {
-    std::shared_lock lock(mut_);
-    return last_changed_;
 }
 
 std::optional<dht::Kbucket::NodeType> dht::Kbucket::GetNode(const NodeInfo &ni) {
@@ -118,7 +115,13 @@ dht::Kbucket::ConstIterType dht::Kbucket::find_node(const NodeInfo &ni) const {
 }
 
 void dht::Kbucket::update_time() {
-    last_changed_ = boost::posix_time::microsec_clock::local_time();
+    last_changed_timeout_.cancel();
+    last_changed_timeout_.expires_from_now(dht_constants::bucket_refresh_interval);
+    last_changed_timeout_.async_wait([this](boost::system::error_code ec){
+        if (!ec) {
+            UpdateNodes();
+        }
+    });
 }
 
 size_t dht::Kbucket::update_nodes() {

@@ -49,8 +49,8 @@ add_library(dht STATIC
         src/Network/DHT/Master.h src/Network/DHT/Master.cpp
         src/Network/DHT/Node.h src/Network/DHT/Node.cpp
 
-        src/DHT/Kbucket.h src/DHT/Kbucket.cpp
-        src/DHT/RouteTable.h src/DHT/RouteTable.cpp)
+        src/Network/DHT/Kbucket.h src/Network/DHT/Kbucket.cpp
+        src/Network/DHT/RouteTable.h src/Network/DHT/RouteTable.cpp)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} network helpers bencode)

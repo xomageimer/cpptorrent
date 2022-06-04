@@ -1,6 +1,8 @@
 #ifndef CPPTORRENT_ROUTETABLE_H
 #define CPPTORRENT_ROUTETABLE_H
 
+#include <boost/asio.hpp>
+
 #include <utility>
 
 #include "DHT/Node.h"
@@ -12,7 +14,7 @@ namespace dht {
         using NodeType = Kbucket::NodeType;
         using RouteTableType = std::vector<Kbucket>;
 
-        explicit RouteTable(network::NodeInfo master_info) : master_(std::move(master_info)) { buckets_.reserve(dht_constants::SHA1_SIZE_BITS); }
+        explicit RouteTable(network::NodeInfo & master_ni, boost::asio::io_service & serv) : master_(master_ni), service_(serv) { buckets_.reserve(dht_constants::SHA1_SIZE_BITS); }
 
         void InsertNode(NodeType node);
 
@@ -24,10 +26,14 @@ namespace dht {
 
         [[nodiscard]] const network::NodeInfo & GetMasterInfo() const;
 
+        [[nodiscard]] boost::asio::io_service & GetService() const { return service_; }
+
     private:
         bool try_to_split();
 
-        network::NodeInfo master_;
+        network::NodeInfo & master_;
+
+        boost::asio::io_service & service_;
 
         RouteTableType buckets_;
     };

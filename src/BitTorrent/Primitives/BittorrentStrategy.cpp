@@ -75,7 +75,6 @@ void bittorrent::BittorrentStrategy::OnInterested(std::shared_ptr<network::PeerC
 void bittorrent::BittorrentStrategy::OnNotInterested(std::shared_ptr<network::PeerClient> peer) {
     if (!peer->IsClientChoked() && peer->IsRemoteChoked()) {
         peer->send_choke();
-        // TODO ���-�� ������� ���� �������� ���
     }
 }
 

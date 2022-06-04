@@ -1,6 +1,8 @@
 #ifndef CPPTORRENT_KBUCKET_H
 #define CPPTORRENT_KBUCKET_H
 
+#include <boost/asio.hpp>
+
 #include <shared_mutex>
 #include <memory>
 #include <list>
@@ -32,6 +34,8 @@ namespace dht {
 
         Kbucket &operator=(Kbucket &&) noexcept;
 
+        ~Kbucket();
+
         size_t UpdateNodes();
 
         bool AddNode(NodeType n);
@@ -39,8 +43,6 @@ namespace dht {
         void ResetNode(NodeType n);
 
         [[nodiscard]] bool Exist(const network::NodeInfo &ni) const;
-
-        [[nodiscard]] boost::posix_time::ptime GetLastChangedTime() const;
 
         [[nodiscard]] std::optional<NodeType> GetNode(const network::NodeInfo &ni);
 
@@ -70,8 +72,8 @@ namespace dht {
         mutable std::shared_mutex mut_;
 
         BucketType nodes_;
-
-        boost::posix_time::ptime last_changed_;
+        
+        boost::asio::deadline_timer last_changed_timeout_;
     };
 
     size_t BucketDistance(const GUID &n1, const GUID &n2);
