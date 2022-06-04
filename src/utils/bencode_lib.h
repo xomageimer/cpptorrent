@@ -82,6 +82,8 @@ namespace bencode {
 
         template <> void MakeSerialize<std::map<std::string, Node>>(const std::map<std::string, Node> &bencode_dict, std::ostream &out);
     } // namespace Serialize
+
+    std::string ToString(Node const & node);
 } // namespace bencode
 
 #endif // QTORRENT_BENCODE_LIB_H

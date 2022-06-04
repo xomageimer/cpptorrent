@@ -1,7 +1,7 @@
 #include "Tracker.h"
 
 #include "Torrent.h"
-#include "BitTorrent/TrackerRequester.h"
+#include "Network/BitTorrent/TrackerRequester.h"
 #include "auxiliary.h"
 
 namespace ba = boost::asio;

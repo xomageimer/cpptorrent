@@ -4,9 +4,7 @@
 #include <filesystem>
 
 #include "Node.h"
-#include "Primitives/Socket.h"
-
-#include "bencode_lib.h"
+#include "Network/Primitives/Socket.h"
 
 #include "random_generator.h"
 #include "auxiliary.h"
@@ -14,7 +12,6 @@
 #include "bitfield.h"
 
 namespace network {
-
     enum class status {
         DISABLED,
         ENABLED
@@ -22,20 +19,25 @@ namespace network {
 
     struct NodeClient : public dht::Node, public network::UDPSocket {
     public:
+        using OnSuccessCalback = std::function<void(bencode::Document doc)>;
         using OnFailedCallback = std::function<void()>;
 
-        NodeClient(uint32_t ip, uint16_t port, dht::Node & master, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
+        NodeClient(UDPSocket::socket_type socket, dht::MasterNode & master);
 
-        void Connect();
+        NodeClient(uint32_t ip, uint16_t port, dht::MasterNode & master, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
 
-        void Ping(OnFailedCallback on_failed);
+        void BlockingPing(OnFailedCallback on_failed);
+
+        void SendQuery(bencode::Document doc, OnSuccessCalback on_success, OnFailedCallback on_failed);
 
         [[nodiscard]] bool IsAlive() const;
 
     private:
+        void connect();
+
         void get_dht_query();
 
-        dht::Node & master_node;
+        dht::MasterNode & master_node_;
 
         mutable std::mutex status_mut_;
         status status_ = status::ENABLED;

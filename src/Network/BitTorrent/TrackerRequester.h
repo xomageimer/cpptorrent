@@ -12,11 +12,11 @@
 
 #include <utility>
 
-#include "Primitives/Message.h"
+#include "Network/Primitives/Message.h"
 #include "constants.h"
-#include "NetExceptions.h"
+#include "Network/NetExceptions.h"
 #include "Tracker.h"
-#include "Primitives/Socket.h"
+#include "Network/Primitives/Socket.h"
 #include "logger.h"
 
 namespace ba = boost::asio;

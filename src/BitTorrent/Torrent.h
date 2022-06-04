@@ -21,6 +21,8 @@
 
 #include "profile.h"
 
+#include "DHT/Node.h"
+
 // Объект с которым работает клиентский код, следовательно -> поменьше исключений | обрабатывать исключения
 
 namespace bittorrent {
@@ -104,6 +106,8 @@ namespace bittorrent {
         size_t downloaded_{};
 
         size_t left_{};
+
+        std::shared_ptr<dht::MasterNode> dht_;
 
         friend class bittorrent::Tracker;
         std::list<std::shared_ptr<bittorrent::Tracker>> active_trackers_;

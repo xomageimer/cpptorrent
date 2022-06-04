@@ -11,12 +11,12 @@ int main() {
 
     using namespace dht;
 
-    network::NodeInfo master {123213, 2990};
-    dht::RouteTable rt{service};
+    dht::MasterNode master {123213, 2990, service};
+    dht::RouteTable rt {reinterpret_cast<dht::Node &>(master), service};
 
     for (size_t i = 0; i < 100; i++){
-        std::shared_ptr<network::NodeClient> node = std::make_shared<network::NodeClient>(random_generator::Random().GetNumber<uint32_t>(), random_generator::Random().GetNumber<uint16_t>(), boost::asio::make_strand(service));
-        rt.InsertNode(node);
+//        std::shared_ptr<network::NodeClient> node = std::make_shared<network::NodeClient>(random_generator::Random().GetNumber<uint32_t>(), random_generator::Random().GetNumber<uint16_t>(), boost::asio::make_strand(service));
+//        rt.InsertNode(node);
     }
 
     return EXIT_SUCCESS;

@@ -1,6 +1,12 @@
 #include "RouteTable.h"
 
+#include "bencode_lib.h"
+
 using namespace network;
+
+dht::RouteTable::RouteTable(dht::Node &master_ni, asio::io_service &serv) : master_(master_ni), service_(serv) {
+    buckets_.reserve(dht_constants::SHA1_SIZE_BITS);
+}
 
 void dht::RouteTable::InsertNode(NodeType node) {
     auto bucket_id = FindBucket(*node);
@@ -11,6 +17,12 @@ void dht::RouteTable::InsertNode(NodeType node) {
             bucket.AddNode(node);
         }
     }
+}
+
+void dht::RouteTable::KickNode(dht::Node const &node) {
+    auto bucket_id = FindBucket(node);
+    auto &bucket = buckets_[bucket_id];
+    bucket.Kick(node);
 }
 
 std::vector<dht::RouteTable::NodeType> dht::RouteTable::FindNearestList(const dht::GUID &hash) const {

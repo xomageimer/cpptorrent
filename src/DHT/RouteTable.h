@@ -5,18 +5,21 @@
 
 #include <utility>
 
-#include "DHT/NodeClient.h"
+#include "Node.h"
+#include "Network/DHT/NodeClient.h"
 #include "Kbucket.h"
 
 namespace dht {
     struct RouteTable {
     public:
-        using NodeType = Kbucket::NodeType;
+        using NodeType = dht::Kbucket::NodeType;
         using RouteTableType = std::vector<Kbucket>;
 
-        explicit RouteTable(dht::Node & master_ni, boost::asio::io_service & serv) : master_(master_ni), service_(serv) { buckets_.reserve(dht_constants::SHA1_SIZE_BITS); }
+        RouteTable(dht::Node & master_ni, boost::asio::io_service & serv);
 
         void InsertNode(NodeType node);
+
+        void KickNode(dht::Node const & node);
 
         [[nodiscard]] std::vector<NodeType> FindNearestList(GUID const & hash) const;
 

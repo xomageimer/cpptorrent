@@ -1,8 +1,8 @@
 #include "Peer.h"
 #include "Torrent.h"
 
-#include "Listener.h"
-#include "BitTorrent/PeerClient.h"
+#include "Network/Listener.h"
+#include "Network/BitTorrent/PeerClient.h"
 
 #include "auxiliary.h"
 #include "random_generator.h"

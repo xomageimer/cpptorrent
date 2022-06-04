@@ -1,5 +1,6 @@
 #include "bencode_lib.h"
 
+#include <sstream>
 #include <algorithm>
 
 bencode::Node bencode::Deserialize::LoadNode(std::istream &input) {
@@ -48,7 +49,7 @@ bencode::Node bencode::Deserialize::LoadArray(std::istream &input) {
 
 bencode::Node bencode::Deserialize::LoadStr(std::istream &input) {
     std::string str;
-    size_t str_size {0};
+    size_t str_size{0};
 
     input >> str_size;
     str.reserve(str_size);
@@ -96,4 +97,10 @@ void bencode::Serialize::MakeSerialize<std::map<std::string, bencode::Node>>(
             [&out](auto const &arg) { bencode::Serialize::MakeSerialize<std::decay_t<decltype(arg)>>(arg, out); }, node_el.GetOrigin());
     }
     out << 'e';
+}
+
+std::string ToString(const bencode::Node &node) {
+    std::ostringstream stream;
+    bencode::Serialize::MakeSerialize(node, stream);
+    return stream.str();
 }

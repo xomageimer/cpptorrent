@@ -1,5 +1,10 @@
 #include "Listener.h"
 
+#include <utility>
+
+#include "Network/BitTorrent/PeerClient.h"
+#include "Network/DHT/NodeClient.h"
+
 void network::participant::Verify() {
     LOG("Listener"
         " : ",
@@ -8,14 +13,14 @@ void network::participant::Verify() {
 
     ba::async_read(socket_, ba::buffer(buff, bittorrent_constants::handshake_length),
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred /*length*/) {
-            LOG ("Listener : ", "get message");
+            LOG("Listener : ", "get message");
             timeout_.cancel();
             if (!ec && bytes_transferred >= bittorrent_constants::handshake_length) {
                 std::string info_hash(reinterpret_cast<const char *>(&buff[28]), 20);
-                LOG ("Listener : ", "check handshake message == ", listener_.torrents.count(info_hash),
-                    "\n", info_hash, " ~ ", listener_.torrents.begin()->second->GetInfoHash());
-                if (listener_.torrents.count(info_hash)) {
-                    auto local_master_peer = listener_.torrents[info_hash]->GetRootPeer();
+                LOG("Listener : ", "check handshake message == ", listener_.torrents_.count(info_hash), "\n", info_hash, " ~ ",
+                    listener_.torrents_.begin()->second->GetInfoHash());
+                if (listener_.torrents_.count(info_hash)) {
+                    auto local_master_peer = listener_.torrents_[info_hash]->GetRootPeer();
 
                     auto new_peer = std::make_shared<network::PeerClient>(local_master_peer, std::move(socket_), buff);
                     LOG("Listener : ", "get ", new_peer->GetStrIP());
@@ -32,14 +37,18 @@ void network::participant::Verify() {
     });
 }
 
-network::Listener::Listener(const boost::asio::strand<boost::asio::io_service::executor_type> &executor)
-    : socket_(executor), acceptor_(executor) {
+network::Listener::Listener(
+    const boost::asio::strand<boost::asio::io_service::executor_type> &executor, std::shared_ptr<dht::MasterNode> dht_entry)
+    : socket_(executor), dht_socket_(executor), acceptor_(executor), dht_entry_(std::move(dht_entry)) {
     get_port();
     do_accept();
+    if (dht_entry) {
+        dht_catcher();
+    }
 }
 
 void network::Listener::AddTorrent(const std::shared_ptr<bittorrent::Torrent> &new_torrent) {
-    torrents.emplace(new_torrent->GetInfoHash(), new_torrent);
+    torrents_.emplace(new_torrent->GetInfoHash(), new_torrent);
 }
 
 void network::Listener::get_port() {
@@ -67,7 +76,26 @@ void network::Listener::do_accept() {
     });
 }
 
+void network::Listener::dht_catcher() {
+    dht_socket_.async_receive(boost::asio::buffer(buff_.prepare(bittorrent_constants::MTU)), [this](size_t bytes_transferred) {
+        buff_.commit(bytes_transferred);
+
+        dht_entry_->TryToInsertNode(std::make_shared<NodeClient>(std::move(dht_socket_), *dht_entry_));
+        std::shared_ptr<KRPCQuery> rpc_query;
+        std::istream is(&buff_);
+        bencode::Document doc(bencode::Deserialize::LoadNode(is));
+        auto type = doc.GetRoot()['q'].AsString();
+        if (type == "ping") {
+        }
+        dht_entry_->AddRPC(std::move(rpc_query));
+        dht_catcher();
+
+        buff_.consume(bytes_transferred);
+    });
+}
+
 network::Listener::~Listener() {
     socket_.close();
+    dht_socket_.close();
     acceptor_.close();
 }

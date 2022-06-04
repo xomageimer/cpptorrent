@@ -17,9 +17,9 @@
 
 #include "Primitives/Socket.h"
 #include "NetExceptions.h"
-#include "BitTorrent/PeerClient.h"
 
 #include "Torrent.h"
+#include "DHT/Node.h"
 #include "logger.h"
 
 namespace ba = boost::asio;
@@ -48,7 +48,7 @@ namespace network {
     // TODO с DHT нужно будет сделать шаблонный листенер с разными participant!
     struct Listener {
     public:
-        explicit Listener(const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
+        explicit Listener(const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor, std::shared_ptr<dht::MasterNode> dht_entry = nullptr);
 
         ~Listener();
 
@@ -61,9 +61,13 @@ namespace network {
 
         void do_accept();
 
+        void dht_catcher();
+
         friend struct participant;
 
-        std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents;
+        std::unordered_map<std::string, std::shared_ptr<bittorrent::Torrent>> torrents_;
+
+        std::shared_ptr<dht::MasterNode> dht_entry_;
 
         size_t port_ = bittorrent_constants::begin_port;
 
@@ -71,7 +75,9 @@ namespace network {
 
         ba::ip::tcp::socket socket_;
 
+        ba::ip::udp::socket dht_socket_;
 
+        boost::asio::streambuf buff_;
     };
 } // namespace network
 

@@ -8,7 +8,7 @@
 #include <list>
 #include <optional>
 
-#include "DHT/NodeClient.h"
+#include "Network/DHT/NodeClient.h"
 
 #include "constants.h"
 #include "bitfield.h"
@@ -72,7 +72,7 @@ namespace dht {
         mutable std::shared_mutex mut_;
 
         BucketType nodes_;
-        
+
         boost::asio::deadline_timer last_changed_timeout_;
     };
 

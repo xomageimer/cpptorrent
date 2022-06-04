@@ -4,7 +4,7 @@
 #include <boost/asio.hpp>
 
 #include "Message.h"
-#include "NetExceptions.h"
+#include "Network/NetExceptions.h"
 
 #include <sstream>
 

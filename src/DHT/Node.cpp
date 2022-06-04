@@ -1,6 +1,6 @@
 #include "Node.h"
 
-#include "DHT/NodeClient.h"
+#include "Network/DHT/NodeClient.h"
 #include "RouteTable.h"
 
 using namespace dht;
@@ -20,4 +20,23 @@ dht::Node::Node(uint32_t arg_ip, uint16_t arg_port) : Node() {
     port = arg_port;
 }
 
-MasterNode::MasterNode(boost::asio::io_service &serv) : route_table_(std::make_shared<RouteTable>(*reinterpret_cast<dht::Node *>(this), serv)) {}
+MasterNode::MasterNode(boost::asio::io_service &serv, size_t thread_num) : a_worker_(thread_num) {
+    route_table_ = std::make_shared<RouteTable>(reinterpret_cast<dht::Node &>(*this), serv);
+    a_worker_.Start();
+}
+
+void MasterNode::AddRPC(MasterNode::rpc_type rpc) {
+    a_worker_.Enqueue([rpc = std::move(rpc)]{
+        rpc->Call();
+    });
+}
+
+void MasterNode::TryToInsertNode(std::shared_ptr<network::NodeClient> nc) {
+    a_worker_.Enqueue([nc, this]{
+        route_table_->InsertNode(nc);
+    });
+}
+
+boost::asio::io_service &MasterNode::GetService() {
+    return route_table_->GetService();
+}

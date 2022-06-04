@@ -47,11 +47,12 @@ add_subdirectory(contrib/json)
 add_library(dht STATIC
         src/Network/DHT/Server.h src/Network/DHT/Server.cpp
         src/Network/DHT/NodeClient.h src/Network/DHT/NodeClient.cpp
+        src/Network/DHT/KRPC.h src/Network/DHT/KRPC.cpp
 
         src/DHT/Node.h src/DHT/Node.cpp
         src/DHT/Kbucket.h src/DHT/Kbucket.cpp
         src/DHT/RouteTable.h src/DHT/RouteTable.cpp)
-target_link_libraries(dht PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(dht PUBLIC nlohmann_json::nlohmann_json)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} network helpers bencode)
@@ -65,8 +66,7 @@ endif ()
 add_executable(cpptorrent src/main_bittorrent.cpp)
 add_executable(cppdht src/main_dht.cpp)
 
-include_directories(${Boost_INCLUDE_DIR} src/Network src/BitTorrent src/DHT src/utils)
+include_directories(${Boost_INCLUDE_DIR} src src/BitTorrent src/DHT src/utils)
 
 target_link_libraries(cpptorrent PUBLIC bittorrent helpers)
-
 target_link_libraries(cppdht PUBLIC dht helpers)

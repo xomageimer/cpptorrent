@@ -8,13 +8,13 @@
 #include <string>
 #include <utility>
 
-#include "NetExceptions.h"
+#include "Network/NetExceptions.h"
 
-#include "Primitives/Socket.h"
+#include "Network/Primitives/Socket.h"
 #include "Peer.h"
 
 #include "Primitives/BittorrentStrategy.h"
-#include "Primitives/Message.h"
+#include "Network/Primitives/Message.h"
 #include "bitfield.h"
 #include "Primitives/Piece.h"
 
