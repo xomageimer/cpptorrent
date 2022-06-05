@@ -131,10 +131,11 @@ size_t dht::Kbucket::update_nodes() {
         if (!node->IsAlive()) {
             it = nodes_.erase(it);
         } else {
-            auto prev_it = it++;
-            (*prev_it)->BlockingPing([this, iter = prev_it] {
+            (*it)->Ping([this, iter = it] {
+                std::unique_lock lock(mut_);
                 nodes_.erase(iter);
             });
+            it++;
         }
     }
     update_time();

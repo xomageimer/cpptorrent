@@ -223,7 +223,7 @@ namespace network {
     struct UDPSocket : Impl<asio::ip::udp, StrandEx> {
         using base_type::base_type;
 
-        void Send(SendAnyData msg, WriteCallback write_callback, ErrorCallback error_callback) {
+        void Send(SendAnyData msg, WriteCallback write_callback = [](size_t bytes_transferred) {}, ErrorCallback error_callback = [](boost::system::error_code ec) {}) {
             std::unique_lock lock(queue_mut_);
             auto it = queue_send_buff_.insert(queue_send_buff_.end(), std::move(msg));
             lock.unlock();

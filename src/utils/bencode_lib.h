@@ -42,6 +42,20 @@ namespace bencode {
         }
 
         [[nodiscard]] const Node &operator[](size_t i) const { return AsArray().at(i); }
+
+        Node &operator[](std::string const &key) {
+            if (!IsDict()) {
+                *this = std::map<std::string, Node>{};
+            }
+            return std::get<std::map<std::string, Node>>(*this)[key];
+        }
+
+        Node &operator[](size_t key) {
+            if (!IsArray()) {
+                *this = std::vector<Node>{};
+            }
+            return std::get<std::vector<Node>>(*this)[key];
+        }
     };
 
     struct Document {
@@ -83,7 +97,7 @@ namespace bencode {
         template <> void MakeSerialize<std::map<std::string, Node>>(const std::map<std::string, Node> &bencode_dict, std::ostream &out);
     } // namespace Serialize
 
-    std::string ToString(Node const & node);
+    std::string ToString(Node const &node);
 } // namespace bencode
 
 #endif // QTORRENT_BENCODE_LIB_H

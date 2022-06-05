@@ -42,6 +42,7 @@ namespace dht_constants {
     const size_t key_size = 100;
     const size_t SHA1_SIZE_BITS = 20 * bittorrent_constants::byte_size;
     const boost::posix_time::seconds ping_wait_time{20};
+    const boost::posix_time::seconds query_wait_time{50};
     const boost::posix_time::seconds bucket_refresh_interval{900};
 } // namespace dht_constants
 

@@ -99,6 +99,8 @@ namespace bittorrent {
             return std::basic_string_view<uint8_t>{data_.data(), data_.size()};
         }
 
+        void CopyFrom(std::istream & is);
+
         void CopyFrom(const Message &msg_buf); // all reference to operator[] are is invalidated
 
         void CopyFrom(const uint8_t *data, size_t size); // all reference to operator[] are is invalidated

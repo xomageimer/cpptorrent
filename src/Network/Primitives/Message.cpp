@@ -29,6 +29,13 @@ void bittorrent::ReceivingPeerMessage::DecodeHeader(uint32_t size) const {
     body_size_ = size;
 }
 
+void bittorrent::SendingMessage::CopyFrom(std::istream &is) {
+    size_t old_size = data_.size();
+    data_.insert(data_.end(), std::istream_iterator<int>(is),
+        std::istream_iterator<int>());
+    out_pos_ += data_.size() - old_size;
+}
+
 void bittorrent::SendingMessage::CopyFrom(const Message &msg_buf) {
     CopyFrom(msg_buf.GetBufferData().data(), msg_buf.Size());
 }

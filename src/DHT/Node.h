@@ -25,6 +25,7 @@ namespace dht {
 
         explicit Node(uint32_t ip, uint16_t port);
 
+        std::string id_sha1;
         GUID id{dht_constants::SHA1_SIZE_BITS};
         uint32_t ip{};
         uint16_t port{};

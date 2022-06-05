@@ -1,6 +1,10 @@
 #ifndef CPPTORRENT_KRPC_H
 #define CPPTORRENT_KRPC_H
 
+#include <memory>
+
+#include "Network/Primitives/Socket.h"
+
 #include "bencode_lib.h"
 
 namespace dht {
@@ -8,7 +12,7 @@ namespace dht {
 }
 
 namespace network {
-    struct KRPCQuery {
+    struct KRPCQuery : public std::enable_shared_from_this<KRPCQuery> {
     public:
         explicit KRPCQuery(bencode::Document doc, dht::RouteTable &route_table);
 

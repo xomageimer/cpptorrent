@@ -55,6 +55,7 @@ add_library(dht STATIC
 target_link_libraries(dht PUBLIC nlohmann_json::nlohmann_json)
 
 target_link_libraries(helpers PUBLIC ${Boost_LIBRARIES})
+target_link_libraries(network PUBLIC helpers)
 target_link_libraries(bittorrent PUBLIC ${Boost_LIBRARIES} network helpers bencode)
 target_link_libraries(dht PUBLIC ${Boost_LIBRARIES} network helpers bencode)
 

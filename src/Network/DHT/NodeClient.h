@@ -26,7 +26,9 @@ namespace network {
 
         NodeClient(uint32_t ip, uint16_t port, dht::MasterNode & master, const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
 
-        void BlockingPing(OnFailedCallback on_failed);
+        static bittorrent::SendingMessage MakeMessage(bencode::Document doc);
+
+        void Ping(OnFailedCallback on_failed);
 
         void SendQuery(bencode::Document doc, OnSuccessCalback on_success, OnFailedCallback on_failed);
 
@@ -41,6 +43,8 @@ namespace network {
 
         mutable std::mutex status_mut_;
         status status_ = status::ENABLED;
+
+        std::atomic<size_t> cur_query_wait_ = 0;
     };
 } // namespace network::dht
 

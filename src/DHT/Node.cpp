@@ -11,6 +11,7 @@ dht::Node::Node() {
         str.push_back(random_generator::Random().GetNumber<char>());
     }
     auto sha1 = GetSHA1(str);
+    id_sha1 = sha1;
     id = Bitfield(reinterpret_cast<const uint8_t *>(sha1.data()), sha1.size());
     assert(id.Size() == dht_constants::SHA1_SIZE_BITS);
 }
