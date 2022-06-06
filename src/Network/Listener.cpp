@@ -22,9 +22,9 @@ void network::participant::Verify() {
                 if (listener_.torrents_.count(info_hash)) {
                     auto local_master_peer = listener_.torrents_[info_hash]->GetRootPeer();
 
-                    auto new_peer = std::make_shared<network::PeerClient>(local_master_peer, std::move(socket_), buff);
+                    auto new_peer = std::make_shared<network::PeerClient>(local_master_peer, std::move(socket_));
                     LOG("Listener : ", "get ", new_peer->GetStrIP());
-                    local_master_peer->Subscribe(new_peer);
+                    local_master_peer->Subscribe(new_peer, buff, bytes_transferred);
                 }
             }
         });
@@ -61,6 +61,7 @@ void network::Listener::get_port() {
         acceptor_.open(ba::ip::tcp::v4(), ec) || acceptor_.bind({ba::ip::tcp::v4(), static_cast<unsigned short>(port_)}, ec);
     } while (ec == ba::error::address_in_use);
     acceptor_.listen();
+    std::cerr << port_ << " seted!" << std::endl;
 }
 
 void network::Listener::do_accept() {
@@ -70,6 +71,7 @@ void network::Listener::do_accept() {
 
     acceptor_.async_accept(socket_, [this](boost::system::error_code ec) {
         if (!ec) {
+            std::cerr << "get peer from listener" << std::endl;
             std::make_shared<participant>(*this, std::move(socket_))->Verify();
         }
         do_accept();
@@ -77,7 +79,7 @@ void network::Listener::do_accept() {
 }
 
 void network::Listener::dht_catcher() {
-    dht_socket_.async_receive(boost::asio::buffer(buff_.prepare(bittorrent_constants::MTU)), [this](size_t bytes_transferred) {
+    dht_socket_.async_receive(boost::asio::buffer(buff_.prepare(bittorrent_constants::MTU)), [this](const boost::system::error_code& ec, size_t bytes_transferred) {
         buff_.commit(bytes_transferred);
 
         dht_entry_->TryToInsertNode(std::make_shared<NodeClient>(std::move(dht_socket_), *dht_entry_));
@@ -88,9 +90,10 @@ void network::Listener::dht_catcher() {
         if (type == "ping") {
         }
         dht_entry_->AddRPC(std::move(rpc_query));
-        dht_catcher();
 
         buff_.consume(bytes_transferred);
+
+        dht_catcher();
     });
 }
 

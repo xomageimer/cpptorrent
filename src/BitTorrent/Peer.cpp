@@ -89,13 +89,16 @@ size_t bittorrent::MasterPeer::GetApplicationPort() const {
     return torrent_.GetPort();
 }
 
-void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient> &new_sub) {
+void bittorrent::MasterPeer::Subscribe(const std::shared_ptr<network::PeerClient> &new_sub, uint8_t *handshake_ptr, size_t size) {
     std::unique_lock lock(mut_);
+    if (IpToStr(new_sub->GetPeerData().GetIP()) == IpToStr(GetIP())) {
+        return;
+    }
 
     LOG(new_sub->GetStrIP(), " was subscribed!");
 
     auto it = peers_subscribers_.emplace(new_sub->GetPeerData().GetIP(), new_sub);
-    if (it.second) it.first->second->Process();
+    if (it.second) it.first->second->Process(handshake_ptr, size);
 }
 
 void bittorrent::MasterPeer::Unsubscribe(IP unsub_ip) {

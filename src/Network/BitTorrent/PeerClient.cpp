@@ -15,7 +15,7 @@ network::PeerClient::PeerClient(const std::shared_ptr<bittorrent::MasterPeer> &m
       slave_peer_(std::move(slave_peer)), active_piece_(std::nullopt) {}
 
 network::PeerClient::PeerClient(
-    const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr)
+    const std::shared_ptr<bittorrent::MasterPeer> &master_peer, ba::ip::tcp::socket socket)
     : TCPSocket(std::move(socket)), keep_alive_timeout_(TCPSocket::socket_.get_executor()),
       piece_wait_timeout_(TCPSocket::socket_.get_executor()), master_peer_(*master_peer), active_piece_(std::nullopt) {
 
@@ -23,10 +23,6 @@ network::PeerClient::PeerClient(
     uint32_t ip_int = IpToInt(remote_ep.address().to_string());
     uint16_t port = remote_ep.port();
     slave_peer_ = bittorrent::Peer{ip_int, port};
-
-    SendData msg;
-    msg.CopyFrom(handshake_ptr, bittorrent_constants::handshake_length);
-    msg_to_read_.SetBuffer(msg.GetBufferData().data(), msg.Size());
 }
 
 std::string network::PeerClient::GetStrIP() const {
@@ -60,15 +56,20 @@ void network::PeerClient::try_again_connect() {
     if (--connect_attempts) {
         LOG(GetStrIP(), " : attempts ", connect_attempts);
         Connect(GetStrIP(), std::to_string(slave_peer_.GetPort()), std::bind(&PeerClient::send_handshake, this),
-            [this](boost::system::error_code) { try_again_connect(); });
+            [this](boost::system::error_code ec) {
+                SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+                LOG (GetStrIP(), ":", slave_peer_.GetPort(), " : ", ec.message());
+                try_again_connect();
+            });
         Await(bittorrent_constants::connection_waiting_time + bittorrent_constants::epsilon);
     } else
         Disconnect();
 }
 
-void network::PeerClient::Process() {
+void network::PeerClient::Process(uint8_t *handshake_ptr, size_t size) {
     if (socket_.is_open()) {
-        Post([this] { verify_handshake(); });
+        std::vector<uint8_t> v (handshake_ptr, handshake_ptr + size);
+        Post([this, v = std::move(v)] { verify_handshake(std::move(v)); });
     } else {
         Connect(GetStrIP(), std::to_string(slave_peer_.GetPort()), std::bind(&PeerClient::send_handshake, this),
             [=](boost::system::error_code ec) {
@@ -279,9 +280,10 @@ void network::PeerClient::access() {
     do_read_header();
 }
 
-void network::PeerClient::verify_handshake() {
+void network::PeerClient::verify_handshake(std::vector<uint8_t> v) {
     LOG(GetStrIP(), " : ", __FUNCTION__);
 
+    msg_to_read_.SetBuffer(v.data(), v.size());
     if (check_handshake(msg_to_read_)) {
         SendData msg_;
         msg_.CopyFrom(msg_to_read_);

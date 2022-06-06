@@ -12,8 +12,7 @@ NodeClient::NodeClient(UDPSocket::socket_type socket, dht::MasterNode &master)
 
 NodeClient::NodeClient(
     uint32_t ip, uint16_t port, dht::MasterNode &master, const asio::strand<boost::asio::io_service::executor_type> &executor)
-    : dht::Node(ip, port), master_node_(master), UDPSocket(executor) {
-}
+    : dht::Node(ip, port), master_node_(master), UDPSocket(executor) {}
 
 void NodeClient::connect() {
     UDPSocket::Connect(
@@ -51,7 +50,18 @@ void network::NodeClient::Ping(OnFailedCallback on_failed) {
 }
 
 void NodeClient::SendQuery(bencode::Document doc, OnSuccessCalback on_success, OnFailedCallback on_failed) {
-    Send(std::move(MakeMessage(std::move(doc))));
+    auto type = doc.GetRoot()["q"].AsString();
+    Send(
+        std::move(MakeMessage(std::move(doc))),
+        [this, type, on_success, on_failed](size_t) {
+            std::lock_guard lock(req_mut_);
+            req_by_callbacks_[type] = {on_success, on_failed};
+        },
+        [on_failed, this](boost::system::error_code ec) {
+            on_failed();
+            std::lock_guard lock(status_mut_);
+            status_ = status::DISABLED;
+        });
     Await(dht_constants::query_wait_time, [this, on_failed] {
         on_failed();
         std::lock_guard lock(status_mut_);
@@ -70,9 +80,17 @@ void NodeClient::get_dht_query() {
         [this, self = shared_from(this)](const bittorrent::ReceivingMessage &data) {
             if (!IsAlive()) return;
 
-            std::shared_ptr<KRPCQuery> rpc_query;
-            // TODO парсим bencode -> создаем KRPC
-            master_node_.AddRPC(rpc_query);
+            boost::iostreams::stream<boost::iostreams::basic_array_source<char>> stream(
+                reinterpret_cast<const char *>(data.GetBufferData().data()), data.GetBufferData().size());
+            auto doc = bencode::Deserialize::Load(stream);
+
+            if (doc.GetRoot()["y"].AsString() == "r") {
+
+            } else {
+                std::shared_ptr<KRPCQuery> rpc_query;
+                //                 TODO парсим bencode -> создаем KRPC
+                master_node_.AddRPC(rpc_query);
+            }
             get_dht_query();
         },
         [this, self = shared_from(this)](boost::system::error_code ec) {

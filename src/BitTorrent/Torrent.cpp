@@ -18,8 +18,7 @@
 #include "logger.h"
 
 bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path,
-    std::filesystem::path const &download_path, size_t listener_port,
-    std::shared_ptr<BittorrentStrategy> strategy)
+    std::filesystem::path const &download_path, size_t listener_port, bool is_completed, std::shared_ptr<BittorrentStrategy> strategy)
     : service_(service), port_(listener_port), strategy_(std::move(strategy)) {
     std::fstream torrent_file(torrent_file_path.c_str(), std::ios::in | std::ios::binary);
     if (!torrent_file.is_open()) {
@@ -39,11 +38,28 @@ bittorrent::Torrent::Torrent(boost::asio::io_service &service, std::filesystem::
     if (pos != std::string::npos) backup_name = torrent_file_path.filename().string().substr(0, pos);
     auto name_value = GetMeta()["info"].TryAt("name");
 
-    auto directory_name = (name_value.has_value() && meta_info_.dict["info"].TryAt("files")) ? name_value.value().get().AsString() : backup_name;
+    auto directory_name =
+        (name_value.has_value() && meta_info_.dict["info"].TryAt("files")) ? name_value.value().get().AsString() : backup_name;
     std::filesystem::create_directories(download_path / directory_name);
 
-    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name, std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1); // ������� �����, ����� ������ ���
+    file_manager_ = std::make_shared<TorrentFilesManager>(*this, download_path / directory_name,
+        std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() / 2 : 1); // ������� �����, ����� ������ ���
+
     master_peer_ = std::make_shared<MasterPeer>(*this);
+    boost::asio::ip::udp::resolver   resolver(service_);
+    boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), "google.com", "");
+    boost::asio::ip::udp::resolver::iterator endpoints = resolver.resolve(query);
+    boost::asio::ip::udp::endpoint ep = *endpoints;
+    boost::asio::ip::udp::socket socket(service_);
+    socket.connect(ep);
+    master_peer_->ip = IpToInt(socket.local_endpoint().address().to_string());
+    if (is_completed) {
+        auto ready_pieces = master_peer_->GetBitfield();
+        for (size_t i = 0; i < ready_pieces.bits.Size(); ++i) {
+            ready_pieces.bits.Set(i);
+        }
+        ready_pieces_num_ = ready_pieces.bits.Size();
+    }
 
     fill_trackers();
 }
@@ -53,6 +69,14 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
 
     bittorrent::Query query = GetDefaultTrackerQuery();
     query.event = event;
+
+
+//    bittorrent::Peer peer {86198815, 6881};
+//    data_from_tracker_.emplace();
+//    data_from_tracker_->peers.push_back({peer, {}});
+//    file_manager_->Process();
+//    return true;
+
 
 #ifdef OS_WIN
     SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
@@ -138,10 +162,15 @@ bool bittorrent::Torrent::TryConnect(bittorrent::Launch policy, bittorrent::Even
     }
 }
 
+bool bittorrent::Torrent::TryConnectDHT() {
+    if (!dht_) return false;
+    return true;
+}
+
 bool bittorrent::Torrent::CouldReconnect() const {
-    for (auto & tracker : active_trackers_){
-        if (tracker && tracker->CouldConnect())
-            return true;
+//    return false;
+    for (auto &tracker : active_trackers_) {
+        if (tracker && tracker->CouldConnect()) return true;
     }
     return false;
 }
@@ -214,7 +243,7 @@ bool bittorrent::Torrent::fill_trackers() {
     return true;
 }
 
-std::optional<size_t> bittorrent::Torrent::DetermineNextPiece(const Peer & peer) {
+std::optional<size_t> bittorrent::Torrent::DetermineNextPiece(const Peer &peer) {
     ADD_DURATION(determine_timer);
     auto val = strategy_->ChoosePiece(*master_peer_, peer);
     return std::move(val);

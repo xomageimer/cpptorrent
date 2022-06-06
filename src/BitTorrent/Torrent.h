@@ -39,7 +39,7 @@ namespace bittorrent {
     struct Torrent {
     public:
         explicit Torrent(boost::asio::io_service &service, std::filesystem::path const &torrent_file_path,
-            std::filesystem::path const &path_to_download, size_t listener_port,
+            std::filesystem::path const &path_to_download, size_t listener_port, bool is_completed = false,
             std::shared_ptr<BittorrentStrategy> strategy = std::make_shared<BittorrentStrategy>());
 
         Torrent(const Torrent &) = delete;
@@ -47,6 +47,8 @@ namespace bittorrent {
         Torrent &operator=(const Torrent &) = delete;
 
         bool TryConnect(bittorrent::Launch policy = bittorrent::Launch::Best, bittorrent::Event event = bittorrent::Event::Empty);
+
+        bool TryConnectDHT();
 
         void ProcessMeetingPeers();
 

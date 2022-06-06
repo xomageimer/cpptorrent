@@ -6,8 +6,6 @@
 
 #include "logger.h"
 
-
-
 using namespace std;
 
 // TODO добавить менеджера кт будет взаимодействовать с данными из какого-нибудь файлика с информацией о том какие файлы есть у нас для \
@@ -43,24 +41,26 @@ int main(int argc, char *argv[]) {
         }
     };
 
-//    std::shared_ptr<bittorrent::MasterPeer> mp;
-//    bittorrent::Peer peer_struct {(uint32_t)IpToInt("5.35.74.31"), 2001};
-//    std::shared_ptr<network::PeerClient> pc = std::make_shared<network::PeerClient>(mp, peer_struct, ba::make_strand(service));
-//    pc->Process();
-//
-//    char f;
-//    std::cin >> f;
-//
-//    service_exit();
-//    return 0;
+    //    std::shared_ptr<bittorrent::MasterPeer> mp;
+    //    bittorrent::Peer peer_struct {(uint32_t)IpToInt("5.35.74.31"), 2001};
+    //    std::shared_ptr<network::PeerClient> pc = std::make_shared<network::PeerClient>(mp, peer_struct, ba::make_strand(service));
+    //    pc->Process();
+    //
+    //    char f;
+    //    std::cin >> f;
+    //
+    //    service_exit();
+    //    return 0;
 
     std::string torrent_dir = argv[1];
     std::string output_dir = std::filesystem::current_path().string();
-        if (argc > 2)
-        output_dir = argv[2];
+    if (argc > 2) output_dir = argv[2];
+
+    bool is_completed = false;
+    if (argc > 3) is_completed = std::string(argv[3]) == "completed";
 
     auto torrent = std::make_shared<bittorrent::Torrent>(
-        service, torrent_dir, output_dir, listener->GetPort(), std::make_shared<bittorrent::OptimalStrategy>()); // TODO config from console
+        service, torrent_dir, output_dir, listener->GetPort(), is_completed, std::make_shared<bittorrent::OptimalStrategy>()); // TODO config from console
 
     //    service_exit();
     //    return 0;

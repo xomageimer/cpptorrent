@@ -89,7 +89,7 @@ namespace bittorrent {
 
         void InitiateJob(boost::asio::io_service &service, std::vector<PeerImage> const &peers);
 
-        void Subscribe(const std::shared_ptr<network::PeerClient> &new_sub);
+        void Subscribe(const std::shared_ptr<network::PeerClient> &new_sub, uint8_t *handshake_ptr = nullptr, size_t size = 0);
 
         void Unsubscribe(IP unsub_ip);
 

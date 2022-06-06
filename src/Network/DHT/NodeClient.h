@@ -1,6 +1,9 @@
 #ifndef CPPTORRENT_NODECLIENT_H
 #define CPPTORRENT_NODECLIENT_H
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 #include <filesystem>
 
 #include "Node.h"
@@ -44,7 +47,8 @@ namespace network {
         mutable std::mutex status_mut_;
         status status_ = status::ENABLED;
 
-        std::atomic<size_t> cur_query_wait_ = 0;
+        mutable std::mutex req_mut_;
+        std::unordered_map<std::string, std::pair<OnSuccessCalback, OnFailedCallback>> req_by_callbacks_;
     };
 } // namespace network::dht
 

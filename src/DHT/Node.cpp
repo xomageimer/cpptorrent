@@ -22,6 +22,9 @@ dht::Node::Node(uint32_t arg_ip, uint16_t arg_port) : Node() {
 }
 
 MasterNode::MasterNode(boost::asio::io_service &serv, size_t thread_num) : a_worker_(thread_num) {
+    if (!std::filesystem::exists(cash_path)) {
+        std::filesystem::create_directories(cash_path);
+    }
     route_table_ = std::make_shared<RouteTable>(reinterpret_cast<dht::Node &>(*this), serv);
     a_worker_.Start();
 }

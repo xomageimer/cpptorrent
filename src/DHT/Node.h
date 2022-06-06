@@ -46,6 +46,10 @@ namespace dht {
 
         void TryToInsertNode(std::shared_ptr<network::NodeClient> nc);
 
+        void FindGiveaway(std::string const & info_hash) {}; // поиск раздачи
+
+        void AnnounceMe(std::string const & info_hash) {};  // сообщить что готов к раздаче
+
         boost::asio::io_service & GetService();
 
     private:

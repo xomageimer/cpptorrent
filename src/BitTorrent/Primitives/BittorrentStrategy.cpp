@@ -1,7 +1,7 @@
 #include "BittorrentStrategy.h"
 
 #include "Torrent.h"
-#include "BitTorrent/PeerClient.h"
+#include "Network/BitTorrent/PeerClient.h"
 #include "random_generator.h"
 
 std::optional<size_t> bittorrent::BittorrentStrategy::ChoosePiece(MasterPeer &peer_owner, const Peer &peer_neigh) {

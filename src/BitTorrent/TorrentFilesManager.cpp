@@ -1,8 +1,8 @@
 #include "TorrentFilesManager.h"
 #include "Torrent.h"
 
-#include "BitTorrent/PeerClient.h"
-#include "Primitives/Message.h"
+#include "Network/BitTorrent/PeerClient.h"
+#include "Network/Primitives/Message.h"
 
 #include "auxiliary.h"
 
@@ -65,11 +65,11 @@ void bittorrent::TorrentFilesManager::fill_files() {
 
         size_t i = 0;
         for (; i < torrent_.GetPieceCount(); i++) {
-            pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, file_beg, static_cast<long long>(piece_size_)});
+            pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, 0, file_beg, static_cast<long long>(piece_size_)});
             file_beg += piece_size_;
         }
         last_piece_size_ = bytes_size % file_info["piece length"].AsNumber();
-        pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, file_beg, static_cast<long long>(last_piece_size_)});
+        pieces_by_files_[i].emplace_back(FileInfo{cur_file_path, i, 0, file_beg, static_cast<long long>(last_piece_size_)});
     } else { // multi-file mode torrent
         const long long piece_length = file_info["piece length"].AsNumber();
         total_size_GB_ = 0;
@@ -159,6 +159,7 @@ bittorrent::Block bittorrent::TorrentFilesManager::ReadPieceBlockFromFile(size_t
 
         file_stream.seekg(it->file_begin + block_beg, std::ios::beg);
         auto size = std::min(it->size - it->file_begin - block_beg, (unsigned long long)length);
+        if (!size) size = length;
         for (size_t j = 0; j < size; j++) {
             file_stream.read(reinterpret_cast<char *>(block.data_.push_back(0), &block.data_.back()), 1);
         }

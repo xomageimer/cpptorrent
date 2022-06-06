@@ -32,10 +32,10 @@ void network::httpRequester::SetResponse(ReceiveData data) {
     resp_str.resize(data.Size());
     data.CopyTo(resp_str.data(), resp_str.size());
 
-//    for (auto ch : resp_str){
-//        std::cerr << ch;
-//    }
-//    std::cerr << std::endl;
+    //    for (auto ch : resp_str){
+    //        std::cerr << ch;
+    //    }
+    //    std::cerr << std::endl;
 
     std::vector<std::string> bencode_response;
     boost::regex expression("(^d(?:.|\\n)*e\\Z)");
@@ -467,5 +467,7 @@ void network::udpRequester::make_announce_request() {
     ValueToArray(NativeToBig((query_.ip ? IpToInt(query_.ip.value()) : 0)), &announce_req_[84]);
     ValueToArray(NativeToBig((query_.key ? std::stoi(query_.key.value()) : 0)), &announce_req_[88]);
     ValueToArray(NativeToBig<int>((query_.numwant ? static_cast<int>(query_.numwant.value()) : -1)), &announce_req_[92]);
-    ValueToArray(NativeToBig(static_cast<uint16_t>((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0))), &announce_req_[96]);
+    //    ValueToArray(NativeToBig(static_cast<uint16_t>((query_.trackerid ? std::stoi(query_.trackerid.value()) : 0))),
+    //    &announce_req_[96]);
+    ValueToArray(NativeToBig(static_cast<uint16_t>(tracker_.GetPort())), &announce_req_[96]);
 }

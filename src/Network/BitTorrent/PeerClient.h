@@ -53,11 +53,11 @@ namespace network {
         explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, bittorrent::Peer slave_peer,
             const boost::asio::strand<typename boost::asio::io_service::executor_type> &executor);
 
-        explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, ba::ip::tcp::socket socket, uint8_t *handshake_ptr);
+        explicit PeerClient(std::shared_ptr<bittorrent::MasterPeer> const &master_peer, ba::ip::tcp::socket socket);
 
         ~PeerClient();
 
-        void Process();
+        void Process(uint8_t *handshake_ptr, size_t size);
 
         void Disconnect();
 
@@ -106,7 +106,7 @@ namespace network {
     private:
         bool check_handshake(const RecvPeerData &) const;
 
-        void verify_handshake();
+        void verify_handshake(std::vector<uint8_t> v);
 
         void access();
 

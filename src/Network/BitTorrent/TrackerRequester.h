@@ -35,7 +35,7 @@ namespace network {
 
         TrackerRequester(TrackerRequester &&) = delete;
 
-        bool IsReady() const;
+        [[nodiscard]] bool IsReady() const;
 
         virtual void Connect(const bittorrent::Query &query) = 0;
 
