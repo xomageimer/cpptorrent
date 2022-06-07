@@ -31,7 +31,7 @@ namespace dht {
 
         [[nodiscard]] boost::asio::io_service & GetService() const { return service_; }
 
-    private:
+//    private:
         bool try_to_split();
 
         dht::Node & master_;

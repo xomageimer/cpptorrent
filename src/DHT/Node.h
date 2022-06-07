@@ -32,6 +32,8 @@ namespace dht {
 
         std::filesystem::path cash_path{std::filesystem::current_path() / "cash"};
 
+        size_t weight = 0;
+
         size_t raznica = 0;
         // boost::asio::ip::udp::endpoint endpoint{boost::asio::ip::address::from_string("127.0.0.1"), 2889};
         // TODO тут мб надо еще и данные пользователя!
@@ -41,6 +43,17 @@ namespace dht {
     public:
         using rpc_type = std::shared_ptr<network::KRPCQuery>;
         explicit MasterNode(boost::asio::io_service &serv, size_t thread_num = 1);
+
+        MasterNode(MasterNode && mv) noexcept {
+            id = mv.id;
+            id_sha1 = mv.id_sha1;
+            ip = mv.ip;
+            port = mv.port;
+            weight = mv.weight;
+            raznica = mv.raznica;
+            cash_path = mv.cash_path;
+            route_table_ = std::move(mv.route_table_);
+        }
 
         void AddRPC(rpc_type);
 
@@ -52,7 +65,7 @@ namespace dht {
 
         boost::asio::io_service & GetService();
 
-    private:
+//    private:
         friend struct RouteTable;
         std::shared_ptr<struct RouteTable> route_table_;
         AsyncWorker a_worker_;

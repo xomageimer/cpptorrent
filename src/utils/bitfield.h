@@ -57,7 +57,7 @@ public:
 
     friend bool operator!=(const Bitfield &lhs, const Bitfield &rhs);
 
-private:
+//private:
     boost::dynamic_bitset<uint8_t> bits_;
 };
 

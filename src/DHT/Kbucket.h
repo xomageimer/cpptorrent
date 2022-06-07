@@ -58,7 +58,7 @@ namespace dht {
         };
         [[nodiscard]] Access GetOrigin() const;
 
-    private:
+//    private:
         size_t update_nodes();
 
         void update_time();

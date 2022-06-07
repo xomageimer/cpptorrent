@@ -16,6 +16,7 @@ std::string BytesToHumanReadable(uint32_t bytes);
 double long BytesToGiga(long long bytes);
 unsigned long long GigaToBytes(long double gigabytes);
 unsigned char ReverseByte(unsigned char b);
+int64_t bytesToInt64(uint8_t * bytes, size_t size);
 
 template <typename T> struct endian_changer {
     static_assert(CHAR_BIT == bittorrent_constants::byte_size, "CHAR_BIT != 8");

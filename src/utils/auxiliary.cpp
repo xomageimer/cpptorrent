@@ -120,3 +120,12 @@ unsigned char ReverseByte(unsigned char b) {
     b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
     return b;
 }
+
+int64_t bytesToInt64(uint8_t * bytes, size_t size) {
+    uint64_t v = 0;
+    for (size_t i = 0; i < std::min(size, (size_t)8); i++){
+        v <<= 8;
+        v |= bytes[i];
+    }
+    return (int64_t) v;
+}
